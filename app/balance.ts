@@ -117,6 +117,22 @@ export function enhancementFailureLevel(currentLevel: number) {
   return currentLevel <= 10 ? currentLevel : currentLevel - 1;
 }
 
+export function equipmentReforgeCost(completedAttempts: number, targeted = false) {
+  const rules = balanceConfig.economy.costs.reforge;
+  const requestedAttempts = Number(completedAttempts);
+  const attempts = Number.isFinite(requestedAttempts)
+    ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(requestedAttempts)))
+    : 0;
+  const baseGold = targeted ? rules.targetedGold : rules.baseGold;
+  const baseStones = targeted ? rules.targetedStones : rules.baseStones;
+  const maxMultiplier = Math.floor(Number.MAX_SAFE_INTEGER / rules.targetedGold);
+  const multiplier = Math.min(maxMultiplier, rules.repeatMultiplier ** attempts);
+  return {
+    gold: Math.ceil(baseGold * multiplier),
+    stones: Math.ceil(baseStones * multiplier),
+  };
+}
+
 export function gamblePackageReward(roll: number) {
   const normalizedRoll = Math.min(0.999999, Math.max(0, roll));
   if (normalizedRoll < 0.4) return { type: "equipment" as const, qualityIndex: 3 as const };
