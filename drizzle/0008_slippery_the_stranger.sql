@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `login_id` text DEFAULT '' NOT NULL;

@@ -1,0 +1,69 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787928157143,
+      "tag": "0000_rich_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788340173331,
+      "tag": "0001_boring_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788340173332,
+      "tag": "0002_reset_legacy_game_saves",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788341985772,
+      "tag": "0003_ambitious_dormammu",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788352010274,
+      "tag": "0004_far_fabian_cortez",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788836559799,
+      "tag": "0005_thankful_madame_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788908699739,
+      "tag": "0006_peaceful_xorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788909358047,
+      "tag": "0007_blue_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789354434281,
+      "tag": "0008_slippery_the_stranger",
+      "breakpoints": true
+    }
+  ]
+}
