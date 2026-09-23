@@ -19,7 +19,7 @@ const vite = await createServer({
   root: new URL("..", import.meta.url).pathname,
   server: { middlewareMode: true },
 });
-const { dropPowerRange, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
+const { dropPowerRange, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, equipmentReforgeCost, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
   "/app/balance.ts",
 );
 const { balanceConfig } = await vite.ssrLoadModule("/app/balance-config.ts");
@@ -101,6 +101,18 @@ test("keeps reforge open for repeated rolls", () => {
   );
   assert.doesNotMatch(reforgeBody, /setReforgeOpen\(false\)/);
   assert.match(reforgeBody, /可繼續洗鍊/);
+});
+
+test("increases both reforge modes by the same per-item attempt multiplier", () => {
+  assert.deepEqual(equipmentReforgeCost(0, false), { gold: 600, stones: 1 });
+  assert.deepEqual(equipmentReforgeCost(1, false), { gold: 900, stones: 2 });
+  assert.deepEqual(equipmentReforgeCost(2, false), { gold: 1350, stones: 3 });
+  assert.deepEqual(equipmentReforgeCost(0, true), { gold: 1800, stones: 3 });
+  assert.deepEqual(equipmentReforgeCost(1, true), { gold: 2700, stones: 5 });
+  assert.deepEqual(equipmentReforgeCost(2, true), { gold: 4050, stones: 7 });
+  assert.match(page, /reforgeCount: Math\.min\(Number\.MAX_SAFE_INTEGER, Math\.max\(0, Math\.floor\(Number\(item\.reforgeCount \?\? 0\) \|\| 0\)\)\)/);
+  assert.match(page, /reforgeCount: Math\.min\(Number\.MAX_SAFE_INTEGER, currentReforgeCount \+ 1\)/);
+  assert.match(page, /兩種方式共用這件裝備的累計次數/);
 });
 
 test("blocks players during maintenance while preserving GM access", () => {
