@@ -290,7 +290,7 @@ export const balanceConfig = {
       socketSecond: 200_000,
       gemFusionBeginner: 10_000,
       gemFusionIntermediate: 50_000,
-      reforge: { baseGold: 600, baseStones: 1, targetedGold: 1_800, targetedStones: 3, repeatMultiplier: 1 },
+      reforge: { baseGold: 600, baseStones: 1, targetedGold: 1_800, targetedStones: 3, repeatMultiplier: 1.25 },
       rerollBase: 5_000,
       affixLockFirst: 50_000,
       affixLockSecond: 150_000,
