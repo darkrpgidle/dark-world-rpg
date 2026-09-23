@@ -95,6 +95,7 @@ import {
   enhancementStoneDismantleYield,
   enhancementStoneDropChance,
   enhancementStoneCost,
+  equipmentReforgeCost,
   evadeChanceFromRatings,
   gamblePackageReward,
   healthFromPercent,
@@ -169,6 +170,7 @@ type Item = (typeof initialItems)[number] & {
   legendaryId?: string;
   artKey?: string;
   affixSchemaVersion?: number;
+  reforgeCount?: number;
   locked?: boolean;
   sockets?: EquipmentSockets;
 };
@@ -1554,6 +1556,7 @@ function normalizeSceneItem(item: Item): Item {
           ? "特殊傳奇" as const
           : "場景普通裝備" as const,
     affixSchemaVersion: 7,
+    reforgeCount: Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(item.reforgeCount ?? 0) || 0))),
   };
   const maxAffixes = MAX_AFFIXES_BY_QUALITY[Math.max(0, qualityOrder.indexOf(normalized.quality))] ?? 0;
   const cleanAffixes = (item.affixes ?? [])
@@ -2351,6 +2354,9 @@ function Game({
   const experienceProgress =
     level >= 100 ? 100 : Math.min(100, (exp / requiredExperience) * 100);
   const currentItem = items[selectedItem] ?? null;
+  const currentReforgeCount = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(currentItem?.reforgeCount ?? 0) || 0)));
+  const normalReforgeCost = equipmentReforgeCost(currentReforgeCount, false);
+  const targetedReforgeCost = equipmentReforgeCost(currentReforgeCount, true);
   const equipped = loadouts[activeLoadout];
   const bagItems = items.filter((item) => !equipped.includes(item.id));
   const defensiveSlots = new Set(["頭盔", "胸甲", "手套", "鞋子", "腰帶", "護腕", "披風"]);
@@ -4943,8 +4949,7 @@ function Game({
     if (!currentItem) return;
     if (targeted && targetedAffix === null)
       return toast.info("請先點選要定向替換的詞綴");
-    const stoneNeed = targeted ? 3 : 1,
-      goldNeed = targeted ? 1800 : 600;
+    const { stones: stoneNeed, gold: goldNeed } = equipmentReforgeCost(currentReforgeCount, targeted);
     if (reforgeStones < stoneNeed || gold < goldNeed)
       return toast.error("洗鍊資源不足", {
         description: `需要 ${goldNeed.toLocaleString()} 金幣與 ${stoneNeed} 顆洗鍊石`,
@@ -4965,6 +4970,7 @@ function Game({
               ...item,
               affixes: nextAffixes,
               affixSchemaVersion: 7,
+              reforgeCount: Math.min(Number.MAX_SAFE_INTEGER, currentReforgeCount + 1),
             }
           : item,
       ),
@@ -6196,7 +6202,7 @@ function Game({
           <DialogHeader>
             <DialogTitle>裝備洗鍊</DialogTitle>
             <DialogDescription>
-              一般洗鍊會重置全部詞綴；定向洗鍊只替換你指定的一條。
+              一般洗鍊會重置全部詞綴；定向洗鍊只替換指定詞綴。兩種方式共用這件裝備的累計次數，每次成功洗鍊後，下次費用提高 1.5 倍。
             </DialogDescription>
           </DialogHeader>
           {currentItem && (
@@ -6237,7 +6243,7 @@ function Game({
                   onClick={() => reforge(false)}
                 >
                   <RefreshCw />
-                  一般洗鍊<small>600 金幣＋1 洗鍊石</small>
+                  一般洗鍊<small>{normalReforgeCost.gold.toLocaleString()} 金幣＋{normalReforgeCost.stones} 洗鍊石（第 {currentReforgeCount + 1} 次）</small>
                 </button>
                 {reforgeMode === "idle" ? (
                   <button
@@ -6254,7 +6260,7 @@ function Game({
                     onClick={() => reforge(true)}
                   >
                     <Sparkles />
-                    確認定向洗鍊<small>1,800 金幣＋3 洗鍊石</small>
+                    確認定向洗鍊<small>{targetedReforgeCost.gold.toLocaleString()} 金幣＋{targetedReforgeCost.stones} 洗鍊石（第 {currentReforgeCount + 1} 次）</small>
                   </button>
                 )}
               </div>
