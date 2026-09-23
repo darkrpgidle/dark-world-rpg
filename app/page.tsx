@@ -6202,7 +6202,7 @@ function Game({
           <DialogHeader>
             <DialogTitle>裝備洗鍊</DialogTitle>
             <DialogDescription>
-              一般洗鍊會重置全部詞綴；定向洗鍊只替換指定詞綴。兩種方式共用這件裝備的累計次數，費用固定，不會隨洗鍊次數增加。
+              一般洗鍊會重置全部詞綴；定向洗鍊只替換指定詞綴。兩種方式共用這件裝備的累計次數，每次洗鍊後費用增加 1.25 倍，金幣與洗鍊石數量皆向上取整。
             </DialogDescription>
           </DialogHeader>
           {currentItem && (
