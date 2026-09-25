@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebGLSpriteLayer } from "./webgl-sprite-layer";
 
 type Anchor = {
   x: number;
@@ -138,7 +139,16 @@ export function RangerDeadlyMarkVfx({
 
   return (
     <div ref={overlayRef} className="ranger-deadly-mark-vfx" aria-hidden="true">
-      {anchor && assetsReady && opacity > 0 && (
+      <WebGLSpriteLayer
+        sprites={anchor && assetsReady && opacity > 0 ? [{
+          source: src,
+          x: anchor.x + driftX,
+          y: anchor.y + driftY,
+          width: size * smokeScale,
+          height: size * smokeScale,
+          opacity: smokeOpacity,
+        }] : []}
+        fallback={anchor && assetsReady && opacity > 0 && (
         <img
           className="ranger-deadly-mark-frame"
           src={src}
@@ -153,6 +163,7 @@ export function RangerDeadlyMarkVfx({
           }}
         />
       )}
+      />
     </div>
   );
 }

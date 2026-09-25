@@ -125,12 +125,14 @@ import {
   type GemStack,
   type SocketedGem,
 } from "./gem-system";
-import { SkillEffectCanvas } from "./skill-effect-canvas";
+import { WebGLSkillEffectCanvas as SkillEffectCanvas } from "./webgl-skill-effect-canvas";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
-import { MythicSkillVfx, type MythicVfxPhase } from "./mythic-skill-vfx";
-import { DeepAbyssBossVfx } from "./deep-abyss-boss-vfx";
+import { WebGLMythicSkillVfx as MythicSkillVfx } from "./webgl-mythic-skill-vfx";
+import type { MythicVfxPhase } from "./mythic-skill-vfx";
+import { WebGLDeepAbyssBossVfx as DeepAbyssBossVfx } from "./webgl-deep-abyss-boss-vfx";
+import { WebGLSpriteLayer } from "./webgl-sprite-layer";
 import { AdminMonitor } from "./admin-panels";
 import { MAINTENANCE_MESSAGE, MAINTENANCE_MODE } from "./maintenance";
 import {
@@ -310,15 +312,35 @@ function appearanceVfxPath(id: AppearanceId) {
 function CharacterAppearanceVfx({ id, className = "" }: { id: AppearanceId; className?: string }) {
   const wingSet = appearanceVfxPath(id);
   const [frame, setFrame] = useState(0);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const [size, setSize] = useState({ width: 178, height: 270 });
   useEffect(() => {
     if (!wingSet) return;
     setFrame(0);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(() => setFrame((current) => (current + 1) % 6), 180);
     return () => window.clearInterval(timer);
   }, [wingSet]);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const observer = new ResizeObserver(() => {
+      const rect = root.getBoundingClientRect();
+      setSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [wingSet]);
   if (!wingSet) return null;
   const src = `/vfx/appearance-wings/${wingSet}/frame-${String(frame).padStart(2, "0")}.png`;
-  return <span className={`character-appearance-vfx ${className}`} aria-hidden="true"><img className="character-appearance-frame" src={src} alt="" /></span>;
+  const combat = className.includes("combat-frame-wings");
+  return <span ref={rootRef} className={`character-appearance-vfx ${className}`} aria-hidden="true">
+    <WebGLSpriteLayer
+      sprites={[{ source: src, x: size.width / 2, y: size.height / 2,
+        width: size.width * (combat ? 1.82 : 1), height: size.height * (combat ? 1.03 : 1) }]}
+      fallback={<img className="character-appearance-frame" src={src} alt="" />}
+    />
+  </span>;
 }
 
 function accountCharacterKey(account: string) {

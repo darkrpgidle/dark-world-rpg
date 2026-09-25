@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebGLSpriteLayer, type WebGLSprite } from "./webgl-sprite-layer";
 
 type Anchor = {
   playerX: number;
@@ -109,10 +110,32 @@ export function RangerWindVolleyVfx({ effectKey, shotCount = 5 }: { effectKey: n
   const srcForCharge = `/vfx/wind-volley/charge/frame-${String(chargeFrame).padStart(2, "0")}.png`;
   const distance = anchor ? Math.max(1, anchor.enemyX - anchor.playerX) : 1;
   const chargeSize = anchor ? Math.max(anchor.playerWidth * 0.9, anchor.playerHeight * 0.48) : 0;
+  const sprites: WebGLSprite[] = anchor ? [
+    { source: srcForCharge, x: anchor.playerX, y: anchor.playerY - anchor.playerHeight * 0.06, width: chargeSize, height: chargeSize, opacity: chargeOpacity },
+    ...shotStarts.flatMap((shotStart, shotIndex) => {
+      const shotElapsed = elapsed - shotStart;
+      if (shotElapsed < 0 || shotElapsed >= SHOT_DURATION) return [];
+      const shotFrame = frameAt(shotElapsed);
+      const progress = Math.min(1, Math.max(0, shotElapsed / 240));
+      const travel = 1 - Math.pow(1 - progress, 3);
+      const targetY = anchor.enemyY + anchor.enemyHeight * (0.3 - (shotIndex / Math.max(1, shotCount - 1)) * 0.6);
+      const size = shotFrame < 2
+        ? Math.max(anchor.playerWidth * 0.46, distance * (shotFrame === 0 ? 0.34 : 0.62))
+        : Math.max(anchor.enemyWidth, anchor.enemyHeight) * (shotFrame === 2 ? 0.55 : 0.72);
+      return [{
+        source: `/vfx/wind-volley/arrow/frame-${String(shotFrame).padStart(2, "0")}.png`,
+        x: anchor.playerX + distance * (shotFrame < 2 ? Math.max(0.05, travel) : 1),
+        y: anchor.playerY + (targetY - anchor.playerY) * Math.min(1, travel),
+        width: size,
+        height: size,
+        opacity: shotOpacity(shotElapsed),
+      }];
+    }),
+  ] : [];
 
   return (
     <div ref={overlayRef} className="ranger-wind-volley-vfx" aria-hidden="true">
-      {anchor && (
+      <WebGLSpriteLayer sprites={sprites} fallback={<>{anchor && (
         <img
           className="ranger-wind-volley-charge"
           src={srcForCharge}
@@ -141,7 +164,7 @@ export function RangerWindVolleyVfx({ effectKey, shotCount = 5 }: { effectKey: n
             style={{ left: x, top: y, width: size, height: size, opacity: shotOpacity(shotElapsed) }}
           />
         ) : null;
-      })}
+      })}</>} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebGLSpriteLayer } from "./webgl-sprite-layer";
 
 type Anchor = {
   playerX: number;
@@ -107,7 +108,10 @@ export function RangerPiercingArrowVfx({ effectKey }: { effectKey: number }) {
   const src = `/vfx/piercing-arrow/variant-${VARIANTS[variant]}/frame-${String(frame).padStart(2, "0")}.png`;
   return (
     <div ref={overlayRef} className="ranger-piercing-arrow-vfx" aria-hidden="true">
-      {anchor && opacity > 0 && <img key={`${effectKey}-${variant}-${frame}`} className="ranger-piercing-arrow-frame" src={src} alt="" style={{ left, top, width: size, height: size, opacity }} />}
+      <WebGLSpriteLayer
+        sprites={anchor && opacity > 0 ? [{ source: src, x: left, y: top, width: size, height: size, opacity }] : []}
+        fallback={anchor && opacity > 0 && <img key={`${effectKey}-${variant}-${frame}`} className="ranger-piercing-arrow-frame" src={src} alt="" style={{ left, top, width: size, height: size, opacity }} />}
+      />
     </div>
   );
 }
