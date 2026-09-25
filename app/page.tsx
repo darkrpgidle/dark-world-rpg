@@ -944,7 +944,9 @@ function itemSetAccent(item: Item) {
 
 function gemEffectLabel(definition: ReturnType<typeof getGemDefinition>) {
   const stat = definition.stat.replace(/%$/, "");
-  return `${stat} +${definition.value}${definition.stat.endsWith("%") ? "%" : ""}`;
+  const percentageStats = ["吸血", "經驗", "金幣"];
+  const isPercentage = definition.stat.endsWith("%") || percentageStats.includes(stat);
+  return `${stat} +${definition.value}${isPercentage ? "%" : ""}`;
 }
 
 function EquipmentIcon({ item, className = "" }: { item: Item; className?: string }) {
