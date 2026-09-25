@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebGLSpriteLayer } from "./webgl-sprite-layer";
 
 const FRAME_COUNT = 8;
 const FRAME_DURATION_MS = 100;
@@ -16,6 +17,7 @@ export function BloodRoarBuffVfx({ active }: { active: boolean }) {
       return;
     }
 
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(
       () => setFrame((current) => (current + 1) % FRAME_COUNT),
       FRAME_DURATION_MS,
@@ -61,8 +63,13 @@ export function BloodRoarBuffVfx({ active }: { active: boolean }) {
         height: `${bounds.height}px`,
         left: `${bounds.left}px`,
         top: `${bounds.top}px`,
-        backgroundImage: `url(/vfx/blood-roar-border/blood-roar-border-frame-${String(frame).padStart(2, "0")}.png)`,
       }}
-    />
+    >
+      <WebGLSpriteLayer
+        sprites={[{ source: `/vfx/blood-roar-border/blood-roar-border-frame-${String(frame).padStart(2, "0")}.png`,
+          x: bounds.width / 2, y: bounds.height / 2, width: bounds.width, height: bounds.height }]}
+        fallback={<span className="blood-roar-buff-fallback" style={{ backgroundImage: `url(/vfx/blood-roar-border/blood-roar-border-frame-${String(frame).padStart(2, "0")}.png)` }} />}
+      />
+    </span>
   );
 }
