@@ -40,6 +40,11 @@ export async function GET() {
         power: Number(item.power ?? 0),
         mapId: Number(item.mapId ?? 0),
         affixes: Array.isArray(item.affixes) ? item.affixes.map(String).slice(0, 8) : [],
+        prefixId: typeof item.prefixId === "string" ? item.prefixId : undefined,
+        suffixId: typeof item.suffixId === "string" ? item.suffixId : undefined,
+        mythicId: typeof item.mythicId === "string" ? item.mythicId : undefined,
+        legendaryId: typeof item.legendaryId === "string" ? item.legendaryId : undefined,
+        artKey: typeof item.artKey === "string" ? item.artKey : undefined,
       }));
     const loadoutOne = Array.isArray(save.loadouts?.["1"]) ? save.loadouts["1"] : [];
     const loadoutTwo = Array.isArray(save.loadouts?.["2"]) ? save.loadouts["2"] : [];

@@ -131,6 +131,7 @@ import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
 import { MythicSkillVfx, type MythicVfxPhase } from "./mythic-skill-vfx";
 import { DeepAbyssBossVfx } from "./deep-abyss-boss-vfx";
+import { amplifyEquipmentStat, epithetDisplayName, equippedEpithetBonuses, getItemEpithets, hasEquippedEpithet, normalizeItemEpithets, rollItemEpithets } from "./equipment-epithets";
 import { AdminMonitor } from "./admin-panels";
 import { MAINTENANCE_MESSAGE, MAINTENANCE_MODE } from "./maintenance";
 import {
@@ -173,6 +174,8 @@ type Item = (typeof initialItems)[number] & {
   reforgeCount?: number;
   locked?: boolean;
   sockets?: EquipmentSockets;
+  prefixId?: string;
+  suffixId?: string;
 };
 type EquipmentStatName =
   | "生命"
@@ -477,7 +480,8 @@ function createCatalogItem(
     affixes: [],
     sockets: createEquipmentSockets(),
   };
-  return { ...item, affixes: rollAffixes(item) };
+  const affixes = rollAffixes(item);
+  return { ...item, affixes, ...rollItemEpithets({ ...item, affixes }) };
 }
 
 function rollCatalogDrop(
@@ -781,7 +785,8 @@ function createDrop(
     set: isSetItem ? map.set : "",
     affixes: [],
   };
-  return { ...item, affixes: rollAffixes(item) };
+  const affixes = rollAffixes(item);
+  return { ...item, affixes, ...rollItemEpithets({ ...item, affixes }) };
 }
 
 function createGambleReward(mapId: number, roll: number, sequence = 0) {
@@ -796,9 +801,11 @@ function createGambleReward(mapId: number, roll: number, sequence = 0) {
     quality,
     equipmentType: qualityIndex === 5 ? "神話裝備" as const : "場景普通裝備" as const,
   };
+  const affixes = rollAffixes(upgraded);
   return { type: "equipment" as const, item: {
     ...upgraded,
-    affixes: rollAffixes(upgraded),
+    affixes,
+    ...rollItemEpithets({ ...upgraded, affixes }),
   } };
 }
 
@@ -845,11 +852,13 @@ function equipmentBaseStats(item: Item, enhanceLevel = item.enhance): EquipmentS
   const qualityMultiplier = balanceConfig.equipment.baseQualityMultipliers[qualityRank] ?? 1;
   return (baseBySlot[item.slot] ?? baseBySlot.武器).map(([name, base, growth]) => {
     const setMultiplier = item.set ? 1.15 : 1;
-    const original = Math.round((base + mapId * growth) * scale * qualityMultiplier * setMultiplier);
+    const rawBase = Math.round((base + mapId * growth) * scale * qualityMultiplier * setMultiplier);
+    const original = amplifyEquipmentStat(item, name, rawBase, "base");
     return {
     name,
     original,
-    value: Math.round(original * (1 + bonus / 100)),
+    // The epithet increases this item's inherent stat; enhancement keeps its original scaling.
+    value: Math.round(rawBase * (1 + bonus / 100)) + (original - rawBase),
   }; });
 }
 
@@ -904,9 +913,21 @@ function equipmentCombatRating(item: Item) {
   };
 
   for (const stat of equipmentBaseStats(item)) addStat(stat.name, stat.value, stat.percent);
-  for (const affix of item.affixes) {
-    addStat(affixName(affix), Number(affix.match(/\d+(?:\.\d+)?/)?.[0] ?? 0), affix.includes("%"));
+  for (const [index, affix] of item.affixes.entries()) {
+    const name = affixName(affix);
+    const value = Number(affix.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
+    addStat(name, index === 0 ? amplifyEquipmentStat(item, name, value, "core") : value, affix.includes("%"));
   }
+  const epithets = equippedEpithetBonuses([item]);
+  combat.hpPct += epithets.hpPct ?? 0;
+  combat.attackPct += epithets.attackPct ?? 0;
+  combat.defensePct += epithets.defensePct ?? 0;
+  combat.speed += epithets.speed ?? 0;
+  combat.hit += epithets.hit ?? 0;
+  combat.crit += epithets.crit ?? 0;
+  combat.critDamage += epithets.critDamage ?? 0;
+  combat.lifesteal += epithets.lifesteal ?? 0;
+  combat.skillDamage += epithets.skillDamage ?? 0;
   for (const [name, value] of Object.entries(getSocketStatBonus(item.sockets ?? { socketCount: 0, gems: [] }))) {
     addStat(name as EquipmentStatName, value, name.endsWith("%"));
   }
@@ -1153,9 +1174,10 @@ function calculateCharacterStats(
       if (stat.name === "資源掉落率") result.resourceDrop += stat.value;
       if (stat.name === "元寶掉率") result.yuanbaoDrop += stat.value;
     }
-    for (const affix of item.affixes) {
-      const value = Number(affix.match(/\d+/)?.[0] ?? 0);
+    for (const [index, affix] of item.affixes.entries()) {
+      const rawValue = Number(affix.match(/\d+/)?.[0] ?? 0);
       const name = affixName(affix);
+      const value = index === 0 ? amplifyEquipmentStat(item, name, rawValue, "core") : rawValue;
       if (name === "生命") result.hp += value;
       if (name === "生命%") result.hpPct += value;
       if (name === "攻擊") result.attack += value;
@@ -1203,6 +1225,10 @@ function calculateCharacterStats(
   result.crit += skill.crit;
   result.lifesteal += skill.lifesteal;
   const catalog = catalogBonus(gear);
+  const epithetBonus = equippedEpithetBonuses(gear);
+  for (const [key, value] of Object.entries(epithetBonus)) {
+    if (key in result) (result as Record<string, number>)[key] += value;
+  }
   result.hpPct += catalog.hpPct ?? 0;
   result.attackPct += catalog.attackPct ?? 0;
   result.defensePct += catalog.defensePct ?? 0;
@@ -1516,6 +1542,25 @@ function displayAffix(affix: string) {
   return `${labels[name] ?? name} +${value}${affix.includes("%") || name === "攻速" || name.endsWith("%") ? "%" : ""}`;
 }
 
+function amplifiedAffix(item: Item, affix: string, index: number) {
+  if (index !== 0) return affix;
+  const name = affixName(affix);
+  const raw = Number(affix.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
+  const value = amplifyEquipmentStat(item, name, raw, "core");
+  return value === raw ? affix : affix.replace(/\d+(?:\.\d+)?/, String(value));
+}
+
+function EquipmentName({ item }: { item: Item }) {
+  const adjective = epithetDisplayName(item);
+  return <>{adjective && <span className="equipment-epithet">{adjective}的</span>}<span className="equipment-base-name">{item.name}</span></>;
+}
+
+function EquipmentEpithetDetails({ item }: { item: Item }) {
+  const { prefix, suffix } = getItemEpithets(item);
+  if (!prefix && !suffix) return null;
+  return <div className="equipment-epithet-details"><strong>特殊前後綴</strong>{[prefix, suffix].filter((effect) => effect !== undefined).map((effect) => <div key={effect.id}><b>{effect.name}</b>：{effect.description}</div>)}{["chase", "charge"].includes(suffix?.id ?? "") && <small>觸發型效果未計入靜態戰力評級。</small>}</div>;
+}
+
 function affixRange(item: Item, affix: string) {
   return affixOptions(item).find((roll) => roll.name === affixName(affix));
 }
@@ -1573,11 +1618,11 @@ function normalizeSceneItem(item: Item): Item {
     });
   // 洗鍊允許同一種詞綴重複出現；正規化只能清理非法／超出區間的數值，
   // 不可依詞綴名稱去重，否則重新登入或下一次存檔會吃掉合法的重複詞綴。
-  return {
+  return normalizeItemEpithets({
     ...normalized,
     affixes: cleanAffixes.slice(0, maxAffixes),
     sockets: normalizeEquipmentSockets(item.sockets),
-  };
+  });
 }
 
 function rollAffixes(item: Item) {
@@ -1651,7 +1696,7 @@ function GearTooltip({
         {item.equipmentType ?? "場景普通裝備"}
       </span>
       <h4>
-        {item.set && <span className="set-name-prefix">【{item.set}】</span>} {item.name} {item.enhance > 0 && `+${item.enhance}`}
+        {item.set && <span className="set-name-prefix">【{item.set}】</span>} <EquipmentName item={item} /> {item.enhance > 0 && `+${item.enhance}`}
       </h4>
       <b>裝備評級 {equipmentDisplayRating(item).toLocaleString()}</b>
       <div className="gear-base-stats">
@@ -1672,11 +1717,12 @@ function GearTooltip({
       <ul className="gear-affixes">
         {item.affixes.map((affix, index) => (
           <li key={`${affix}-${index}`}>
-            <span>{displayAffix(affix)}</span>
-            <small>{affixRangeLabel(item, affix)}</small>
+            <span>{displayAffix(amplifiedAffix(item, affix, index))}</span>
+            <small>{amplifiedAffix(item, affix, index) !== affix ? `前後綴放大・原 ${affix}` : affixRangeLabel(item, affix)}</small>
           </li>
         ))}
       </ul>
+      <EquipmentEpithetDetails item={item} />
       {catalogDefinition && (
         <>
           <div className="catalog-story">
@@ -2456,7 +2502,7 @@ function Game({
       (hasBlessing("stat-lifesteal") ? 8 : 0),
     bossDamage: baseCharacterStats.bossDamage + rebirthTalents.combatBoss * 5,
     damageReduction: baseCharacterStats.damageReduction + rebirthTalents.combatDamageReduction * 3,
-    equipmentDrop: rebirthTier * 5,
+    equipmentDrop: baseCharacterStats.equipmentDrop + rebirthTier * 5,
     expBonus: baseCharacterStats.expBonus + rebirthTier * 20,
     goldBonus: baseCharacterStats.goldBonus + rebirthTier * 20,
     enhanceDrop: rebirthTier * 20,
@@ -3277,6 +3323,8 @@ function Game({
     const salvaged = autoSalvage
       ? cleanLoot.filter((item) => {
           if (item.locked) return false;
+          // Named drops are always kept so a low combat rating cannot silently destroy them.
+          if (getItemEpithets(item).prefix || getItemEpithets(item).suffix) return false;
           // 神話與特殊傳奇是可組流派的核心裝備，不讓自動分解把它們吃掉。
           if (findEquipmentDefinition(item)) return false;
           if (autoSalvageQuality === "全分解") {
@@ -3494,6 +3542,7 @@ function Game({
             power: item.power + 38,
             affixes: rollAffixes({ ...item, quality }),
           };
+          item = { ...item, prefixId: undefined, suffixId: undefined, ...rollItemEpithets(item) };
         }
       }
       const drop = {
@@ -3811,6 +3860,7 @@ function Game({
     let magicShieldExplosionPending = false;
     let warriorAttackCount = 0;
     let playerAttackCount = 0;
+    let enemyAttackCount = 0;
     let fissureRemaining = 0;
     let fissureDetonationPending = false;
     const hasPerk = (id: string) => hasCatalogItem(equippedGear, id);
@@ -4016,7 +4066,10 @@ function Game({
             if (combatPerksRef.current.killBuffRemaining > 0)
               combatPerksRef.current.killBuffRemaining -= 1;
           }
-          if (playerActs) playerAttackCount += 1;
+          if (playerActs) {
+            playerAttackCount += 1;
+            enemyAttackCount += 1;
+          }
           const setTriggered =
             activeSetCount >= SET_RESONANCE_ATTACKS &&
             playerAttackCount % SET_RESONANCE_ATTACKS === 0;
@@ -4261,7 +4314,11 @@ function Game({
             playerDamageMultiplier:
               attackPerkMultiplier *
               (activeSetCount >= 2 ? 1.08 : 1) *
-              (fissureWasActive ? 1.3 : 1),
+              (fissureWasActive ? 1.3 : 1) *
+              (enemyAttackCount === 1 && hasEquippedEpithet(equippedGear, "chase") ? 1.1 : 1) *
+              (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGear, "charge")
+                ? (100 + characterStats.critDamage + 8) / (100 + characterStats.critDamage)
+                : 1),
           });
           const bossDamageMultiplier =
             currentWaveBoss || currentWaveGuardian || currentWaveElite
@@ -4591,6 +4648,7 @@ function Game({
                 yuanbao: yuanbaoGain,
               });
               setPlayerHp(100);
+              enemyAttackCount = 0;
               setCombatStatuses([]);
               defenseBreakRemaining = 0;
               markedRemaining = 0;
@@ -5543,11 +5601,13 @@ function Game({
             bossMarkMultiplier *
             bossExecutionDamageMultiplier *
             (activeSetCount >= 2 ? 1.08 : 1) *
-            (hasPerk("special-warhelm") && bossPlayerHpRef.current > 80 ? 1.1 : 1),
+            (hasPerk("special-warhelm") && bossPlayerHpRef.current > 80 ? 1.1 : 1) *
+            (bossPlayerAttackCount === 1 && hasEquippedEpithet(equippedGearRef.current, "chase") ? 1.1 : 1),
           skillTriggered: Boolean(bossSkill),
           defenseIgnore: bossDefenseIgnore,
           guaranteedCritical: bossGuaranteedCritical,
-          critDamageBonus: bossCritDamageBonus,
+          critDamageBonus: bossCritDamageBonus +
+            (bossPlayerAttackCount <= 3 && hasEquippedEpithet(equippedGearRef.current, "charge") ? 8 : 0),
           skillDamage:
             characterStats.skillDamage +
             (activeSetCount >= 8 ? 12 : 0) +
@@ -6215,7 +6275,7 @@ function Game({
                   <small style={{ color: qualityColors[currentItem.quality] }}>
                     {currentItem.quality} · {currentItem.slot}
                   </small>
-                  <b>{currentItem.name}</b>
+                   <b><EquipmentName item={currentItem} /></b>
                 </span>
               </div>
               <div
@@ -6305,7 +6365,7 @@ function Game({
                     <EquipmentIcon item={currentItem} className="reforge-equipment-art" />
                     <span>
                       <small style={{ color: qualityColors[currentItem.quality] }}>{currentItem.quality} · {currentItem.slot}</small>
-                      <b>{currentItem.name}</b>
+                       <b><EquipmentName item={currentItem} /></b>
                     </span>
                   </div>
                   <div className="socket-row">
@@ -6843,7 +6903,7 @@ function Game({
                             <i />
                             <EquipmentIcon item={drop.item} className="battle-equipment-art" />
                             <span>{drop.item.quality}</span>
-                            <b>{drop.item.name}</b>
+                             <b><EquipmentName item={drop.item} /></b>
                           </button>
                         ))}
                       </div>
@@ -7443,7 +7503,7 @@ function Game({
                         {currentItem.equipmentType ?? "場景普通裝備"}
                       </span>
                       <h3>
-                        {currentItem.set && <span className="set-name-prefix">【{currentItem.set}】</span>} {currentItem.name} <em>+{currentItem.enhance}</em>
+                         {currentItem.set && <span className="set-name-prefix">【{currentItem.set}】</span>} <EquipmentName item={currentItem} /> <em>+{currentItem.enhance}</em>
                       </h3>
                       <b>
                         裝備評級 {equipmentDisplayRating(currentItem).toLocaleString()}
@@ -7475,11 +7535,12 @@ function Game({
                       <ul className="detail-affixes">
                         {currentItem.affixes.map((a, index) => (
                           <li key={`${a}-${index}`}>
-                            <span>{a}</span>
-                            <small>{affixRangeLabel(currentItem, a)}</small>
+                             <span>{amplifiedAffix(currentItem, a, index)}</span>
+                             <small>{amplifiedAffix(currentItem, a, index) !== a ? `前後綴放大・原 ${a}` : affixRangeLabel(currentItem, a)}</small>
                           </li>
                         ))}
                       </ul>
+                      <EquipmentEpithetDetails item={currentItem} />
                       <div className="detail-sockets">
                         <strong>寶石孔位 {normalizeEquipmentSockets(currentItem.sockets).socketCount} / 2</strong>
                         <div>
@@ -8231,7 +8292,7 @@ function Ranking({
     highestFloor?: number;
     unlockedMapId?: number;
     mapBestFloors?: Record<string, number>;
-    equippedItems?: { id: number; name: string; slot: string; quality: string; enhance: number; set: string; power: number; mapId: number; affixes: string[] }[];
+    equippedItems?: { id: number; name: string; slot: string; quality: string; enhance: number; set: string; power: number; mapId: number; affixes: string[]; prefixId?: string; suffixId?: string; mythicId?: string; legendaryId?: string; artKey?: string }[];
     appearance?: AppearanceId;
   };
   const [ranks, setRanks] = useState<PublicRank[]>([]);
@@ -8254,7 +8315,7 @@ function Ranking({
   const rankItemToItem = (item: NonNullable<PublicRank["equippedItems"]>[number]) => ({
     ...item,
     mapId: item.mapId || 1,
-    equipmentType: "場景普通裝備" as const,
+    equipmentType: (item.mythicId ? "神話裝備" : item.legendaryId ? "特殊傳奇" : "場景普通裝備") as Item["equipmentType"],
   }) as Item;
   const rankNameClass = (name: string, podium = false) => {
     const prefix = podium ? "place-name" : "rank-name";
