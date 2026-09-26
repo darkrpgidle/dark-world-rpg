@@ -86,6 +86,16 @@ export function isValidSkillBuild(build: SkillBuild, characterClass: SkillClass,
   });
 }
 
+// New saves carry a separate optional skillReworkBuild field. Legacy skills are
+// kept by the caller until the full combat migration is ready.
+export function restoreSkillBuild(saved: unknown, characterClass: SkillClass, characterLevel: number): SkillBuild {
+  if (!saved || typeof saved !== "object" || !isValidSkillBuild(saved as SkillBuild, characterClass, characterLevel)) {
+    return createSkillBuild();
+  }
+  const build = saved as SkillBuild;
+  return { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] as SkillSlots };
+}
+
 export function upgradeSkill(
   build: SkillBuild, characterClass: SkillClass, characterLevel: number, name: string,
 ): SkillBuild | null {
