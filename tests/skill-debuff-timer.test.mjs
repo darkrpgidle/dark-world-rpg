@@ -52,3 +52,19 @@ test("death clears status and reapplication after expiry starts a fresh tick clo
   assert.equal(fresh.state.burn.nextTickAt, 4500);
   assert.deepEqual(advanceEnemyDebuffs(clearEnemyDebuffs(), 10000).ticks, []);
 });
+
+test("ascended bleed bonus stays on one-second ticks, including settled ticks before refresh", () => {
+  let state = applyEnemyDebuff({}, { kind: "bleed", bleedDamageBonusPercent: 20 }, 0).state;
+  const refreshed = applyEnemyDebuff(state, { kind: "bleed" }, 1500);
+  assert.deepEqual(refreshed.ticks, [
+    { kind: "bleed", at: 1000, stacks: 1, bleedDamageBonusPercent: 20 },
+  ]);
+  assert.equal(refreshed.state.bleed.bleedDamageBonusPercent, 20);
+  assert.equal(refreshed.state.bleed.nextTickAt, 2000);
+  state = advanceEnemyDebuffs(refreshed.state, 4500);
+  assert.deepEqual(state.ticks, [2000, 3000, 4000].map((at) => ({
+    kind: "bleed", at, stacks: 2, bleedDamageBonusPercent: 20,
+  })));
+  assert.deepEqual(state.state, {});
+  assert.throws(() => applyEnemyDebuff({}, { kind: "burn", bleedDamageBonusPercent: 20 }, 0), RangeError);
+});
