@@ -221,7 +221,11 @@ export const balanceConfig = {
       naturalDropChance: { oneSocket: 0.08, twoSockets: 0.02 },
       drillingStoneDropChance: 0.0005,
     },
-    enhancement: { firstFivePerLevel: 3, nextFivePerLevel: 4, finalFivePerLevel: 5 },
+    enhancement: {
+      firstFourPerLevel: 3,
+      levelsFiveToNinePerLevel: 5,
+      levelTenPlusPerLevel: 10,
+    },
     enhancementAttempt: {
       goldCost: {
         base: 200,
