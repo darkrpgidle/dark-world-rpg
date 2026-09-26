@@ -7,6 +7,7 @@ import {
   enabledUltimate,
   equipActiveSkill,
   isValidSkillBuild,
+  restoreSkillBuild,
   spentSkillPoints,
   upgradeSkill,
 } from "../app/skill-rework.ts";
@@ -19,6 +20,17 @@ test("each class has the prescribed 8 active and 12 passive skills with unlocks"
     assert.equal(new Set(catalog.map((skill) => skill.name)).size, 20);
   }
   assert.deepEqual([1, 2, 49, 50, 100].map(earnedSkillPoints), [0, 1, 24, 25, 50]);
+});
+
+test("optional rework save restores valid builds and isolates malformed or legacy saves", () => {
+  assert.deepEqual(restoreSkillBuild(undefined, "法師", 50), createSkillBuild());
+  assert.deepEqual(restoreSkillBuild({ ranks: { 裂地斬: 1 }, activeSlots: ["裂地斬", null, null] }, "法師", 50), createSkillBuild());
+  assert.deepEqual(restoreSkillBuild({ ranks: { 霜火新星: 6 }, activeSlots: [null, null, null] }, "法師", 50), createSkillBuild());
+  const saved = { ranks: { 霜火新星: 2 }, activeSlots: ["霜火新星", null, null] };
+  const restored = restoreSkillBuild(saved, "法師", 50);
+  assert.deepEqual(restored, saved);
+  restored.ranks["霜火新星"] = 1;
+  assert.equal(saved.ranks["霜火新星"], 2);
 });
 
 test("one point buys one rank, with level, class, point and rank caps", () => {
