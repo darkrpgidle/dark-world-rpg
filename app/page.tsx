@@ -1260,6 +1260,13 @@ function equippedSetPieceCount(gear: Item[]) {
   );
 }
 
+function equippedSetAttackMultiplier(gear: Item[]) {
+  const twoPieceSetCount = maps.filter(
+    (map) => gear.filter((item) => item.set === map.set).length >= 2,
+  ).length;
+  return 1 + twoPieceSetCount * (SET_ATTACK_BONUS - 1);
+}
+
 function calculateCombatPower(
   playerClass: GameClass,
   level: number,
@@ -1272,7 +1279,7 @@ function calculateCombatPower(
     ["鋼鐵壁壘", "獵手本能", "魔力護盾"].includes(skill.name),
   );
   const current = calculateCharacterStats(playerClass, level, gear, statSkills);
-  const setAttackMultiplier = equippedSetPieceCount(gear) >= 2 ? SET_ATTACK_BONUS : 1;
+  const setAttackMultiplier = equippedSetAttackMultiplier(gear);
   const permanentAttackMultiplier = (1 + permanentBonuses.attack / 100) * setAttackMultiplier;
   const statPower =
     (current.hp - naked.hp) * 0.25 +
@@ -2509,13 +2516,15 @@ function Game({
     skills,
   );
   const activeSetCount = equippedSetPieceCount(equippedGear);
+  const activeSetAttackMultiplier = equippedSetAttackMultiplier(equippedGear);
+  const activeSetAttackBonusPct = Math.round((activeSetAttackMultiplier - 1) * 100);
   const characterStats = {
     ...baseCharacterStats,
     hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1)),
     attack: Math.round(
       baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) *
       (hasBlessing("stat-attack") ? 1.15 : 1) *
-      (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1),
+      activeSetAttackMultiplier,
     ),
     defense: Math.round(
       baseCharacterStats.defense *
@@ -2600,8 +2609,8 @@ function Game({
           ? `每次攻擊追加 ${SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害`
           : activeSetCount >= 4
             ? "離線收益 +10%"
-            : activeSetCount >= 2
-              ? `攻擊 +${Math.round((SET_ATTACK_BONUS - 1) * 100)}%`
+            : activeSetAttackBonusPct > 0
+              ? `攻擊 +${activeSetAttackBonusPct}%`
               : "尚未形成套裝共鳴";
   const monsterEvasionRating =
     evasionRules.monsterEvasionBase + mapId * evasionRules.monsterEvasionPerMap;
