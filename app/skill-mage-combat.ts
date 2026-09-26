@@ -14,12 +14,17 @@ import {
 } from "./skill-mage-rules";
 import { resolveMagePassiveAttack } from "./skill-mage-passives";
 import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
+import {
+  consumeMageSigilActiveCast, createMageSigilState, recordMageSigilStatuses,
+  transitionMageSigilTarget, type MageSigilState,
+} from "./skill-mage-sigil";
 
 export type MageCombat = {
   session: SkillCombatSession;
   build: SkillBuild;
   overload: MageOverloadState;
   shield: MageShieldState;
+  sigil: MageSigilState;
 };
 
 export function createMageCombat(build: SkillBuild, level: number): MageCombat {
@@ -28,6 +33,7 @@ export function createMageCombat(build: SkillBuild, level: number): MageCombat {
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
     overload: createMageOverload(),
     shield: createMageShieldState(),
+    sigil: createMageSigilState(),
   };
 }
 
@@ -37,6 +43,8 @@ export function transitionMageCombat(combat: MageCombat, boundary: CombatBoundar
     session: transitionCombatSession(combat.session, boundary),
     overload: boundary === "normal-kill" ? combat.overload : createMageOverload(),
     shield: boundary === "normal-kill" ? combat.shield : createMageShieldState(),
+    sigil: boundary === "normal-kill"
+      ? transitionMageSigilTarget(combat.sigil, false) : createMageSigilState(),
   };
 }
 
@@ -79,6 +87,7 @@ export type MageTurnResult = {
   abnormalKindsCounted: number;
   passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
   shieldAscensionDamageBonusPercent: number;
+  sigilAscensionStatusChancePoints: number;
 };
 
 export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageTurnResult | null {
@@ -112,7 +121,11 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const successfulHit = input.hits.some((hit) => hit.hit);
   // Check the enemy state before this cast applies any new status. Delayed
   // ticks are already settled and expired statuses are no longer counted.
+  const markActiveAtStart = Boolean(session.enemy.elementSigil);
   const targetHadSigil = session.enemy.elementSigil?.strength ?? 0;
+  const currentSigil = transitionMageSigilTarget(combat.sigil, markActiveAtStart);
+  // Consume a previously granted buff before this cast may grant a new one.
+  const sigilCast = consumeMageSigilActiveCast(currentSigil, isActive);
   const targetAbnormal = Boolean(session.enemy.burn || session.enemy.bleed
     || session.enemy.armorBreak || session.enemy.elementSigil);
   const conditionalDamageBonusPercent = input.skill === "虛空崩解" && targetAbnormal
@@ -138,7 +151,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     const chances = input.skill === "霜火新星"
       ? MAGE_ACTIVE_RULES.霜火新星.burnChance : MAGE_ACTIVE_RULES.隕星術.burnChance;
     burnChancePercent = Math.min(100, mageSkillRankValue(chances, rank)
-      + targetHadSigil + passive.activeStatusChancePoints);
+      + targetHadSigil + passive.activeStatusChancePoints + sigilCast.statusChancePoints);
     // A multi-segment cast receives one status roll per status category.
     if ((input.roll ?? Math.random)() * 100 < burnChancePercent) {
       statusApplications.push({ kind: "burn" });
@@ -156,6 +169,11 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  const sigil = recordMageSigilStatuses(sigilCast.state, {
+    hadCurrentSigil: markActiveAtStart,
+    appliedKinds: statusApplications.map((status) => status.kind),
+    newlyAppliedSigilAscended: input.skill === "元素蝕印" && input.ascended.has("元素蝕印"),
+  });
   if (passive.ultimateEnergyGain) {
     session = { ...session, charge: grantUltimateEnergy(session.charge, passive.ultimateEnergyGain) };
   }
@@ -184,7 +202,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
       : input.skill === "normal" ? [100] : [];
 
   return {
-    combat: { ...combat, session, overload, shield: shieldCast.state },
+    combat: { ...combat, session, overload, shield: shieldCast.state, sigil },
     damageSegmentPercents,
     totalDamagePercent: input.skill === "星界寂滅"
       ? mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank) : 0,
@@ -200,5 +218,6 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     abnormalKindsCounted: passive.abnormalCount,
     passiveDamageProcs,
     shieldAscensionDamageBonusPercent: shieldCast.activeDamageBonusPercent,
+    sigilAscensionStatusChancePoints: sigilCast.statusChancePoints,
   };
 }

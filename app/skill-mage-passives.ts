@@ -47,7 +47,9 @@ export function resolveMagePassiveAttack(build: SkillBuild, input: MagePassiveAt
 
   const statuses: StatusApplication[] = [];
   const normalBurnChance = value(build, "焰脈", "normalBurnChance");
-  if (input.kind === "normal" && hit && normalBurnChance > 0 && input.roll() * 100 < normalBurnChance) {
+  const markedBurnChance = normalBurnChance > 0
+    ? Math.min(100, normalBurnChance + (input.targetStatuses.elementSigil?.strength ?? 0)) : 0;
+  if (input.kind === "normal" && hit && markedBurnChance > 0 && input.roll() * 100 < markedBurnChance) {
     statuses.push({ kind: "burn" });
   }
 
