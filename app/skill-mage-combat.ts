@@ -73,6 +73,13 @@ export type MageTurnResult = {
   // These values describe potential damage for each original segment. The
   // actual hit/critical outcomes and HP reduction belong to the caller.
   damageSegmentPercents: number[];
+  // The caller resolves each ascension segment's own hit/crit, HP damage and
+  // VFX after the indicated original segment. These are not primary actions.
+  ascensionDamageEvents: {
+    id: "極炎霜爆" | "星環共鳴" | "天火墜星";
+    percent: number;
+    afterOriginalSegment: number;
+  }[];
   // Ultimate has a total multiplier, but its individual segments are unknown.
   totalDamagePercent: number;
   conditionalDamageBonusPercent: number;
@@ -122,6 +129,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   // Check the enemy state before this cast applies any new status. Delayed
   // ticks are already settled and expired statuses are no longer counted.
   const markActiveAtStart = Boolean(session.enemy.elementSigil);
+  const targetBurningAtStart = Boolean(session.enemy.burn);
   const targetHadSigil = session.enemy.elementSigil?.strength ?? 0;
   const currentSigil = transitionMageSigilTarget(combat.sigil, markActiveAtStart);
   // Consume a previously granted buff before this cast may grant a new one.
@@ -200,10 +208,28 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     : input.skill === "霜火新星" || input.skill === "隕星術" || input.skill === "虛空崩解"
       ? [mageSkillRankValue(MAGE_ACTIVE_RULES[input.skill].damage, rank)]
       : input.skill === "normal" ? [100] : [];
+  const ascensionDamageEvents: MageTurnResult["ascensionDamageEvents"] = [];
+  if (input.skill !== "normal" && input.ascended.has(input.skill)) {
+    if (input.skill === "霜火新星" && successfulHit && targetBurningAtStart) {
+      ascensionDamageEvents.push({
+        id: "極炎霜爆", percent: MAGE_ACTIVE_RULES.霜火新星.afterburstDamage, afterOriginalSegment: 1,
+      });
+    } else if (input.skill === "奧術飛彈" && input.hits.every((hit) => hit.hit)) {
+      ascensionDamageEvents.push({
+        id: "星環共鳴", percent: MAGE_ACTIVE_RULES.奧術飛彈.resonanceMissileDamage,
+        afterOriginalSegment: MAGE_ACTIVE_RULES.奧術飛彈.missiles,
+      });
+    } else if (input.skill === "隕星術" && successfulHit && targetBurningAtStart) {
+      ascensionDamageEvents.push({
+        id: "天火墜星", percent: MAGE_ACTIVE_RULES.隕星術.emberExplosionDamage, afterOriginalSegment: 1,
+      });
+    }
+  }
 
   return {
     combat: { ...combat, session, overload, shield: shieldCast.state, sigil },
     damageSegmentPercents,
+    ascensionDamageEvents,
     totalDamagePercent: input.skill === "星界寂滅"
       ? mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank) : 0,
     conditionalDamageBonusPercent,
