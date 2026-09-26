@@ -12,7 +12,7 @@ import {
   clearMageExhaustion, consumeMageOverload, createMageOverload,
   mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
-import { resolveMagePassiveAttack } from "./skill-mage-passives";
+import { countMageAbnormalKinds, resolveMagePassiveAttack } from "./skill-mage-passives";
 import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
 import {
   consumeMageSigilActiveCast, createMageSigilState, recordMageSigilStatuses,
@@ -83,6 +83,11 @@ export type MageTurnResult = {
   // Ultimate has a total multiplier, but its individual segments are unknown.
   totalDamagePercent: number;
   conditionalDamageBonusPercent: number;
+  voidAscensionDamageBonusPercent: number;
+  ultimateCollapseStacks: number;
+  // Applied only to the explicitly confirmed final original explosion, not
+  // to totalDamagePercent (individual ultimate multipliers are not defined).
+  finalExplosionDamageBonusPercent: number;
   burnChancePercent: number;
   statusApplications: StatusApplication[];
   dueTicks: ReturnType<typeof advanceCombatSession>["ticks"];
@@ -134,10 +139,23 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const currentSigil = transitionMageSigilTarget(combat.sigil, markActiveAtStart);
   // Consume a previously granted buff before this cast may grant a new one.
   const sigilCast = consumeMageSigilActiveCast(currentSigil, isActive);
-  const targetAbnormal = Boolean(session.enemy.burn || session.enemy.bleed
-    || session.enemy.armorBreak || session.enemy.elementSigil);
+  const distinctAbnormalKinds = countMageAbnormalKinds(session.enemy);
+  const targetAbnormal = distinctAbnormalKinds > 0;
   const conditionalDamageBonusPercent = input.skill === "虛空崩解" && targetAbnormal
     ? mageSkillRankValue(MAGE_ACTIVE_RULES.虛空崩解.damageBonusVsStatus, rank) : 0;
+  const voidAscensionDamageBonusPercent = input.skill === "虛空崩解"
+    && input.ascended.has("虛空崩解") && successfulHit
+    ? Math.min(distinctAbnormalKinds, MAGE_ACTIVE_RULES.虛空崩解.maxDistinctStatuses)
+      * MAGE_ACTIVE_RULES.虛空崩解.damagePerDistinctStatus : 0;
+  // The caller must identify the final original explosion. Without that
+  // signal, there is no safe way to distinguish a preceding hit from it.
+  const ultimateCollapseStacks = input.skill === "星界寂滅"
+    && input.ascended.has("星界寂滅") && input.finalExplosionConfirmed
+    ? Math.min(input.hits.slice(0, -1).filter((hit) => hit.hit).length,
+      MAGE_ACTIVE_RULES.星界寂滅.maxCollapseStacks) : 0;
+  const finalExplosionDamageBonusPercent = input.skill === "星界寂滅"
+    && input.finalExplosionConfirmed && input.hits.at(-1)?.hit
+    ? ultimateCollapseStacks * MAGE_ACTIVE_RULES.星界寂滅.finalExplosionDamagePerStack : 0;
   // Consume one of the three later active casts even on a miss or a status
   // cast; a normal attack never spends this buff.
   const shieldCast = consumeMageShieldActiveCast(combat.shield, isActive);
@@ -233,6 +251,9 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     totalDamagePercent: input.skill === "星界寂滅"
       ? mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank) : 0,
     conditionalDamageBonusPercent,
+    voidAscensionDamageBonusPercent,
+    ultimateCollapseStacks,
+    finalExplosionDamageBonusPercent,
     burnChancePercent,
     statusApplications,
     dueTicks: [...settled.ticks, ...action.ticks],
