@@ -6,7 +6,7 @@ import {
   trySkillProc,
   type SkillCombatSession, type StatusApplication,
 } from "./skill-combat-session";
-import type { PrimaryAttackEvent } from "./skill-combat-queue";
+import { recoverPrimaryAttackCharges, type PrimaryAttackEvent } from "./skill-combat-queue";
 import {
   RANGER_ACTIVE_RULES, activateRangerWindDomain, consumeRangerWindDomain,
   createRangerWindDomain, rangerSkillRankValue,
@@ -50,6 +50,8 @@ export type RangerTurnResult = {
   // Rain's total is defined, but its nine individual multipliers are not.
   totalDamagePercent: number;
   additionalArrowPercent: number;
+  additionalArrowEvents: { id: "風痕追獵" | "六重風葬"; percent: number }[];
+  attackChargeRecovered: number;
   skyMarks: number;
   mainArrowDamageBonusPercent: number;
   damageBonusPercent: number;
@@ -112,6 +114,13 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     kind: rule ? "skill" : "normal", hits: input.hits, successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  const snipeCrit = input.skill === "破星狙擊"
+    && input.ascended.has("破星狙擊")
+    && input.hits.some((hit) => hit.hit && hit.critical);
+  const attackChargeRecovered = snipeCrit ? RANGER_ACTIVE_RULES.破星狙擊.ascendedChargeRecovery : 0;
+  if (attackChargeRecovered) {
+    session = { ...session, charge: recoverPrimaryAttackCharges(session.charge, attackChargeRecovered) };
+  }
   const passiveDamageProcs: RangerTurnResult["passiveDamageProcs"] = [];
   for (const candidate of passive.damageCandidates) {
     const checked = trySkillProc(session, { id: candidate.id, kind: "damage", source: "primary", family: "passive" });
@@ -125,9 +134,16 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
       : input.skill === "normal" ? [100] : [];
   const totalDamagePercent = input.skill === "蒼穹箭雨"
     ? rangerSkillRankValue(RANGER_ACTIVE_RULES.蒼穹箭雨.totalDamage, rank) : 0;
-  const additionalArrowPercent = input.skill === "疾風連射"
+  const rapidSixthArrow = input.skill === "疾風連射"
     && input.ascended.has("疾風連射") && input.hits.every((hit) => hit.hit)
     ? RANGER_ACTIVE_RULES.疾風連射.sixthArrowDamage : 0;
+  const tailwindArrow = input.skill === "追風箭" && input.ascended.has("追風箭")
+    && input.hits.some((hit) => hit.hit && hit.critical)
+    ? RANGER_ACTIVE_RULES.追風箭.ascendedArrowDamage : 0;
+  const additionalArrowEvents: RangerTurnResult["additionalArrowEvents"] = [
+    ...(rapidSixthArrow ? [{ id: "六重風葬" as const, percent: rapidSixthArrow }] : []),
+    ...(tailwindArrow ? [{ id: "風痕追獵" as const, percent: tailwindArrow }] : []),
+  ];
   const skyMarks = input.skill === "蒼穹箭雨" && input.ascended.has("蒼穹箭雨")
     ? input.hits.slice(0, 8).filter((hit) => hit.hit && hit.critical).length : 0;
   const ignoreDefensePercent = (input.skill === "穿雲箭"
@@ -147,7 +163,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state, defense },
     damageSegmentPercents,
     totalDamagePercent,
-    additionalArrowPercent,
+    additionalArrowPercent: rapidSixthArrow || tailwindArrow,
+    additionalArrowEvents,
+    attackChargeRecovered,
     skyMarks,
     mainArrowDamageBonusPercent: skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark,
     damageBonusPercent: passive.damageBonusPercent,
