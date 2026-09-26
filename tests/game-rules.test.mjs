@@ -194,10 +194,10 @@ test("names only actual set drops after their set and lists every worn set", () 
 });
 
 test("stacks the two-piece attack bonus once for each equipped set", () => {
-  assert.match(page, /function equippedSetAttackMultiplier\\(gear: Item\\[\\]\\)[\\s\\S]*?maps\\.filter\\([\\s\\S]*?length >= 2[\\s\\S]*?1 \\+ twoPieceSetCount \\* \\(SET_ATTACK_BONUS - 1\\)/);
-  assert.match(page, /const setAttackMultiplier = equippedSetAttackMultiplier\\(gear\\)/);
-  assert.match(page, /const activeSetAttackMultiplier = equippedSetAttackMultiplier\\(equippedGear\\)/);
-  assert.match(page, /activeSetAttackBonusPct = Math\\.round\\(\\(activeSetAttackMultiplier - 1\\) \\* 100\\)/);
+  assert.match(page, /function equippedSetAttackMultiplier\(gear: Item\[\]\)[\s\S]*?maps\.filter\([\s\S]*?length >= 2[\s\S]*?1 \+ twoPieceSetCount \* \(SET_ATTACK_BONUS - 1\)/);
+  assert.match(page, /const setAttackMultiplier = equippedSetAttackMultiplier\(gear\)/);
+  assert.match(page, /const activeSetAttackMultiplier = equippedSetAttackMultiplier\(equippedGear\)/);
+  assert.match(page, /activeSetAttackBonusPct = Math\.round\(\(activeSetAttackMultiplier - 1\) \* 100\)/);
 });
 
 test("uses non-overlapping equipment rails", () => {
