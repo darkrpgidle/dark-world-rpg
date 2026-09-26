@@ -1981,6 +1981,13 @@ body {
   padding-top: 6px;
   border-top: 1px solid #34413d;
 }
+.detail-base-stats > .gear-epithet-stat {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #34413d;
+}
 .gear-epithet-stat b em {
   font-style: normal;
 }
@@ -1991,6 +1998,10 @@ body {
   line-height: 1.5;
 }
 .gear-base-stats > .gear-epithet-note {
+  color: #d2aa78;
+  font-size: 9px;
+}
+.detail-base-stats > .gear-epithet-note {
   color: #d2aa78;
   font-size: 9px;
 }
