@@ -23,6 +23,7 @@ export type StatusApplication = {
   kind: EnemyDebuffKind;
   level?: number;
   ascendedBleed?: boolean;
+  bleedDamageBonusPercent?: number;
   strength?: number;
 };
 
