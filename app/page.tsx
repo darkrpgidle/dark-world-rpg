@@ -1253,6 +1253,13 @@ function calculateCharacterStats(
   return result;
 }
 
+function equippedSetPieceCount(gear: Item[]) {
+  return maps.reduce(
+    (maximum, map) => Math.max(maximum, gear.filter((item) => item.set === map.set).length),
+    0,
+  );
+}
+
 function calculateCombatPower(
   playerClass: GameClass,
   level: number,
@@ -1265,9 +1272,11 @@ function calculateCombatPower(
     ["鋼鐵壁壘", "獵手本能", "魔力護盾"].includes(skill.name),
   );
   const current = calculateCharacterStats(playerClass, level, gear, statSkills);
+  const setAttackMultiplier = equippedSetPieceCount(gear) >= 2 ? SET_ATTACK_BONUS : 1;
+  const permanentAttackMultiplier = (1 + permanentBonuses.attack / 100) * setAttackMultiplier;
   const statPower =
     (current.hp - naked.hp) * 0.25 +
-    (current.attack - naked.attack) * 4 +
+    (current.attack - naked.attack) * permanentAttackMultiplier * 4 +
     (current.defense - naked.defense) * 3 +
     (current.speed - naked.speed) * 4 +
     (current.hit - naked.hit) * 5 +
@@ -1281,7 +1290,7 @@ function calculateCombatPower(
     current.bossReduction * 9;
   const permanentPower =
     naked.hp * (permanentBonuses.hp / 100) * 0.25 +
-    naked.attack * (permanentBonuses.attack / 100) * 4 +
+    naked.attack * (permanentAttackMultiplier - 1) * 4 +
     naked.defense * (permanentBonuses.defense / 100) * 3;
   return Math.max(
     1,
@@ -2499,11 +2508,14 @@ function Game({
     equippedGear,
     skills,
   );
+  const activeSetCount = equippedSetPieceCount(equippedGear);
   const characterStats = {
     ...baseCharacterStats,
     hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1)),
     attack: Math.round(
-      baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) * (hasBlessing("stat-attack") ? 1.15 : 1),
+      baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) *
+      (hasBlessing("stat-attack") ? 1.15 : 1) *
+      (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1),
     ),
     defense: Math.round(
       baseCharacterStats.defense *
@@ -2573,7 +2585,6 @@ function Game({
     .filter((group) => group.count > 0)
     .sort((a, b) => b.count - a.count);
   const activeSet = equippedSetGroups[0];
-  const activeSetCount = activeSet?.count ?? 0;
   const setTier = activeSet
     ? Math.min(
         3,
@@ -4330,7 +4341,6 @@ function Game({
               (balanceConfig.combat.evasionModel.monsterEvasionBonusByMap[mapId] ?? 0),
             playerDamageMultiplier:
               attackPerkMultiplier *
-              (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1) *
               (fissureWasActive ? 1.3 : 1) *
               (enemyAttackCount === 1 && hasEquippedEpithet(equippedGear, "chase") ? 1.1 : 1) *
               (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGear, "charge")
@@ -5626,7 +5636,6 @@ function Game({
             bossSkillMultiplier *
             bossMarkMultiplier *
             bossExecutionDamageMultiplier *
-            (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1) *
             (hasPerk("special-warhelm") && bossPlayerHpRef.current > 80 ? 1.1 : 1) *
             (bossPlayerAttackCount === 1 && hasEquippedEpithet(equippedGearRef.current, "chase") ? 1.1 : 1),
           skillTriggered: Boolean(bossSkill),
