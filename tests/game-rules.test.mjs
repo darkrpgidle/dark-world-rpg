@@ -23,6 +23,7 @@ const { dropPowerRange, enhancementBonusPercent, enhancementFailureLevel, enhanc
   "/app/balance.ts",
 );
 const { balanceConfig } = await vite.ssrLoadModule("/app/balance-config.ts");
+const { settleCombatHealth } = await vite.ssrLoadModule("/app/skill-health-settlement.ts");
 const {
   createEquipmentSockets,
   drillSocket,
@@ -598,7 +599,7 @@ test("class balance gives warrior durability and mage single-target burst", () =
   assert.equal(balanceConfig.character.baseStats.法師.hp, 390);
   assert.match(balanceSource, /playerDefense/);
   assert.match(balanceConfigSource, /monsterProfiles/);
-  assert.match(page, /const playerHpLossFromDamage/);
+  assert.match(page, /settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/);
   assert.match(page, /playerDamageMultiplier/);
   assert.match(data, /單體・術式爆發/);
   assert.doesNotMatch(data, /群攻・成長核心/);
@@ -737,14 +738,17 @@ test("shows the same damage that is removed from the monster's real hp", () => {
   assert.match(page, /monsterProfile\(currentEnemyBaseName\)/);
   assert.match(page, /monsterName: currentEnemyBaseName/);
   assert.match(page, /monsterProfile\(bossMonsterName\)/);
-  assert.match(page, /actualPercentDamage = Math\.min\(\s*h,\s*healthPercentFromDamage\(finalHpDamage, enemyMaximumHealth\),\s*\)/);
-  assert.match(page, /if \(h - actualPercentDamage <= 0\.000001\)/);
-  assert.match(page, /Math\.min\(Math\.round\(currentEffectiveEnemyHealth\), finalHpDamage\)/);
+  assert.deepEqual(settleCombatHealth(40, 17050, 1023), {
+    actualDamage: 1023, percentDamage: 6, remainingPercent: 34, defeated: false,
+  });
+  assert.match(page, /settleCombatHealth\(h, enemyMaximumHealth, finalHpDamage\)/);
+  assert.match(page, /Math\.round\(healthSettlement\.actualDamage\)/);
   assert.match(page, /currentEnemyHealth\.toLocaleString\(\).*currentEnemyMaximumHealth\.toLocaleString\(\).*HP/s);
   assert.match(page, /共 \$\{totalDisplayedDamage\.toLocaleString\(\)\} 傷害/);
   assert.match(page, /const bossHpLoss =/);
   assert.match(page, /bossHpLoss/);
-  assert.match(page, /return Math\.max\(0, h - actualPercentDamage\)/);
+  assert.match(page, /const bossHealthSettlement = settleCombatHealth/);
+  assert.match(page, /return healthSettlement\.remainingPercent/);
   assert.match(page, /className="player-health-label"/);
   assert.match(page, /width: `\$\{Math\.max\(0, Math\.min\(100, value\)\)\}%`/);
   assert.doesNotMatch(page, /3 \/ monsterCombatHealthMultiplier/);
@@ -759,9 +763,9 @@ test("stops tower combat on the lethal frame", () => {
   assert.equal((page.match(/finishRun\("death", wave\), 0/g) ?? []).length, 2);
   assert.doesNotMatch(page, /finishRun\("death", wave\), 120/);
   assert.match(page, /if \(savedPlayerHp <= 0\)/);
-  assert.equal((page.match(/actualDamage >= healthFromPercent\(playerHealth, characterStats\.hp\)/g) ?? []).length, 2);
-  assert.equal((page.match(/playerHealth - hpLoss <= 0\.000001/g) ?? []).length, 2);
-  assert.match(page, /if \(hp - hpLoss <= 0\.000001\)/);
+  assert.equal((page.match(/settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/g) ?? []).length, 2);
+  assert.equal((page.match(/settleCombatHealth\(hp, characterStats\.hp, bossDamage\)/g) ?? []).length, 2);
+  assert.equal(settleCombatHealth(0.00001, 1394, 1).remainingPercent, 0);
 });
 
 test("does not expose a direct equipment quality-upgrade button", () => {
