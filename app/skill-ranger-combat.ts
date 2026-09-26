@@ -3,6 +3,7 @@
 import type { SkillBuild } from "./skill-rework";
 import {
   advanceCombatSession, createSkillCombatSession, resolveSkillAction, takeReadySkill,
+  trySkillProc,
   type SkillCombatSession, type StatusApplication,
 } from "./skill-combat-session";
 import type { PrimaryAttackEvent } from "./skill-combat-queue";
@@ -11,11 +12,15 @@ import {
   createRangerWindDomain, rangerSkillRankValue,
   type RangerActiveName, type RangerWindDomain,
 } from "./skill-ranger-rules";
+import {
+  createRangerPassiveState, resolveRangerPassiveAttack, type RangerPassiveState,
+} from "./skill-ranger-passives";
 
 export type RangerCombat = {
   session: SkillCombatSession;
   build: SkillBuild;
   windDomain: RangerWindDomain;
+  passives: RangerPassiveState;
   nextSkillIgnoreDefensePending: boolean;
 };
 
@@ -24,6 +29,7 @@ export function createRangerCombat(build: SkillBuild, level: number): RangerComb
     session: createSkillCombatSession(build, "遊俠", level),
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
     windDomain: createRangerWindDomain(),
+    passives: createRangerPassiveState(),
     nextSkillIgnoreDefensePending: false,
   };
 }
@@ -43,6 +49,11 @@ export type RangerTurnResult = {
   additionalArrowPercent: number;
   skyMarks: number;
   mainArrowDamageBonusPercent: number;
+  damageBonusPercent: number;
+  criticalDirectDamageBonusPercentBySegment: number[];
+  criticalChancePoints: number;
+  dodgeChancePoints: number;
+  passiveDamageProcs: { id: "乘風閃擊" | "蒼穹餘響"; percent: number }[];
   ignoreDefensePercent: number;
   skillCriticalDamageBonusPercent: number;
   markedTargetCriticalChancePoints: number;
@@ -76,6 +87,13 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     kind: rule ? "skill" : "normal", hits: input.hits,
   });
   const successfulHit = input.hits.some((hit) => hit.hit);
+  const passive = resolveRangerPassiveAttack(combat.passives, combat.build, {
+    kind: rule ? "skill" : "normal",
+    category: rule?.category,
+    hits: input.hits,
+    targetMarked: Boolean(session.enemy.hunterMark),
+    isUltimate: input.skill === "蒼穹箭雨",
+  });
   const statusApplications: StatusApplication[] = [];
   if (input.skill === "獵殺標記" && successfulHit) {
     statusApplications.push({
@@ -87,6 +105,12 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     kind: rule ? "skill" : "normal", hits: input.hits, successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  const passiveDamageProcs: RangerTurnResult["passiveDamageProcs"] = [];
+  for (const candidate of passive.damageCandidates) {
+    const checked = trySkillProc(session, { id: candidate.id, kind: "damage", source: "primary", family: "passive" });
+    session = checked.session;
+    if (checked.allowed) passiveDamageProcs.push(candidate);
+  }
 
   const damageSegmentPercents = input.skill === "疾風連射"
     ? Array.from({ length: 5 }, () => rangerSkillRankValue(RANGER_ACTIVE_RULES.疾風連射.damagePerArrow, rank))
@@ -108,17 +132,22 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     ? activateRangerWindDomain(rank, input.ascended.has("風行領域")) : wind.state;
 
   return {
-    combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending },
+    combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state },
     damageSegmentPercents,
     totalDamagePercent,
     additionalArrowPercent,
     skyMarks,
     mainArrowDamageBonusPercent: skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark,
+    damageBonusPercent: passive.damageBonusPercent,
+    criticalDirectDamageBonusPercentBySegment: passive.criticalDirectDamageBonusPercentBySegment,
+    criticalChancePoints: passive.criticalChancePoints + markedTargetCriticalChancePoints,
+    dodgeChancePoints: passive.dodgeChancePoints,
+    passiveDamageProcs,
     ignoreDefensePercent,
     skillCriticalDamageBonusPercent: input.skill === "破星狙擊"
       ? rangerSkillRankValue(RANGER_ACTIVE_RULES.破星狙擊.criticalDamageBonus, rank) : 0,
     markedTargetCriticalChancePoints,
-    attackSpeedBonusPercent: wind.attackSpeedBonusPercent,
+    attackSpeedBonusPercent: wind.attackSpeedBonusPercent + passive.attackSpeedBonusPercent,
     normalDamagePenaltyPercent: wind.normalDamagePenaltyPercent,
     statusApplications,
     dueTicks: [...settled.ticks, ...action.ticks],
