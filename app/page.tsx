@@ -129,6 +129,8 @@ import {
 import { SkillEffectCanvas } from "./skill-effect-canvas";
 import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
+import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
+import { settleCombatHealth } from "./skill-health-settlement";
 import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import type { SkillSaveAction } from "./skill-save-policy";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
@@ -2552,8 +2554,6 @@ function Game({
   const combatAttackSpeed =
     characterStats.speed +
     (hasBlessing("rapid") ? (blessingUpgraded("rapid") ? 35 : 20) : 0);
-  const playerHpLossFromDamage = (damage: number) =>
-    healthPercentFromDamage(damage, characterStats.hp);
   const currentWaveBoss = wave === MAP_FLOORS;
   const currentWaveGuardian = wave % 10 === 0 && !currentWaveBoss;
   const currentWaveElite = wave % 5 === 0 && !currentWaveGuardian && !currentWaveBoss;
@@ -3930,6 +3930,15 @@ function Game({
 
   useEffect(() => {
     if (!battleOn || activeBossBattle || runSummary) return;
+    // The live skill queue still owns hits, rewards and death handling. Keep its
+    // settlement route on legacy until the replacement owns all three together.
+    const cutoverRoute = beginSkillBattleCutover({
+      battleId: `tower:${runStartedAt}:${mapId}`,
+      encounter: "tower",
+      enableRework: false,
+      reworkReady: false,
+    });
+    let actionSequence = 0;
     const tickMs = COMBAT_TICK_MS;
     const monsterAttackSpeed = monsterProfile(currentEnemyBaseName).speed * 100;
     let playerClock = 0;
@@ -3992,7 +4001,11 @@ function Game({
         if (burningUntil > Date.now() && Date.now() >= nextBurnAt) {
           nextBurnAt = Date.now() + 1000;
           const burnLevel = skills.find((skill) => skill.name === "霜火新星")?.level ?? 1;
-          setEnemyHp((health) => Math.max(0, health - (1.5 + burnLevel * 0.5)));
+          const burnTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
+          const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName);
+          setEnemyHp((health) => settleCombatHealth(
+            health, maximumHealth, maximumHealth * (1.5 + burnLevel * 0.5) / 100,
+          ).remainingPercent);
         }
         const dynamicDamageReduction = characterStats.damageReduction +
           (hasPerk("special-ashguard") && playerHp < 40 ? 8 : 0);
@@ -4095,20 +4108,14 @@ function Game({
                 setBloodShieldReady(false);
                 setCausePrompt(`血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`);
               }
-              const actualDamage = Math.min(
-                healthFromPercent(playerHealth, characterStats.hp),
-                monsterDamage,
-              );
-              const hpLoss = playerHpLossFromDamage(actualDamage);
+              const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
+              const actualDamage = healthSettlement.actualDamage;
               if (hasPerk("special-revenge-thorn")) {
                 combatPerksRef.current.revengeStacks = Math.min(3, combatPerksRef.current.revengeStacks + 1);
               }
               setPlayerHitFeedback({ damage: actualDamage, dodged: false, key: next });
               setEnemyHitFeedback({ damage: actualDamage, dodged: false, key: next });
-              if (
-                actualDamage >= healthFromPercent(playerHealth, characterStats.hp) ||
-                playerHealth - hpLoss <= 0.000001
-              ) {
+              if (healthSettlement.defeated) {
                 if (!towerDeathPendingRef.current) {
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
@@ -4117,7 +4124,7 @@ function Game({
                 }
                 return 0;
               }
-              return playerHealth - hpLoss;
+              return healthSettlement.remainingPercent;
             });
             return next;
           }
@@ -4502,6 +4509,7 @@ function Game({
             fissureDetonationThisAttack ? "大地崩解：裂痕引爆" : null,
           ].filter(Boolean).join("｜");
           setCausePrompt(attackDebugParts);
+          const currentAction = ++actionSequence;
           setEnemyHp((h) => {
             const execution =
               hasBlessing("execute") &&
@@ -4515,22 +4523,22 @@ function Game({
             const finalMultiplier =
               (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
               executionMythicBonus;
-            const finalHpDamage = Math.round(hpDamage * finalMultiplier);
+            const finalHpDamage = settleCutoverAction(cutoverRoute, {
+              battleId: cutoverRoute.battleId,
+              sequence: currentAction,
+              legacyDamage: Math.round(hpDamage * finalMultiplier),
+            }).damage;
             const enemyMaximumHealth = effectiveMonsterMaximumHealth(
               mapId,
               currentRecommendedPower,
               tier,
               currentEnemyBaseName,
             );
-            const actualPercentDamage = Math.min(
-              h,
-              healthPercentFromDamage(finalHpDamage, enemyMaximumHealth),
-            );
-            const currentEffectiveEnemyHealth =
-              healthFromPercent(h, enemyMaximumHealth);
+            const healthSettlement = settleCombatHealth(h, enemyMaximumHealth, finalHpDamage);
+            const actualPercentDamage = healthSettlement.percentDamage;
             const totalDisplayedDamage = Math.max(
               1,
-              Math.min(Math.round(currentEffectiveEnemyHealth), finalHpDamage),
+              Math.round(healthSettlement.actualDamage),
             );
             let mainDisplayedDamage = Math.min(totalDisplayedDamage,
               Math.round((hpDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
@@ -4655,7 +4663,7 @@ function Game({
               combatPerksRef.current.nextAttackCritDamage = 40;
               showCombatStatus({ name: "完美獵殺・下一擊暴傷 +40%", target: "player", remaining: 1, unit: "次", tone: "gold" });
             }
-            if (h - actualPercentDamage <= 0.000001) {
+            if (healthSettlement.defeated) {
               const executionFinisher = triggered?.name === "處決";
               if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
               combatPerksRef.current.firstEnemyAttackReady = true;
@@ -4789,7 +4797,7 @@ function Game({
               advanceToNextEnemy();
               return 100;
             }
-            if (!monsterActs) return Math.max(0, h - actualPercentDamage);
+            if (!monsterActs) return healthSettlement.remainingPercent;
             setPlayerHp((playerHealth) => {
               const shieldWasActive = magicShieldCooldown > 0;
               if (magicShieldCooldown > 0) magicShieldCooldown -= 1;
@@ -4850,10 +4858,8 @@ function Game({
                   `血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`,
                 );
               }
-              const actualDamage = Math.min(
-                healthFromPercent(playerHealth, characterStats.hp),
-                monsterDamage,
-              );
+              const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
+              const actualDamage = healthSettlement.actualDamage;
               setEnemyHitFeedback({
                 damage: actualDamage,
                 dodged: false,
@@ -4863,11 +4869,7 @@ function Game({
               if (hasPerk("special-revenge-thorn")) {
                 combatPerksRef.current.revengeStacks = Math.min(3, combatPerksRef.current.revengeStacks + 1);
               }
-              const hpLoss = playerHpLossFromDamage(actualDamage);
-              if (
-                actualDamage >= healthFromPercent(playerHealth, characterStats.hp) ||
-                playerHealth - hpLoss <= 0.000001
-              ) {
+              if (healthSettlement.defeated) {
                 if (!towerDeathPendingRef.current) {
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
@@ -4876,9 +4878,9 @@ function Game({
                 }
                 return 0;
               }
-              return playerHealth - hpLoss;
+              return healthSettlement.remainingPercent;
             });
-            return Math.max(0, h - actualPercentDamage);
+            return healthSettlement.remainingPercent;
           });
           return next;
         });
@@ -4917,6 +4919,7 @@ function Game({
     currentWaveGuardian,
     currentWaveBoss,
     wave,
+    runStartedAt,
     enemyName,
     mapId,
     level,
@@ -5447,6 +5450,13 @@ function Game({
 
   useEffect(() => {
     if (!activeBossBattle || bossOutcome) return;
+    const cutoverRoute = beginSkillBattleCutover({
+      battleId: `boss:${activeBossBattle.mode}:${activeBossBattle.name}:${worldBossDeadlineRef.current ?? "personal"}`,
+      encounter: activeBossBattle.mode === "world" ? "world-boss" : "personal-boss",
+      enableRework: false,
+      reworkReady: false,
+    });
+    let actionSequence = 0;
     const tickMs = COMBAT_TICK_MS;
     const bossMonsterName = baseMonsterName(activeBossBattle.name);
     // 個人首領採固定節奏，避免沿用各怪物原始攻速而造成首領間的壓力落差。
@@ -5473,8 +5483,7 @@ function Game({
         ) {
           activeWorldBurn.nextAt = Date.now() + 1_000;
           const burnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
-          const burnHpLoss = healthPercentFromDamage(burnDamage, activeBossBattle.hp);
-          setBossEnemyHp((hp) => Math.max(0, hp - burnHpLoss));
+          setBossEnemyHp((hp) => settleCombatHealth(hp, activeBossBattle.hp, burnDamage).remainingPercent);
           setWorldDamage((value) => value + burnDamage);
           setWorldRoundDamage((value) => value + burnDamage);
           setLastBossDamage(burnDamage);
@@ -5715,8 +5724,16 @@ function Game({
           ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100 : 0;
         const calculatedPlayerDamage = playerActs
           ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage : 0;
-        const remainingBossHealth = healthFromPercent(bossEnemyHpRef.current, activeBossBattle.hp);
-        const playerDamage = Math.min(remainingBossHealth, calculatedPlayerDamage);
+        const bossHealthSettlement = settleCombatHealth(
+          bossEnemyHpRef.current, activeBossBattle.hp, calculatedPlayerDamage,
+        );
+        const playerDamage = playerActs
+          ? settleCutoverAction(cutoverRoute, {
+              battleId: cutoverRoute.battleId,
+              sequence: ++actionSequence,
+              legacyDamage: bossHealthSettlement.actualDamage,
+            }).damage
+          : 0;
         const shownBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
         const shownBossElemental = Math.min(playerDamage - shownBossMain, bossElementalDamage);
         const shownBossResonance = Math.max(0, playerDamage - shownBossMain - shownBossElemental);
@@ -5786,15 +5803,13 @@ function Game({
             bossPlayerHpRef.current = nextHealth;
             return nextHealth;
           });
-        const bossHpLoss =
-          playerDamage <= 0
-            ? 0
-            : healthPercentFromDamage(playerDamage, activeBossBattle.hp);
+        const bossHpLoss = playerActs ? bossHealthSettlement.percentDamage : 0;
         const abyssSpecialTriggered = abyssSpecialReady && bossEnemyHpRef.current > bossHpLoss;
         if (bossActs && !abyssSpecialTriggered)
           setLastBossCounterDamage(bossEnemyHpRef.current <= bossHpLoss ? 0 : bossDamage);
         if (playerActs) setBossEnemyHp((hp) => {
-          if (hp <= bossHpLoss) {
+          const healthSettlement = settleCombatHealth(hp, activeBossBattle.hp, calculatedPlayerDamage);
+          if (healthSettlement.defeated) {
             if (bossRoundEndedRef.current) return hp;
             bossRoundEndedRef.current = true;
             worldBossDeadlineRef.current = null;
@@ -5856,7 +5871,7 @@ function Game({
             bossEnemyHpRef.current = 0;
             return 0;
           }
-          const nextHp = hp - bossHpLoss;
+          const nextHp = healthSettlement.remainingPercent;
           bossEnemyHpRef.current = nextHp;
           return nextHp;
         });
@@ -5872,8 +5887,8 @@ function Game({
             setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
             setLastBossCounterDamage(bossDamage);
             setBossPlayerHp((hp) => {
-              const hpLoss = playerHpLossFromDamage(bossDamage);
-              if (hp - hpLoss <= 0.000001) {
+              const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
+              if (healthSettlement.defeated) {
                 if (bossRoundEndedRef.current) return hp;
                 bossRoundEndedRef.current = true;
                 worldBossDeadlineRef.current = null;
@@ -5887,7 +5902,7 @@ function Game({
                 bossPlayerHpRef.current = 0;
                 return 0;
               }
-              const nextHp = hp - hpLoss;
+              const nextHp = healthSettlement.remainingPercent;
               bossPlayerHpRef.current = nextHp;
               return nextHp;
             });
@@ -5901,8 +5916,8 @@ function Game({
         }
         if (bossActs && !abyssSpecialTriggered) setBossPlayerHp((hp) => {
           if (bossEnemyHpRef.current <= bossHpLoss) return hp;
-          const hpLoss = playerHpLossFromDamage(bossDamage);
-          if (hp - hpLoss <= 0.000001) {
+          const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
+          if (healthSettlement.defeated) {
             if (bossRoundEndedRef.current) return hp;
             bossRoundEndedRef.current = true;
             worldBossDeadlineRef.current = null;
@@ -5918,7 +5933,7 @@ function Game({
             bossPlayerHpRef.current = 0;
             return 0;
           }
-          const nextHp = hp - hpLoss;
+          const nextHp = healthSettlement.remainingPercent;
           bossPlayerHpRef.current = nextHp;
           return nextHp;
         });
