@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { skillDisplay } from "./skill-rework-display";
 import {
+  ascensionOptions, confirmSkillAscensions, selectSkillAscension, type SkillAscensionState,
+} from "./skill-ascensions";
+import {
   SKILL_REWORK_CATALOG,
   earnedSkillPoints,
   enabledUltimate,
@@ -18,9 +21,11 @@ type Props = {
   characterLevel: number;
   build: SkillBuild;
   onChange: (build: SkillBuild) => void;
+  ascensions: SkillAscensionState;
+  onAscensionsChange: (next: SkillAscensionState) => void;
 };
 
-export function SkillReworkPanel({ characterClass, characterLevel, build, onChange }: Props) {
+export function SkillReworkPanel({ characterClass, characterLevel, build, onChange, ascensions, onAscensionsChange }: Props) {
   const [pendingUpgrade, setPendingUpgrade] = useState<string | null>(null);
   const catalog = SKILL_REWORK_CATALOG[characterClass];
   const available = earnedSkillPoints(characterLevel) - spentSkillPoints(build);
@@ -59,6 +64,45 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onChan
         ))}
       </div>
       <p>固定終極：{ultimate ?? (characterLevel < 50 ? "Lv50 解鎖" : "尚未投入技能點，不會施放")}</p>
+      <section aria-label="新版昇華配置">
+        <h4>轉生昇華（新版第 {ascensions.rebirthCount}/5 轉）</h4>
+        <p>轉生後可免費重配已取得的昇華；每次確認後鎖定至下一次轉生。昇華不消耗技能點，選中的技能仍須學習與配置才會在未來新版戰鬥生效。</p>
+        {ascensions.rebirthCount === 0 && <p>第一次轉生後開放基礎技能昇華。</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
+          {Array.from({ length: ascensions.rebirthCount }, (_, index) => {
+            const tier = index + 1;
+            const options = ascensionOptions(characterClass, tier);
+            const value = ascensions.choices[index];
+            return <label key={tier}>
+              第 {tier} 轉{tier === 5 ? "・固定終極" : "・昇華選擇"}
+              <select
+                aria-label={`第 ${tier} 轉昇華`}
+                style={{ display: "block", width: "100%", minHeight: 44 }}
+                value={value ?? ""}
+                disabled={!ascensions.selectionOpen || tier === 5}
+                onChange={(event) => {
+                  const next = selectSkillAscension(ascensions, characterClass, tier, event.target.value);
+                  if (next) onAscensionsChange(next);
+                }}
+              >
+                <option value="">請選擇</option>
+                {options.map((name) => <option key={name} value={name}
+                  disabled={(tier === 2 && ascensions.choices[2] === name) || (tier === 3 && ascensions.choices[1] === name)}>
+                  {name}・{skillDisplay(characterClass, name)?.ascensionName}
+                </option>)}
+              </select>
+              {value && <small>{skillDisplay(characterClass, value)?.ascensionEffect}</small>}
+            </label>;
+          })}
+        </div>
+        {ascensions.selectionOpen && <button className="btn btn-ghost" style={{ minHeight: 44, marginTop: 12 }}
+          disabled={ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
+          onClick={() => {
+            const next = confirmSkillAscensions(ascensions, characterClass);
+            if (next) onAscensionsChange(next);
+          }}>確認昇華配置</button>}
+        <p>付費技能重置待元寶價格、重置卷道具及伺服器扣款規則定案後開放。</p>
+      </section>
       {(["active", "passive"] as const).map((kind) => (
         <div key={kind}>
           <h4>{kind === "active" ? "主動技能" : "被動技能"}</h4>

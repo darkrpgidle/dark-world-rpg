@@ -129,6 +129,7 @@ import {
 import { SkillEffectCanvas } from "./skill-effect-canvas";
 import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
+import { beginSkillRebirth, createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
@@ -2235,6 +2236,7 @@ function Game({
   });
   const [skillPoints, setSkillPoints] = useState(1);
   const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
+  const [skillAscensions, setSkillAscensions] = useState<SkillAscensionState>(createSkillAscensions);
   const [skills, setSkills] = useState(() =>
     skillsByClass[playerClass].map((skill, index) => ({
       ...skill,
@@ -2804,6 +2806,7 @@ function Game({
             }
             if (Array.isArray(save.skills)) setSkills(save.skills);
             setSkillReworkBuild(restoreSkillBuild(save.skillReworkBuild, playerClass, savedLevel));
+            setSkillAscensions(restoreSkillAscensions(save.skillAscensions, playerClass));
             const needsBossTicketReset = save.bossTicketResetVersion !== PERSONAL_BOSS_RESET_VERSION;
             setBossTickets(needsBossTicketReset ? 10 : (save.bossTickets ?? 10));
             setHighestFloor(save.highestFloor ?? savedWave);
@@ -3005,6 +3008,7 @@ function Game({
         activeLoadout,
         skills,
         skillReworkBuild,
+        skillAscensions,
         bossTickets,
         bossTicketResetVersion: PERSONAL_BOSS_RESET_VERSION,
         worldAttempts,
@@ -3126,6 +3130,7 @@ function Game({
     activeLoadout,
     skills,
     skillReworkBuild,
+    skillAscensions,
     bossTickets,
     worldAttempts,
     highestFloor,
@@ -3785,6 +3790,7 @@ function Game({
   const canRebirth = level >= 100 && (mapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
   const rebirth = () => {
     if (!canRebirth) return;
+    const nextSkillRebirth = beginSkillRebirth(skillAscensions, playerClass, level);
     towerDeathPendingRef.current = false;
     resetCombatPerks();
     setRebirthCount((value) => Math.min(MAX_REBIRTHS, value + 1));
@@ -3805,7 +3811,8 @@ function Game({
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
     setSkills(skillsByClass[playerClass].map((skill, index) => ({ ...skill, level: index === 0 ? 1 : 0 })));
-    setSkillReworkBuild(createSkillBuild());
+    setSkillReworkBuild(nextSkillRebirth?.build ?? createSkillBuild());
+    if (nextSkillRebirth) setSkillAscensions(nextSkillRebirth.ascensions);
     setSkillPoints(1);
     setCompletedRuns(0);
     setStoredSeconds(0);
@@ -7877,6 +7884,8 @@ function Game({
                 characterLevel={level}
                 build={skillReworkBuild}
                 onChange={setSkillReworkBuild}
+                ascensions={skillAscensions}
+                onAscensionsChange={setSkillAscensions}
               />
               <h3>目前戰鬥使用的技能</h3>
               <SkillGrowthTable skills={skills} />
