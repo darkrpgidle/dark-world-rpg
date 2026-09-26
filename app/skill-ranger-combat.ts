@@ -54,6 +54,7 @@ export type RangerTurnInput = {
   hits: PrimaryAttackEvent["hits"];
   now: number;
   ascended: ReadonlySet<RangerActiveName>;
+  roll?: () => number;
 };
 
 export type RangerTurnResult = {
@@ -65,6 +66,10 @@ export type RangerTurnResult = {
   additionalArrowEvents: { id: "風痕追獵" | "六重風葬"; percent: number }[];
   hunterExplosionEvents: { id: "死亡鎖定"; percent: number }[];
   attackChargeRecovered: number;
+  tailwindChargeReductionChancePercent: number;
+  // The trigger is rolled once on the original critical. The amount of
+  // charge reduction remains unspecified; no charges are changed by it.
+  tailwindChargeReductionTriggered: boolean;
   skyMarks: number;
   mainArrowDamageBonusPercent: number;
   damageBonusPercent: number;
@@ -148,6 +153,11 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   if (attackChargeRecovered) {
     session = { ...session, charge: recoverPrimaryAttackCharges(session.charge, attackChargeRecovered) };
   }
+  const tailwindChargeReductionChancePercent = input.skill === "追風箭"
+    && input.hits.some((hit) => hit.hit && hit.critical)
+    ? rangerSkillRankValue(RANGER_ACTIVE_RULES.追風箭.chargeReductionChance, rank) : 0;
+  const tailwindChargeReductionTriggered = tailwindChargeReductionChancePercent > 0
+    && (input.roll ?? Math.random)() * 100 < tailwindChargeReductionChancePercent;
   const passiveDamageProcs: RangerTurnResult["passiveDamageProcs"] = [];
   for (const candidate of passive.damageCandidates) {
     const checked = trySkillProc(session, { id: candidate.id, kind: "damage", source: "primary", family: "passive" });
@@ -198,8 +208,11 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     additionalArrowEvents,
     hunterExplosionEvents,
     attackChargeRecovered,
+    tailwindChargeReductionChancePercent,
+    tailwindChargeReductionTriggered,
     skyMarks,
-    mainArrowDamageBonusPercent: skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark,
+    mainArrowDamageBonusPercent: input.skill === "蒼穹箭雨" && input.hits[8]?.hit
+      ? skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark : 0,
     damageBonusPercent: passive.damageBonusPercent,
     criticalDirectDamageBonusPercentBySegment: passive.criticalDirectDamageBonusPercentBySegment,
     criticalChancePoints: passive.criticalChancePoints + markedTargetCriticalChancePoints
