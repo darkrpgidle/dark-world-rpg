@@ -15,12 +15,14 @@ import {
 import {
   createRangerPassiveState, resolveRangerPassiveAttack, type RangerPassiveState,
 } from "./skill-ranger-passives";
+import { createRangerDefenseState, type RangerDefenseState } from "./skill-ranger-defense";
 
 export type RangerCombat = {
   session: SkillCombatSession;
   build: SkillBuild;
   windDomain: RangerWindDomain;
   passives: RangerPassiveState;
+  defense: RangerDefenseState;
   nextSkillIgnoreDefensePending: boolean;
 };
 
@@ -30,6 +32,7 @@ export function createRangerCombat(build: SkillBuild, level: number): RangerComb
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
     windDomain: createRangerWindDomain(),
     passives: createRangerPassiveState(),
+    defense: createRangerDefenseState(),
     nextSkillIgnoreDefensePending: false,
   };
 }
@@ -52,6 +55,7 @@ export type RangerTurnResult = {
   damageBonusPercent: number;
   criticalDirectDamageBonusPercentBySegment: number[];
   criticalChancePoints: number;
+  phantomNextSkillCriticalDamagePercent: number;
   dodgeChancePoints: number;
   passiveDamageProcs: { id: "乘風閃擊" | "蒼穹餘響"; percent: number }[];
   ignoreDefensePercent: number;
@@ -83,6 +87,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   }
 
   const markedTargetCriticalChancePoints = session.enemy.hunterMark?.strength ?? 0;
+  const phantomNextHitCriticalChancePoints = combat.defense.nextHitCriticalChancePoints;
+  const phantomNextSkillCriticalDamagePercent = rule && combat.defense.nextSkillCriticalDamagePending
+    ? RANGER_ACTIVE_RULES.幻影步.nextSkillCritDamage : 0;
   const wind = consumeRangerWindDomain(combat.windDomain, {
     kind: rule ? "skill" : "normal", hits: input.hits,
   });
@@ -130,9 +137,14 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     ? true : rule ? false : combat.nextSkillIgnoreDefensePending;
   const windDomain = input.skill === "風行領域"
     ? activateRangerWindDomain(rank, input.ascended.has("風行領域")) : wind.state;
+  const defense: RangerDefenseState = {
+    ...combat.defense,
+    nextHitCriticalChancePoints: successfulHit ? 0 : phantomNextHitCriticalChancePoints,
+    nextSkillCriticalDamagePending: rule ? false : combat.defense.nextSkillCriticalDamagePending,
+  };
 
   return {
-    combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state },
+    combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state, defense },
     damageSegmentPercents,
     totalDamagePercent,
     additionalArrowPercent,
@@ -140,7 +152,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     mainArrowDamageBonusPercent: skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark,
     damageBonusPercent: passive.damageBonusPercent,
     criticalDirectDamageBonusPercentBySegment: passive.criticalDirectDamageBonusPercentBySegment,
-    criticalChancePoints: passive.criticalChancePoints + markedTargetCriticalChancePoints,
+    criticalChancePoints: passive.criticalChancePoints + markedTargetCriticalChancePoints
+      + phantomNextHitCriticalChancePoints,
+    phantomNextSkillCriticalDamagePercent,
     dodgeChancePoints: passive.dodgeChancePoints,
     passiveDamageProcs,
     ignoreDefensePercent,
