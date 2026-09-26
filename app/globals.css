@@ -1974,18 +1974,25 @@ body {
 .equipment-base-name {
   color: #f7f5f0;
 }
-.equipment-epithet-details {
-  margin: 10px 0;
-  padding: 9px 11px;
-  border: 1px solid #ab632e;
-  border-radius: 6px;
-  background: #49290933;
-  color: #eae4dc;
-  line-height: 1.6;
+.gear-base-stats > .gear-epithet-stat {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #34413d;
 }
-.equipment-epithet-details strong,
-.equipment-epithet-details b {
-  color: #ff9e35;
+.gear-epithet-stat b em {
+  font-style: normal;
+}
+.gear-epithet-stat small {
+  color: #d2aa78;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.gear-base-stats > .gear-epithet-note {
+  color: #d2aa78;
+  font-size: 9px;
 }
 .bulk-salvage-btn {
   padding: 7px 10px !important;
