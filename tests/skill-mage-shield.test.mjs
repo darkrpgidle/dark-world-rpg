@@ -24,8 +24,8 @@ function mage(ranks, slots = []) {
 function activate(combat, currentHealth = 500, ascended = false, maxHealthBeforeMagePassive = 1000) {
   return tryActivateMageShield(combat, { currentHealth, maxHealthBeforeMagePassive, ascended });
 }
-function turn(combat, skill, now, hits = [{ hit: true }]) {
-  return resolveMageTurn(combat, { skill, hits, now, ascended: new Set(), roll: () => 1 });
+function turn(combat, skill, now, hits = [{ hit: true }], equippedItems = []) {
+  return resolveMageTurn(combat, { skill, hits, now, ascended: new Set(), roll: () => 1, equippedItems });
 }
 function untilReady(combat, skill, time = 0) {
   for (let i = 0; i < 10 && !combat.session.charge.ready.includes(skill); i++) {
@@ -153,6 +153,26 @@ test("shield transfer ends on break but an unused ascended cast still carries it
   const afterward = turn(broken.combat, "霜火新星", 400);
   assert.equal(afterward.passiveDirectDamageBonusPercent, 0);
   assert.equal(afterward.shieldAscensionDamageBonusPercent, 10);
+});
+
+test("eternal core adds 25% skill damage only while the shield exists", () => {
+  const core = [{ mythicId: "skill-mage-eternal-core" }];
+  let combat = untilReady(activate(mage({ 魔力護盾: 1, 霜火新星: 1 }, ["霜火新星"]), 500, true).combat,
+    "霜火新星");
+  assert.equal(turn(combat, "霜火新星", 400, [{ hit: true }], core).equipmentSkillDamageBonusPercent, 25);
+  assert.equal(turn(combat, "霜火新星", 400).equipmentSkillDamageBonusPercent, 0);
+  const broken = recordMageIncomingAttack(combat, [120]);
+  const cast = turn(broken.combat, "霜火新星", 400, [{ hit: true }], core);
+  assert.equal(cast.equipmentSkillDamageBonusPercent, 0);
+  assert.equal(cast.shieldAscensionDamageBonusPercent, 10); // ascension buff survives break
+});
+
+test("eternal core does not improve normal attacks or status-only spells", () => {
+  const core = [{ mythicId: "skill-mage-eternal-core" }];
+  let combat = activate(mage({ 魔力護盾: 1, 元素蝕印: 1 }, ["元素蝕印"]), 500).combat;
+  assert.equal(turn(combat, "normal", 0, [{ hit: true }], core).equipmentSkillDamageBonusPercent, 0);
+  combat = untilReady(combat, "元素蝕印");
+  assert.equal(turn(combat, "元素蝕印", 500, [{ hit: true }], core).equipmentSkillDamageBonusPercent, 0);
 });
 
 test("normal kill retains player shield and unused buff; death and new battle boundaries clear them", () => {

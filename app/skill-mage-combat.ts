@@ -96,6 +96,7 @@ export type MageTurnResult = {
   skillEfficiencyBonusPercent: number;
   skillDamagePenaltyPercent: number;
   passiveDirectDamageBonusPercent: number;
+  equipmentSkillDamageBonusPercent: number;
   passiveStatusChancePoints: number;
   passiveUltimateEnergyGain: number;
   abnormalKindsCounted: number;
@@ -170,12 +171,16 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   // cast; a normal attack never spends this buff.
   const shieldCast = consumeMageShieldActiveCast(combat.shield, isActive);
 
+  const hasDirectDamage = input.skill === "normal" || input.skill === "霜火新星"
+    || input.skill === "奧術飛彈" || input.skill === "隕星術"
+    || input.skill === "虛空崩解" || input.skill === "星界寂滅";
+  const equipmentSkillDamageBonusPercent = isActive && hasDirectDamage && combat.shield.value > 0
+    && equippedSkillMythic(input.equippedItems ?? [], "魔力護盾")?.id === "skill-mage-eternal-core"
+    ? 25 : 0;
   const passive = resolveMagePassiveAttack(combat.build, {
     kind: isActive ? "skill" : "normal", hits: input.hits,
     targetStatuses: session.enemy, shieldValue: combat.shield.value,
-    hasDirectDamage: input.skill === "normal" || input.skill === "霜火新星"
-      || input.skill === "奧術飛彈" || input.skill === "隕星術"
-      || input.skill === "虛空崩解" || input.skill === "星界寂滅",
+    hasDirectDamage,
     isUltimate: input.skill === "星界寂滅",
     finalExplosionConfirmed: input.finalExplosionConfirmed ?? false,
     roll: input.roll ?? Math.random,
@@ -284,6 +289,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     skillEfficiencyBonusPercent: overloadResult?.skillEfficiencyBonusPercent ?? 0,
     skillDamagePenaltyPercent: overloadResult?.skillDamagePenaltyPercent ?? 0,
     passiveDirectDamageBonusPercent: passive.directDamageBonusPercent,
+    equipmentSkillDamageBonusPercent,
     passiveStatusChancePoints: passive.activeStatusChancePoints,
     passiveUltimateEnergyGain: passive.ultimateEnergyGain,
     abnormalKindsCounted: passive.abnormalCount,
