@@ -11,7 +11,7 @@ import {
   type SkillCombatSession,
   type StatusApplication,
 } from "./skill-combat-session";
-import { type PrimaryAttackEvent } from "./skill-combat-queue";
+import { type CombatBoundary, type PrimaryAttackEvent } from "./skill-combat-queue";
 import {
   WARRIOR_ACTIVE_RULES,
   consumeWarriorPrimaryAttack,
@@ -47,8 +47,20 @@ export function createWarriorCombat(build: SkillBuild, level: number): WarriorCo
   };
 }
 
+export function transitionWarriorCombat(combat: WarriorCombat, boundary: CombatBoundary): WarriorCombat {
+  const normalKill = boundary === "normal-kill";
+  return {
+    ...combat,
+    session: transitionCombatSession(combat.session, boundary),
+    buffs: normalKill ? combat.buffs : createWarriorBuffState(),
+    passives: normalKill ? combat.passives : createWarriorPassiveState(),
+    defense: normalKill ? combat.defense : createWarriorDefenseState(),
+    bloodBrandBurstUsed: false,
+  };
+}
+
 export function transitionWarriorNormalKill(combat: WarriorCombat): WarriorCombat {
-  return { ...combat, session: transitionCombatSession(combat.session, "normal-kill"), bloodBrandBurstUsed: false };
+  return transitionWarriorCombat(combat, "normal-kill");
 }
 
 export type WarriorTurnInput = {

@@ -84,7 +84,7 @@ export function resolveSkillAction(
 export type ProcCandidate = {
   id: string;
   kind: "damage" | "buff" | "status";
-  source: "primary" | "secondary" | "proc" | "dot";
+  source: "primary" | "secondary" | "ascension" | "counter" | "proc" | "dot";
   family: "passive" | "equipment";
 };
 
@@ -95,9 +95,14 @@ const statusNameByKind: Partial<Record<EnemyDebuffKind, string>> = {
 };
 
 export function trySkillProc(session: SkillCombatSession, candidate: ProcCandidate): { allowed: boolean; session: SkillCombatSession } {
-  if (candidate.kind !== "damage") return { allowed: true, session };
-  if (candidate.source === "proc" || candidate.source === "dot") return { allowed: false, session };
+  // A standalone secondary attack may trigger equipment once, but follow-up
+  // damage from an ascension, counter, proc or DoT cannot start any new proc.
+  if (candidate.source === "ascension" || candidate.source === "counter"
+      || candidate.source === "proc" || candidate.source === "dot") {
+    return { allowed: false, session };
+  }
   if (candidate.source === "secondary" && candidate.family === "passive") return { allowed: false, session };
+  if (candidate.kind !== "damage") return { allowed: true, session };
   if (session.usedDamageProcs.includes(candidate.id) || session.usedDamageProcs.length >= 2) {
     return { allowed: false, session };
   }

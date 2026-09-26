@@ -7,7 +7,7 @@ import {
   trySkillProc,
   type SkillCombatSession, type StatusApplication,
 } from "./skill-combat-session";
-import { recoverPrimaryAttackCharges, type PrimaryAttackEvent } from "./skill-combat-queue";
+import { recoverPrimaryAttackCharges, type CombatBoundary, type PrimaryAttackEvent } from "./skill-combat-queue";
 import {
   RANGER_ACTIVE_RULES, activateRangerWindDomain, consumeRangerWindDomain,
   createRangerWindDomain, rangerSkillRankValue,
@@ -42,11 +42,20 @@ export function createRangerCombat(build: SkillBuild, level: number): RangerComb
   };
 }
 
-export function transitionRangerNormalKill(combat: RangerCombat): RangerCombat {
+export function transitionRangerCombat(combat: RangerCombat, boundary: CombatBoundary): RangerCombat {
+  const normalKill = boundary === "normal-kill";
   return {
-    ...combat, session: transitionCombatSession(combat.session, "normal-kill"),
+    ...combat, session: transitionCombatSession(combat.session, boundary),
+    windDomain: normalKill ? combat.windDomain : createRangerWindDomain(),
+    passives: normalKill ? combat.passives : createRangerPassiveState(),
+    defense: normalKill ? combat.defense : createRangerDefenseState(),
+    nextSkillIgnoreDefensePending: normalKill && combat.nextSkillIgnoreDefensePending,
     hunterMarkCriticalHits: 0, hunterExplosionPending: false,
   };
+}
+
+export function transitionRangerNormalKill(combat: RangerCombat): RangerCombat {
+  return transitionRangerCombat(combat, "normal-kill");
 }
 
 export type RangerTurnInput = {
