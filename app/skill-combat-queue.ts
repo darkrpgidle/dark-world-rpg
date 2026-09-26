@@ -104,6 +104,24 @@ export function recordSuccessfulDodge(state: SkillCombatState): SkillCombatState
   return next;
 }
 
+// Recovery from a skill effect is not a new attack: it awards no ultimate energy
+// and never reorders skills that were already ready.
+export function recoverPrimaryAttackCharges(state: SkillCombatState, amount: number): SkillCombatState {
+  if (!Number.isInteger(amount) || amount < 0) throw new RangeError("Charge recovery must be a nonnegative integer");
+  const next = copyState(state);
+  if (!amount) return next;
+  const newlyReady: string[] = [];
+  for (const name of Object.keys(next.charges)) {
+    const rule = SKILL_CHARGE_RULES[next.characterClass][name];
+    if (rule.event !== "primary" || next.ready.includes(name)) continue;
+    next.charges[name] = Math.min(rule.threshold, next.charges[name] + amount);
+    if (next.charges[name] === rule.threshold) newlyReady.push(name);
+  }
+  newlyReady.sort((a, b) => next.slots.indexOf(a) - next.slots.indexOf(b));
+  next.ready.push(...newlyReady);
+  return next;
+}
+
 export function nextReadySkill(
   state: SkillCombatState, targetAvailable: boolean, targetStatuses: ReadonlySet<string> = new Set(),
 ): string | null {
