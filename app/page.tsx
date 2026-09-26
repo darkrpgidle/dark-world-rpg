@@ -1560,7 +1560,17 @@ function EquipmentName({ item }: { item: Item }) {
 function EquipmentEpithetDetails({ item }: { item: Item }) {
   const { prefix, suffix } = getItemEpithets(item);
   if (!prefix && !suffix) return null;
-  return <div className="equipment-epithet-details"><strong>特殊前後綴</strong>{[prefix, suffix].filter((effect) => effect !== undefined).map((effect) => <div key={effect.id}><b>{effect.name}</b>：{effect.description}</div>)}{["chase", "charge"].includes(suffix?.id ?? "") && <small>觸發型效果未計入靜態戰力評級。</small>}</div>;
+  return <>
+    {[prefix, suffix].filter((effect) => effect !== undefined).map((effect) => (
+      <span key={effect.id} className="gear-epithet-stat">
+        <b><em className="equipment-epithet">{effect.name}</em></b>
+        <small>{effect.description}</small>
+      </span>
+    ))}
+    {["chase", "charge"].includes(suffix?.id ?? "") && (
+      <small className="gear-epithet-note">觸發型效果未計入靜態戰力評級。</small>
+    )}
+  </>;
 }
 
 function affixRange(item: Item, affix: string) {
@@ -1714,6 +1724,7 @@ function GearTooltip({
             )}
           </span>
         ))}
+        <EquipmentEpithetDetails item={item} />
       </div>
       <div className="affix-divider"><span>詞綴加成</span></div>
       <ul className="gear-affixes">
@@ -1724,7 +1735,6 @@ function GearTooltip({
           </li>
         ))}
       </ul>
-      <EquipmentEpithetDetails item={item} />
       {catalogDefinition && (
         <>
           <div className="catalog-story">
