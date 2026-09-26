@@ -90,6 +90,7 @@ import {
 } from "./game-data";
 import {
   dropPowerRange,
+  enhancementBonusPercent,
   enhancementFailureLevel,
   enhancementGoldCost,
   enhancementStoneDismantleYield,
@@ -835,15 +836,6 @@ function equipmentIconPath(item: Item) {
   return `/equipment/map-${mapId}/${slot}.png`;
 }
 
-function enhancementBonusPercent(level: number) {
-  const safeLevel = Math.max(0, Math.min(balanceConfig.progression.maxEnhancement, level));
-  const rules = balanceConfig.equipment.enhancement;
-  return (
-    Math.min(5, safeLevel) * rules.firstFivePerLevel +
-    Math.max(0, Math.min(10, safeLevel) - 5) * rules.nextFivePerLevel +
-    Math.max(0, safeLevel - 10) * rules.finalFivePerLevel
-  );
-}
 
 function equipmentBaseStats(item: Item, enhanceLevel = item.enhance): EquipmentStat[] {
   const mapId = equipmentMapId(item);
