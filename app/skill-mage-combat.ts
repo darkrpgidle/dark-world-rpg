@@ -13,6 +13,7 @@ import {
   mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
 import { countMageAbnormalKinds, resolveMagePassiveAttack } from "./skill-mage-passives";
+import { equippedSkillMythic } from "./mythic-data";
 import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
 import {
   consumeMageSigilActiveCast, createMageSigilState, recordMageSigilStatuses,
@@ -65,6 +66,7 @@ export type MageTurnInput = {
   now: number;
   ascended: ReadonlySet<MageActiveName>;
   roll?: () => number;
+  equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[];
   finalExplosionConfirmed?: boolean; // final original ultimate segment was the explosion
 };
 
@@ -98,6 +100,14 @@ export type MageTurnResult = {
   passiveUltimateEnergyGain: number;
   abnormalKindsCounted: number;
   passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
+  // A second meteor is resolved by the caller as its own hit/crit and VFX.
+  // Its 70% is relative to the original meteor's final damage.
+  equipmentDamageEvents: {
+    id: "滅世星雨";
+    damageRatio: number;
+    guaranteedCritical: true;
+    afterOriginalSegment: 1;
+  }[];
   shieldAscensionDamageBonusPercent: number;
   sigilAscensionStatusChancePoints: number;
 };
@@ -226,6 +236,18 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     : input.skill === "霜火新星" || input.skill === "隕星術" || input.skill === "虛空崩解"
       ? [mageSkillRankValue(MAGE_ACTIVE_RULES[input.skill].damage, rank)]
       : input.skill === "normal" ? [100] : [];
+  const equipmentDamageEvents: MageTurnResult["equipmentDamageEvents"] = [];
+  if (input.skill === "隕星術" && successfulHit
+      && equippedSkillMythic(input.equippedItems ?? [], "隕星術")?.id === "skill-mage-cataclysm-crown"
+      && (input.roll ?? Math.random)() < 0.35) {
+    const checked = trySkillProc(session, {
+      id: "skill-mage-cataclysm-crown", kind: "damage", source: "primary", family: "equipment",
+    });
+    session = checked.session;
+    if (checked.allowed) equipmentDamageEvents.push({
+      id: "滅世星雨", damageRatio: 0.7, guaranteedCritical: true, afterOriginalSegment: 1,
+    });
+  }
   const ascensionDamageEvents: MageTurnResult["ascensionDamageEvents"] = [];
   if (input.skill !== "normal" && input.ascended.has(input.skill)) {
     if (input.skill === "霜火新星" && successfulHit && targetBurningAtStart) {
@@ -247,6 +269,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   return {
     combat: { ...combat, session, overload, shield: shieldCast.state, sigil },
     damageSegmentPercents,
+    equipmentDamageEvents,
     ascensionDamageEvents,
     totalDamagePercent: input.skill === "星界寂滅"
       ? mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank) : 0,

@@ -8,6 +8,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 } });
 const { createSkillBuild, upgradeSkill, equipActiveSkill } = await import("../app/skill-rework.ts");
 const { applyEnemyDebuff } = await import("../app/skill-debuff-timer.ts");
+const { trySkillProc } = await import("../app/skill-combat-session.ts");
 const {
   createMageCombat, resolveMageTurn, transitionMageCombat,
   recordMageStability, clearMageCombatExhaustion,
@@ -26,8 +27,57 @@ function mage(names, slots = names.filter((name) => name !== "星界寂滅"), ra
 function turn(combat, skill, now, hits = [{ hit: true }], options = {}) {
   return resolveMageTurn(combat, {
     skill, now, hits, ascended: options.ascended ?? new Set(), roll: options.roll ?? (() => 1),
+    equippedItems: options.equippedItems,
   });
 }
+
+test("meteor mythic adds one critical second meteor without another cast or charge", () => {
+  const item = { mythicId: "skill-mage-cataclysm-crown" };
+  const ready = normalUntilSkillReady(mage(["隕星術"]), "隕星術");
+  const base = turn(ready, "隕星術", 1000, [{ hit: true }], { roll: () => 0.99 });
+  const rolls = [0.99, 0.34]; // burn fails; the equipment's 35% roll succeeds
+  const equipped = turn(ready, "隕星術", 1000, [{ hit: true }], {
+    equippedItems: [item], roll: () => rolls.shift(),
+  });
+  assert.deepEqual(equipped.equipmentDamageEvents, [{
+    id: "滅世星雨", damageRatio: 0.7, guaranteedCritical: true, afterOriginalSegment: 1,
+  }]);
+  assert.deepEqual(equipped.damageSegmentPercents, base.damageSegmentPercents);
+  assert.deepEqual(equipped.combat.session.charge, base.combat.session.charge);
+  assert.deepEqual(equipped.combat.session.usedDamageProcs, ["skill-mage-cataclysm-crown"]);
+  assert.equal(rolls.length, 0);
+});
+
+test("meteor mythic requires its own equipment and hit, and shares two proc slots", () => {
+  const item = { mythicId: "skill-mage-cataclysm-crown" };
+  const ready = normalUntilSkillReady(mage(["隕星術"]), "隕星術");
+  const noItem = turn(ready, "隕星術", 1000, [{ hit: true }], { roll: () => 0 });
+  assert.deepEqual(noItem.equipmentDamageEvents, []);
+  const otherItem = turn(ready, "隕星術", 1000, [{ hit: true }], {
+    equippedItems: [{ mythicId: "skill-mage-polar-staff" }], roll: () => 0,
+  });
+  assert.deepEqual(otherItem.equipmentDamageEvents, []);
+  const miss = turn(ready, "隕星術", 1000, [{ hit: false }], {
+    equippedItems: [item], roll: () => 0,
+  });
+  assert.deepEqual(miss.equipmentDamageEvents, []);
+  const failed = turn(ready, "隕星術", 1000, [{ hit: true }], {
+    equippedItems: [item], roll: () => 0.35,
+  });
+  assert.deepEqual(failed.equipmentDamageEvents, []);
+  const success = turn(ready, "隕星術", 1000, [{ hit: true }], {
+    equippedItems: [item], roll: () => 0,
+  });
+  assert.equal(success.combat.session.usedDamageProcs.length, 1);
+  const second = trySkillProc(success.combat.session, {
+    id: "another-equipment", kind: "damage", source: "primary", family: "equipment",
+  });
+  const third = trySkillProc(second.session, {
+    id: "third-equipment", kind: "damage", source: "primary", family: "equipment",
+  });
+  assert.equal(second.allowed, true);
+  assert.equal(third.allowed, false);
+});
 
 function normalUntilReady(combat, count, startingAt = 0) {
   for (let i = 0; i < count; i++) combat = turn(combat, "normal", startingAt + i * 100).combat;
