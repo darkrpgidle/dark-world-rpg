@@ -1,10 +1,10 @@
 // Stage 19: mage primary actions on the isolated reworked combat path.
 // The caller rolls each hit/critical, applies HP damage and plays VFX.
 import type { SkillBuild } from "./skill-rework";
-import type { CombatBoundary, PrimaryAttackEvent } from "./skill-combat-queue";
+import { grantUltimateEnergy, type CombatBoundary, type PrimaryAttackEvent } from "./skill-combat-queue";
 import {
   advanceCombatSession, createSkillCombatSession, resolveSkillAction,
-  takeReadySkill, transitionCombatSession,
+  takeReadySkill, transitionCombatSession, trySkillProc,
   type SkillCombatSession, type StatusApplication,
 } from "./skill-combat-session";
 import {
@@ -12,6 +12,7 @@ import {
   clearMageExhaustion, consumeMageOverload, createMageOverload,
   mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
+import { resolveMagePassiveAttack } from "./skill-mage-passives";
 
 export type MageCombat = {
   session: SkillCombatSession;
@@ -52,6 +53,8 @@ export type MageTurnInput = {
   now: number;
   ascended: ReadonlySet<MageActiveName>;
   roll?: () => number;
+  shieldValue?: number; // the stage-21 shield adapter supplies the current value
+  finalExplosionConfirmed?: boolean; // final original ultimate segment was the explosion
 };
 
 export type MageTurnResult = {
@@ -67,6 +70,11 @@ export type MageTurnResult = {
   dueTicks: ReturnType<typeof advanceCombatSession>["ticks"];
   skillEfficiencyBonusPercent: number;
   skillDamagePenaltyPercent: number;
+  passiveDirectDamageBonusPercent: number;
+  passiveStatusChancePoints: number;
+  passiveUltimateEnergyGain: number;
+  abnormalKindsCounted: number;
+  passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
 };
 
 export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageTurnResult | null {
@@ -106,12 +114,24 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const conditionalDamageBonusPercent = input.skill === "虛空崩解" && targetAbnormal
     ? mageSkillRankValue(MAGE_ACTIVE_RULES.虛空崩解.damageBonusVsStatus, rank) : 0;
 
-  const statusApplications: StatusApplication[] = [];
+  const passive = resolveMagePassiveAttack(combat.build, {
+    kind: isActive ? "skill" : "normal", hits: input.hits,
+    targetStatuses: session.enemy, shieldValue: input.shieldValue ?? 0,
+    hasDirectDamage: input.skill === "normal" || input.skill === "霜火新星"
+      || input.skill === "奧術飛彈" || input.skill === "隕星術"
+      || input.skill === "虛空崩解" || input.skill === "星界寂滅",
+    isUltimate: input.skill === "星界寂滅",
+    finalExplosionConfirmed: input.finalExplosionConfirmed ?? false,
+    roll: input.roll ?? Math.random,
+  });
+
+  const statusApplications: StatusApplication[] = [...passive.statuses];
   let burnChancePercent = 0;
   if (successfulHit && (input.skill === "霜火新星" || input.skill === "隕星術")) {
     const chances = input.skill === "霜火新星"
       ? MAGE_ACTIVE_RULES.霜火新星.burnChance : MAGE_ACTIVE_RULES.隕星術.burnChance;
-    burnChancePercent = Math.min(100, mageSkillRankValue(chances, rank) + targetHadSigil);
+    burnChancePercent = Math.min(100, mageSkillRankValue(chances, rank)
+      + targetHadSigil + passive.activeStatusChancePoints);
     // A multi-segment cast receives one status roll per status category.
     if ((input.roll ?? Math.random)() * 100 < burnChancePercent) {
       statusApplications.push({ kind: "burn" });
@@ -129,13 +149,22 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  if (passive.ultimateEnergyGain) {
+    session = { ...session, charge: grantUltimateEnergy(session.charge, passive.ultimateEnergyGain) };
+  }
+  const passiveDamageProcs: MageTurnResult["passiveDamageProcs"] = [];
+  for (const candidate of passive.damageCandidates) {
+    const checked = trySkillProc(session, { id: candidate.id, kind: "damage", source: "primary", family: "passive" });
+    session = checked.session;
+    if (checked.allowed) passiveDamageProcs.push(candidate);
+  }
 
   // Overload activation itself has no target hit and does not consume one of
   // its six following successful active casts. Other skills consume at most
   // once even when several of their original segments connect.
   const overloadResult = input.skill === "奧術超載" ? null : consumeMageOverload(combat.overload, {
     kind: isActive ? "skill" : "normal", hits: input.hits,
-  });
+  }, combat.build.ranks["枯竭控制"] ?? 0);
   const overload = input.skill === "奧術超載"
     ? activateMageOverload(rank, input.ascended.has("奧術超載"))
     : overloadResult!.state;
@@ -158,5 +187,10 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     dueTicks: [...settled.ticks, ...action.ticks],
     skillEfficiencyBonusPercent: overloadResult?.skillEfficiencyBonusPercent ?? 0,
     skillDamagePenaltyPercent: overloadResult?.skillDamagePenaltyPercent ?? 0,
+    passiveDirectDamageBonusPercent: passive.directDamageBonusPercent,
+    passiveStatusChancePoints: passive.activeStatusChancePoints,
+    passiveUltimateEnergyGain: passive.ultimateEnergyGain,
+    abnormalKindsCounted: passive.abnormalCount,
+    passiveDamageProcs,
   };
 }

@@ -104,6 +104,18 @@ export function recordSuccessfulDodge(state: SkillCombatState): SkillCombatState
   return next;
 }
 
+// Resource effects from one resolved event (e.g. a learned passive) do not
+// create another attack, re-charge skills or reorder already-ready casts.
+export function grantUltimateEnergy(state: SkillCombatState, amount: number): SkillCombatState {
+  if (!Number.isSafeInteger(amount) || amount < 0) throw new RangeError("Ultimate energy gain must be a nonnegative integer");
+  const next = copyState(state);
+  if (next.ultimate && amount > 0) {
+    next.ultimateEnergy = Math.min(100, next.ultimateEnergy + amount);
+    if (next.ultimateEnergy === 100 && !next.ready.includes(next.ultimate)) next.ready.push(next.ultimate);
+  }
+  return next;
+}
+
 // Recovery from a skill effect is not a new attack: it awards no ultimate energy
 // and never reorders skills that were already ready.
 export function recoverPrimaryAttackCharges(state: SkillCombatState, amount: number): SkillCombatState {
