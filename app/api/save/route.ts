@@ -51,7 +51,7 @@ function prepareAuthoritativePayload(
   clientId: string,
   clientSequence: number,
 ) {
-  const next = { ...incoming, _saveSessionId: sessionId };
+  const next: Record<string, unknown> = { ...incoming, _saveSessionId: sessionId };
   delete next._lastSkillActionId;
   delete next._lastSkillRebirthLegacyCount;
   let serverSave: Record<string, unknown> | null = null;
