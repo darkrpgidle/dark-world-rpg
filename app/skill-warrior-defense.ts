@@ -8,10 +8,11 @@ import { WARRIOR_ACTIVE_RULES, warriorSkillRankValue } from "./skill-warrior-rul
 export type WarriorDefenseState = {
   receivedAttacks: number;
   guaranteedBlockPending: boolean;
+  ascendedCounterStacks: number;
 };
 
 export function createWarriorDefenseState(): WarriorDefenseState {
-  return { receivedAttacks: 0, guaranteedBlockPending: false };
+  return { receivedAttacks: 0, guaranteedBlockPending: false, ascendedCounterStacks: 0 };
 }
 
 export function warriorDefenseActivation(build: SkillBuild, ascended: boolean) {
@@ -43,6 +44,7 @@ export function recordWarriorEnemyAttack(combat: WarriorCombat, input: WarriorEn
   const defense: WarriorDefenseState = {
     receivedAttacks: activation ? 0 : total,
     guaranteedBlockPending: combat.defense.guaranteedBlockPending || Boolean(activation?.grantsGuaranteedBlock),
+    ascendedCounterStacks: combat.defense.ascendedCounterStacks,
   };
   return {
     combat: { ...combat, defense },
@@ -52,11 +54,13 @@ export function recordWarriorEnemyAttack(combat: WarriorCombat, input: WarriorEn
 }
 
 // Called only after the surrounding battle engine confirms a successful block.
-export function recordWarriorSuccessfulBlock(combat: WarriorCombat) {
+export function recordWarriorSuccessfulBlock(combat: WarriorCombat, ascended = false) {
+  const ascendedCounterStacks = ascended && (combat.build.ranks["不屈戰意"] ?? 0) > 0
+    ? Math.min(3, combat.defense.ascendedCounterStacks + 1) : combat.defense.ascendedCounterStacks;
   return {
     combat: {
       ...combat,
-      defense: { ...combat.defense, guaranteedBlockPending: false },
+      defense: { ...combat.defense, guaranteedBlockPending: false, ascendedCounterStacks },
       passives: recordWarriorBlock(combat.passives, combat.build),
     },
     consumedGuaranteedBlock: combat.defense.guaranteedBlockPending,
@@ -64,7 +68,15 @@ export function recordWarriorSuccessfulBlock(combat: WarriorCombat) {
 }
 
 // Called only after a counterattack occurs; a failed counter roll does not consume it.
-export function recordWarriorCounter(combat: WarriorCombat) {
+export function recordWarriorCounter(combat: WarriorCombat, hit = true) {
   const counter = consumeWarriorCounter(combat.passives, combat.build);
-  return { combat: { ...combat, passives: counter.state }, damageBonusPercent: counter.damageBonusPercent };
+  const bonus = counter.damageBonusPercent + combat.defense.ascendedCounterStacks * 20;
+  return {
+    combat: { ...combat, passives: counter.state,
+      defense: { ...combat.defense, ascendedCounterStacks: 0 } },
+    damageBonusPercent: hit ? bonus : 0,
+    // The counter's base damage and hit/crit are owned by the caller. No
+    // primary attack, charge, energy, status or passive proc is created here.
+    counterDamageEvent: hit ? { id: "反擊" as const, damageBonusPercent: bonus } : null,
+  };
 }

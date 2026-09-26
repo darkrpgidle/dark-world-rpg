@@ -34,7 +34,8 @@ test("one enemy attack event counts once even with many segments; fourth event a
   assert.deepEqual(fourth.activation, {
     blockChancePercent: 15, counterChancePercent: 10, grantsGuaranteedBlock: true,
   });
-  assert.deepEqual(fourth.combat.defense, { receivedAttacks: 0, guaranteedBlockPending: true });
+  assert.deepEqual(fourth.combat.defense,
+    { receivedAttacks: 0, guaranteedBlockPending: true, ascendedCounterStacks: 0 });
   assert.equal(enemy(fourth.combat, true).combat.defense.receivedAttacks, 1);
 });
 

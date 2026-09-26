@@ -81,13 +81,17 @@ export function recordWarriorSkillHit(
 
 export function consumeWarriorPrimaryAttack(
   state: WarriorBuffState, causedBleedOrArmorBreak: boolean,
-): { state: WarriorBuffState; damageBonusPercent: number; lifestealPercent: number; extraDamagePercents: number[]; attackSpeedBonusPercent: number; defensePenaltyPercent: number } {
+): { state: WarriorBuffState; damageBonusPercent: number; lifestealPercent: number;
+  extraDamagePercents: number[];
+  additionalEvents: { id: "地脈崩裂" | "天地斷絕" | "血怒終焉"; percent: number }[];
+  attackSpeedBonusPercent: number; defensePenaltyPercent: number } {
   const roar = state.bloodRoarRemaining > 0;
   const stance = state.stanceRemaining > 0;
-  const extraDamagePercents = [
-    ...(state.groundShockPending ? [60] : []),
-    ...(state.titanSlashesRemaining > 0 ? [70] : []),
-    ...(roar && state.bloodRoarRemaining === 1 && state.bloodRoarAscended ? [180] : []),
+  const additionalEvents: { id: "地脈崩裂" | "天地斷絕" | "血怒終焉"; percent: number }[] = [
+    ...(state.groundShockPending ? [{ id: "地脈崩裂" as const, percent: 60 }] : []),
+    ...(state.titanSlashesRemaining > 0 ? [{ id: "天地斷絕" as const, percent: 70 }] : []),
+    ...(roar && state.bloodRoarRemaining === 1 && state.bloodRoarAscended
+      ? [{ id: "血怒終焉" as const, percent: 180 }] : []),
   ];
   const canExtendStance = stance && state.stanceAscended && causedBleedOrArmorBreak && state.stanceExtensions < 3;
   return {
@@ -102,7 +106,8 @@ export function consumeWarriorPrimaryAttack(
     damageBonusPercent: (roar ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.鮮血怒吼.damageBonus, state.bloodRoarRank) : 0)
       + (stance ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.狂戰姿態.damageBonus, state.stanceRank) : 0),
     lifestealPercent: roar ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.鮮血怒吼.lifesteal, state.bloodRoarRank) : 0,
-    extraDamagePercents,
+    extraDamagePercents: additionalEvents.map((event) => event.percent),
+    additionalEvents,
     attackSpeedBonusPercent: stance ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.狂戰姿態.attackSpeedBonus, state.stanceRank) : 0,
     defensePenaltyPercent: stance ? 15 : 0,
   };

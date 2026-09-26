@@ -58,6 +58,9 @@ export type WarriorTurnInput = {
   now: number;
   ascended: ReadonlySet<WarriorActiveName>;
   roll?: () => number;
+  // Player debuffs are owned by the caller; its ordering chooses which one
+  // to remove if the ascended roar activates on this event.
+  negativeStatuses?: readonly string[];
 };
 
 export type WarriorTurnResult = {
@@ -65,7 +68,7 @@ export type WarriorTurnResult = {
   baseDamagePercent: number;
   bonusDamagePercent: number;
   extraDamagePercents: number[];
-  ascensionDamageEvents: { id: "血祭印記"; percent: 100 }[];
+  ascensionDamageEvents: { id: "血祭印記" | "地脈崩裂" | "天地斷絕" | "血怒終焉"; percent: number }[];
   passiveDamageProcs: { id: "堅盾反射" | "泰坦餘震"; percent: number }[];
   lifestealPercent: number;
   attackSpeedBonusPercent: number;
@@ -74,6 +77,8 @@ export type WarriorTurnResult = {
   statusApplications: StatusApplication[];
   dueTicks: ReturnType<typeof advanceCombatSession>["ticks"];
   clearsOneNegativeStatus: boolean;
+  clearedNegativeStatus: string | null;
+  remainingNegativeStatuses: string[];
   // Exact conversion of repeated armor break to damage is not specified yet.
   repeatedArmorBreakBonusCapPercent: number;
 };
@@ -146,13 +151,14 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     && (combat.build.ranks["血戰烙印"] ?? 0) > 0
     && input.ascended.has("血戰烙印")
     && statusApplications.some((status) => status.kind === "bleed");
-  const ascensionDamageEvents: WarriorTurnResult["ascensionDamageEvents"] = bloodBrandBurst
-    ? [{ id: "血祭印記", percent: 100 }] : [];
 
   // Buffs already present at the start of this action are consumed once. A
   // newly cast stance starts after this action, lasting eight later actions.
   const modifiers = consumeWarriorPrimaryAttack(buffs, statusApplications.some((status) => status.kind === "bleed" || status.kind === "armorBreak"));
   buffs = modifiers.state;
+  const ascensionDamageEvents: WarriorTurnResult["ascensionDamageEvents"] = successfulHit
+    ? [...modifiers.additionalEvents, ...(bloodBrandBurst ? [{ id: "血祭印記" as const, percent: 100 }] : [])]
+    : [];
   const action = resolveSkillAction(session, {
     kind: active ? "skill" : "normal", hits: input.hits, successfulStatuses: statusApplications,
   }, input.now);
@@ -168,6 +174,10 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   }
   if (input.skill === "狂戰姿態") buffs = triggerWarriorStance(buffs, rank, input.ascended.has("狂戰姿態"));
 
+  const clearsOneNegativeStatus = Boolean(newlyTriggeredRoar && input.ascended.has("鮮血怒吼"));
+  const negativeStatuses = input.negativeStatuses ?? [];
+  const clearedNegativeStatus = clearsOneNegativeStatus ? negativeStatuses[0] ?? null : null;
+
   return {
     combat: {
       ...combat, session, buffs, passives: passive.state,
@@ -176,7 +186,7 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     baseDamagePercent,
     bonusDamagePercent: modifiers.damageBonusPercent + passive.damageBonusPercent,
     extraDamagePercents: [
-      ...modifiers.extraDamagePercents, ...ascensionDamageEvents.map((event) => event.percent),
+      ...ascensionDamageEvents.map((event) => event.percent),
       ...passiveDamageProcs.map((proc) => proc.percent),
     ],
     ascensionDamageEvents,
@@ -187,7 +197,9 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     bleedChancePercent,
     statusApplications,
     dueTicks: [...settled.ticks, ...action.ticks],
-    clearsOneNegativeStatus: Boolean(newlyTriggeredRoar && input.ascended.has("鮮血怒吼")),
+    clearsOneNegativeStatus,
+    clearedNegativeStatus,
+    remainingNegativeStatuses: clearedNegativeStatus === null ? [...negativeStatuses] : negativeStatuses.slice(1),
     repeatedArmorBreakBonusCapPercent: input.skill === "碎甲猛擊" && previousArmorBreak && input.ascended.has("碎甲猛擊") ? 60 : 0,
   };
 }
