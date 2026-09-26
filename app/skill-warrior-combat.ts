@@ -27,9 +27,11 @@ import {
   resolveWarriorPassiveAttack,
   type WarriorPassiveState,
 } from "./skill-warrior-passives";
+import { createWarriorDefenseState, type WarriorDefenseState } from "./skill-warrior-defense";
 
 export type WarriorCombat = {
-  session: SkillCombatSession; buffs: WarriorBuffState; passives: WarriorPassiveState; build: SkillBuild;
+  session: SkillCombatSession; buffs: WarriorBuffState; passives: WarriorPassiveState;
+  defense: WarriorDefenseState; build: SkillBuild;
 };
 
 export function createWarriorCombat(build: SkillBuild, level: number): WarriorCombat {
@@ -37,6 +39,7 @@ export function createWarriorCombat(build: SkillBuild, level: number): WarriorCo
     session: createSkillCombatSession(build, "戰士", level),
     buffs: createWarriorBuffState(),
     passives: createWarriorPassiveState(),
+    defense: createWarriorDefenseState(),
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
   };
 }
