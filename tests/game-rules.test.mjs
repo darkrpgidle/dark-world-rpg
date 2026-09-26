@@ -643,7 +643,8 @@ test("caps all scene equipment at legendary and reserves mythic gear", () => {
 test("allows mythic equipment to roll five affixes", () => {
   assert.match(page, /const MAX_AFFIXES_BY_QUALITY = \[0, 1, 2, 3, 4, 5\]/);
   assert.match(page, /const affixCount = MAX_AFFIXES_BY_QUALITY/);
-  assert.match(page, /affixes: rollAffixes\(upgraded\)/);
+  assert.match(page, /const affixes = rollAffixes\(upgraded\)/);
+  assert.match(page, /\.\.\.upgraded,\s*affixes,/);
 });
 
 test("implements the confirmed rebirth reset and permanent growth rules", () => {
@@ -654,7 +655,7 @@ test("implements the confirmed rebirth reset and permanent growth rules", () => 
   assert.match(page, /setLoadouts\(\{ 1: \[\], 2: \[\] \}\)/);
   assert.match(page, /setGold\(save\.gold/);
   assert.match(page, /setYuanbao\(save\.yuanbao/);
-  assert.match(page, /equipmentDrop: rebirthTier \* 5/);
+  assert.match(page, /equipmentDrop: baseCharacterStats\.equipmentDrop \+ rebirthTier \* 5/);
   assert.match(page, /expBonus: baseCharacterStats\.expBonus \+ rebirthTier \* 20/);
   assert.match(page, /goldBonus: baseCharacterStats\.goldBonus \+ rebirthTier \* 20/);
   assert.match(page, /highQualityDrop: rebirthTier \* 3/);
