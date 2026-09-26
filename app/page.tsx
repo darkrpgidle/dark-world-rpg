@@ -155,10 +155,12 @@ const SAVE_MAX_INTERVAL_MS = 20_000;
 const LOGIN_INSTANCE_STORAGE_KEY = "dark-world-login-instance-v1";
 const LOGIN_ID_HEADER = "x-dark-world-login-id";
 const SET_ELEMENTAL_DAMAGE_PCT = 15;
+const SET_ATTACK_BONUS = 1.10;
+const SET_SKILL_DAMAGE_PCT = 20;
 const WORLD_BOSS_ROUND_MS = 60_000;
 const WORLD_BOSS_RESET_VERSION = "2026-09-14-60s";
 const SET_RESONANCE_ATTACKS = 10;
-const SET_RESONANCE_DAMAGE_PCT = 100;
+const SET_RESONANCE_DAMAGE_PCT = 200;
 const loginHeaders = (loginId: string, json = false): Record<string, string> => ({
   [LOGIN_ID_HEADER]: loginId,
   ...(json ? { "content-type": "application/json" } : {}),
@@ -2138,6 +2140,11 @@ function Game({
     key: number;
     hits: { damage: number; critical: boolean }[];
   }[]>([]);
+  const [setElementalHits, setSetElementalHits] = useState<{
+    key: number;
+    hits: { damage: number; label: string }[];
+    volley: boolean;
+  }[]>([]);
   const [enemyHitFeedback, setEnemyHitFeedback] = useState<{
     damage: number;
     dodged: boolean;
@@ -2567,13 +2574,13 @@ function Game({
     activeSetCount >= 10
       ? `每 ${SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發`
       : activeSetCount >= 8
-        ? "技能傷害 +12%"
+        ? `技能傷害 +${SET_SKILL_DAMAGE_PCT}%`
         : activeSetCount >= 6
           ? `每次攻擊追加 ${SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害`
           : activeSetCount >= 4
             ? "離線收益 +10%"
             : activeSetCount >= 2
-              ? "攻擊 +8%"
+              ? `攻擊 +${Math.round((SET_ATTACK_BONUS - 1) * 100)}%`
               : "尚未形成套裝共鳴";
   const monsterEvasionRating =
     evasionRules.monsterEvasionBase + mapId * evasionRules.monsterEvasionPerMap;
@@ -4294,7 +4301,7 @@ function Game({
                   : 1) *
               (bloodRoarWasActive ? 1 + bloodRoarDamageBonus(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0) / 100 : 1),
             skillDamage: characterStats.skillDamage +
-              (activeSetCount >= 8 ? 12 : 0) +
+              (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
               (skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
             eliteDamage: 0,
             bossReduction: characterStats.bossReduction,
@@ -4313,7 +4320,7 @@ function Game({
               (balanceConfig.combat.evasionModel.monsterEvasionBonusByMap[mapId] ?? 0),
             playerDamageMultiplier:
               attackPerkMultiplier *
-              (activeSetCount >= 2 ? 1.08 : 1) *
+              (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1) *
               (fissureWasActive ? 1.3 : 1) *
               (enemyAttackCount === 1 && hasEquippedEpithet(equippedGear, "chase") ? 1.1 : 1) *
               (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGear, "charge")
@@ -4329,13 +4336,11 @@ function Game({
               windCriticalMultiplier *
               bossDamageMultiplier,
           );
-          let hpDamage = baseHpDamage;
-          if (activeSetCount >= 6) {
-            hpDamage += Math.round(combatValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100);
-          }
-          if (setTriggered) {
-            hpDamage += Math.round(combatValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100);
-          }
+          const setElementalDamage = activeSetCount >= 6
+            ? Math.round(combatValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100) : 0;
+          const setResonanceDamage = setTriggered
+            ? Math.round(combatValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100) : 0;
+          let hpDamage = baseHpDamage + setElementalDamage + setResonanceDamage;
           if (fissureDetonationThisAttack) hpDamage += Math.round(combatValues.playerDamage);
           if (activeAttackPerks?.ironWallBonus) hpDamage += activeAttackPerks.ironWallBonus;
           if (bloodRoarFinalAttack) hpDamage += Math.round(combatValues.playerDamage * 2.5);
@@ -4429,11 +4434,10 @@ function Game({
               h <= 25
                 ? 2
                 : 1;
-            const finalHpDamage = Math.round(
-              hpDamage *
-                (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
-                executionMythicBonus,
-            );
+            const finalMultiplier =
+              (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
+              executionMythicBonus;
+            const finalHpDamage = Math.round(hpDamage * finalMultiplier);
             const enemyMaximumHealth = effectiveMonsterMaximumHealth(
               mapId,
               currentRecommendedPower,
@@ -4450,27 +4454,39 @@ function Game({
               1,
               Math.min(Math.round(currentEffectiveEnemyHealth), finalHpDamage),
             );
-            const baseHitDamage = Math.max(1, Math.floor(totalDisplayedDamage / attacks));
-            const remainder = Math.max(0, totalDisplayedDamage - baseHitDamage * attacks);
+            let mainDisplayedDamage = Math.min(totalDisplayedDamage,
+              Math.round((hpDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
+            const elementalDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage,
+              Math.round(setElementalDamage * finalMultiplier));
+            const resonanceDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed,
+              Math.round(setResonanceDamage * finalMultiplier));
+            mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed;
+            const baseHitDamage = Math.floor(mainDisplayedDamage / attacks);
+            const remainder = Math.max(0, mainDisplayedDamage - baseHitDamage * attacks);
             const hitDamages = windVolleyTriggered
-              ? Array.from({ length: attacks }, (_, index) =>
-                  Math.max(
-                    1,
-                    Math.round(
-                      (totalDisplayedDamage *
-                        (windVolleyCriticals[index] ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100 : 1)) /
-                        windVolleyCriticals.reduce<number>(
-                          (total, isCritical) => total + (isCritical ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100 : 1),
-                          0,
-                        ),
-                    ),
-                  ),
-                )
+              ? (() => {
+                  const weights = windVolleyCriticals.map((isCritical) =>
+                    isCritical ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100 : 1);
+                  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+                  const amounts = weights.map((weight) => Math.floor(mainDisplayedDamage * weight / weightTotal));
+                  let leftover = mainDisplayedDamage - amounts.reduce((sum, amount) => sum + amount, 0);
+                  for (let index = 0; leftover > 0; index = (index + 1) % amounts.length, leftover--) amounts[index]++;
+                  return amounts;
+                })()
               : Array.from({ length: attacks }, (_, index) =>
                   baseHitDamage + (index < remainder ? 1 : 0),
                 );
             const perHitDamage = hitDamages[0] ?? baseHitDamage;
             const publishDamageDisplay = () => {
+              const elementalHits = [
+                ...(elementalDisplayed > 0 ? [{ damage: elementalDisplayed, label: "元素" }] : []),
+                ...(resonanceDisplayed > 0 ? [{ damage: resonanceDisplayed, label: "元素爆發" }] : []),
+              ];
+              if (elementalHits.length) {
+                setSetElementalHits((current) => [...current, { key: next, hits: elementalHits, volley: windVolleyTriggered }]);
+                window.setTimeout(() => setSetElementalHits((current) => current.filter((hit) => hit.key !== next)),
+                  windVolleyTriggered ? 1_800 : 1_200);
+              }
               if (windVolleyTriggered) {
                 setRangerWindVolleyDamage((current) => [
                   ...current.filter((volley) => volley.key !== next),
@@ -5600,7 +5616,7 @@ function Game({
             bossSkillMultiplier *
             bossMarkMultiplier *
             bossExecutionDamageMultiplier *
-            (activeSetCount >= 2 ? 1.08 : 1) *
+            (activeSetCount >= 2 ? SET_ATTACK_BONUS : 1) *
             (hasPerk("special-warhelm") && bossPlayerHpRef.current > 80 ? 1.1 : 1) *
             (bossPlayerAttackCount === 1 && hasEquippedEpithet(equippedGearRef.current, "chase") ? 1.1 : 1),
           skillTriggered: Boolean(bossSkill),
@@ -5610,22 +5626,23 @@ function Game({
             (bossPlayerAttackCount <= 3 && hasEquippedEpithet(equippedGearRef.current, "charge") ? 8 : 0),
           skillDamage:
             characterStats.skillDamage +
-            (activeSetCount >= 8 ? 12 : 0) +
+            (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
             (bossSkill && hasPerk("skill-mage-eternal-core") ? 25 : 0),
           monsterAttack: bossBaseline.monsterDamage,
           monsterDefense: bossBaseline.monsterDefense,
           monsterMultiplier: activeBossBattle.multiplier,
         });
+        const bossElementalDamage = playerActs && activeSetCount >= 6
+          ? bossValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100 : 0;
+        const bossResonanceDamage = playerActs && setResonanceTriggered
+          ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100 : 0;
         const calculatedPlayerDamage = playerActs
-          ? bossValues.playerDamage *
-            (activeSetCount >= 6 ? 1 + SET_ELEMENTAL_DAMAGE_PCT / 100 : 1) +
-            (setResonanceTriggered
-              ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100
-              : 0) +
-            frostfireDetonationDamage
-          : 0;
+          ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage : 0;
         const remainingBossHealth = healthFromPercent(bossEnemyHpRef.current, activeBossBattle.hp);
         const playerDamage = Math.min(remainingBossHealth, calculatedPlayerDamage);
+        const shownBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
+        const shownBossElemental = Math.min(playerDamage - shownBossMain, bossElementalDamage);
+        const shownBossResonance = Math.max(0, playerDamage - shownBossMain - shownBossElemental);
         if (activeBossBattle.mode === "world" && playerActs) {
           setWorldDamage((value) => value + playerDamage);
           setWorldRoundDamage((value) => value + playerDamage);
@@ -5658,9 +5675,16 @@ function Game({
           const publishBossDamage = () => {
             setLastBossDamage(playerDamage);
             const groupKey = Date.now();
-            setBossDamageGroups((current) => [...current, { key: groupKey, damage: playerDamage }]);
+            setBossDamageGroups((current) => [...current, { key: groupKey, damage: shownBossMain }]);
+            const elementalHits = [
+              ...(shownBossElemental > 0 ? [{ damage: shownBossElemental, label: "元素" }] : []),
+              ...(shownBossResonance > 0 ? [{ damage: shownBossResonance, label: "元素爆發" }] : []),
+            ];
+            if (elementalHits.length)
+              setSetElementalHits((current) => [...current, { key: groupKey, hits: elementalHits, volley: false }]);
             window.setTimeout(() => {
               setBossDamageGroups((current) => current.filter((group) => group.key !== groupKey));
+              setSetElementalHits((current) => current.filter((group) => group.key !== groupKey));
             }, 1_200);
           };
           const bossDamageDisplayDelay = bossExecutionTriggered
@@ -6808,7 +6832,7 @@ function Game({
                         ) : battleHitGroups.length > 0 ? (
                           battleHitGroups.map((group) => (
                             <div key={`damage-sequence-${group.key}`} className="damage-sequence">
-                              {group.hits.map((hit, index) => (
+                              {group.hits.filter((hit) => hit.damage > 0).map((hit, index) => (
                                 <div
                                   key={`${group.key}-${index}`}
                                   className={`combo-hit ${hit.critical ? "critical-hit" : ""}`}
@@ -6831,7 +6855,7 @@ function Game({
                         key={`volley-damage-${volley.key}`}
                         className="damage-float player-damage-float volley-damage-float"
                       >
-                        {volley.hits.slice(0, volley.visible).map((hit, index) => (
+                        {volley.hits.slice(0, volley.visible).map((hit, index) => hit.damage > 0 && (
                           <div
                             key={`${volley.key}-${index}`}
                             className={`combo-hit volley-hit ${hit.critical ? "critical-hit" : ""}`}
@@ -6842,6 +6866,16 @@ function Game({
                           >
                             {hit.critical && index === 0 && <small>暴擊!</small>}
                             <b>-{hit.damage.toLocaleString()}</b>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {setElementalHits.map((group) => (
+                      <div key={`set-elemental-${group.key}`} className={`damage-float set-elemental-float ${group.volley ? "volley-elemental-float" : ""}`}>
+                        {group.hits.map((hit, index) => (
+                          <div key={`${group.key}-${index}`} className="combo-hit set-elemental-hit"
+                            style={{ "--hit-index": index, "--hit-count": group.hits.length } as React.CSSProperties}>
+                            <small>{hit.label}</small><b>-{Math.round(hit.damage).toLocaleString()}</b>
                           </div>
                         ))}
                       </div>
@@ -7385,10 +7419,10 @@ function Game({
                       equippedSetGroups.map((group) => (
                         <div key={group.name} className="set-bonus-row">
                           <b>{group.name} · {group.count} / 10</b>
-                          <span>2 件：攻擊 +8%</span>
+                          <span>2 件：攻擊 +{Math.round((SET_ATTACK_BONUS - 1) * 100)}%</span>
                           <span>4 件：離線收益 +10%</span>
                           <span>6 件：每次攻擊追加 {SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害</span>
-                          <span>8 件：技能傷害 +12%</span>
+                          <span>8 件：技能傷害 +{SET_SKILL_DAMAGE_PCT}%</span>
                           <span>10 件：每 {SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發（{SET_RESONANCE_DAMAGE_PCT}%）</span>
                         </div>
                       ))
