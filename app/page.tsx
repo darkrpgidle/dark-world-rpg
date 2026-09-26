@@ -7574,6 +7574,7 @@ function Game({
                             </small>
                           </span>
                         ))}
+                        <EquipmentEpithetDetails item={currentItem} />
                       </div>
                       <div className="affix-divider"><span>詞綴加成</span></div>
                       <ul className="detail-affixes">
@@ -7584,7 +7585,6 @@ function Game({
                           </li>
                         ))}
                       </ul>
-                      <EquipmentEpithetDetails item={currentItem} />
                       <div className="detail-sockets">
                         <strong>寶石孔位 {normalizeEquipmentSockets(currentItem.sockets).socketCount} / 2</strong>
                         <div>
