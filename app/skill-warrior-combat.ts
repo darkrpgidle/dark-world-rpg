@@ -6,6 +6,7 @@ import {
   createSkillCombatSession,
   resolveSkillAction,
   takeReadySkill,
+  trySkillProc,
   type SkillCombatSession,
   type StatusApplication,
 } from "./skill-combat-session";
@@ -21,13 +22,21 @@ import {
   type WarriorActiveName,
   type WarriorBuffState,
 } from "./skill-warrior-rules";
+import {
+  createWarriorPassiveState,
+  resolveWarriorPassiveAttack,
+  type WarriorPassiveState,
+} from "./skill-warrior-passives";
 
-export type WarriorCombat = { session: SkillCombatSession; buffs: WarriorBuffState; build: SkillBuild };
+export type WarriorCombat = {
+  session: SkillCombatSession; buffs: WarriorBuffState; passives: WarriorPassiveState; build: SkillBuild;
+};
 
 export function createWarriorCombat(build: SkillBuild, level: number): WarriorCombat {
   return {
     session: createSkillCombatSession(build, "戰士", level),
     buffs: createWarriorBuffState(),
+    passives: createWarriorPassiveState(),
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
   };
 }
@@ -46,6 +55,7 @@ export type WarriorTurnResult = {
   baseDamagePercent: number;
   bonusDamagePercent: number;
   extraDamagePercents: number[];
+  passiveDamageProcs: { id: "堅盾反射" | "泰坦餘震"; percent: number }[];
   lifestealPercent: number;
   attackSpeedBonusPercent: number;
   defensePenaltyPercent: number;
@@ -100,6 +110,19 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   }
   if (successfulHit && input.skill === "血戰烙印") statusApplications.push({ kind: "bloodBrand", level: rank });
 
+  const passive = resolveWarriorPassiveAttack(combat.passives, combat.build, {
+    kind: active ? "skill" : "normal",
+    category: rule?.category,
+    hit: successfulHit,
+    targetBleeding: previousBleed,
+    targetArmorBroken: previousArmorBreak,
+    healthPercent: input.healthPercent,
+    isUltimate: input.skill === "泰坦斷界斬",
+    ascendedBleed: input.ascended.has("血刃斬"),
+    roll: input.roll ?? Math.random,
+  });
+  statusApplications.push(...passive.statuses);
+
   // Buffs already present at the start of this action are consumed once. A
   // newly cast stance starts after this action, lasting eight later actions.
   const modifiers = consumeWarriorPrimaryAttack(buffs, statusApplications.some((status) => status.kind === "bleed" || status.kind === "armorBreak"));
@@ -108,17 +131,24 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     kind: active ? "skill" : "normal", hits: input.hits, successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  const passiveDamageProcs: WarriorTurnResult["passiveDamageProcs"] = [];
+  for (const candidate of passive.damageCandidates) {
+    const result = trySkillProc(session, { id: candidate.id, kind: "damage", source: "primary", family: "passive" });
+    session = result.session;
+    if (result.allowed) passiveDamageProcs.push(candidate);
+  }
   if (successfulHit && active) {
     buffs = recordWarriorSkillHit(buffs, input.skill, previousArmorBreak, input.ascended.has(input.skill));
   }
   if (input.skill === "狂戰姿態") buffs = triggerWarriorStance(buffs, rank, input.ascended.has("狂戰姿態"));
 
   return {
-    combat: { ...combat, session, buffs },
+    combat: { ...combat, session, buffs, passives: passive.state },
     baseDamagePercent,
-    bonusDamagePercent: modifiers.damageBonusPercent,
-    extraDamagePercents: modifiers.extraDamagePercents,
-    lifestealPercent: modifiers.lifestealPercent,
+    bonusDamagePercent: modifiers.damageBonusPercent + passive.damageBonusPercent,
+    extraDamagePercents: [...modifiers.extraDamagePercents, ...passiveDamageProcs.map((proc) => proc.percent)],
+    passiveDamageProcs,
+    lifestealPercent: modifiers.lifestealPercent + passive.lifestealPercent,
     attackSpeedBonusPercent: modifiers.attackSpeedBonusPercent,
     defensePenaltyPercent: modifiers.defensePenaltyPercent,
     bleedChancePercent,
