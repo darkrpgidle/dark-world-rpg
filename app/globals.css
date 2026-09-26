@@ -1319,6 +1319,19 @@ body {
   font-size: 11px;
   letter-spacing: .08em;
 }
+.set-elemental-float {
+  right: 8%;
+  top: 31%;
+  animation: none;
+  pointer-events: none;
+}
+.set-elemental-hit,
+.set-elemental-hit small {
+  color: #6bf3a0;
+  text-shadow: 0 0 9px #148b51, 0 2px 5px #000;
+}
+.set-elemental-hit b { font-size: 20px; }
+.volley-elemental-float .set-elemental-hit { animation-delay: calc(495ms + var(--hit-index) * 110ms); }
 .combo-hit.critical-hit {
   color: #ffd15c;
   position: relative;
@@ -5755,5 +5768,13 @@ body {
   }
   .volley-damage-float {
     top: 10%;
+  }
+  .set-elemental-float {
+    left: 68%;
+    right: auto;
+    top: 31%;
+    width: 38%;
+    max-width: 130px;
+    transform: translateX(-50%) scale(.82);
   }
 }
