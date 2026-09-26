@@ -1954,6 +1954,26 @@ body {
   color: #d2a24f;
   font-size: 0.8em;
 }
+.equipment-epithet {
+  color: #ff9e35;
+  font-weight: 800;
+}
+.equipment-base-name {
+  color: #f7f5f0;
+}
+.equipment-epithet-details {
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid #ab632e;
+  border-radius: 6px;
+  background: #49290933;
+  color: #eae4dc;
+  line-height: 1.6;
+}
+.equipment-epithet-details strong,
+.equipment-epithet-details b {
+  color: #ff9e35;
+}
 .bulk-salvage-btn {
   padding: 7px 10px !important;
 }
