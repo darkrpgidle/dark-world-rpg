@@ -19,7 +19,7 @@ const vite = await createServer({
   root: new URL("..", import.meta.url).pathname,
   server: { middlewareMode: true },
 });
-const { dropPowerRange, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, equipmentReforgeCost, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
+const { dropPowerRange, enhancementBonusPercent, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, equipmentReforgeCost, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
   "/app/balance.ts",
 );
 const { balanceConfig } = await vite.ssrLoadModule("/app/balance-config.ts");
@@ -336,7 +336,10 @@ test("derives combat power from actual stats and enhancement", () => {
   assert.doesNotMatch(page, /import[\s\S]*\bMap,\n/);
   assert.match(page, /function calculateCombatPower\(/);
   assert.match(page, /current\.attack - naked\.attack/);
-  assert.match(page, /function enhancementBonusPercent\(level: number\)/);
+  assert.deepEqual(
+    Array.from({ length: 16 }, (_, level) => enhancementBonusPercent(level)),
+    [0, 3, 6, 9, 12, 17, 22, 27, 32, 37, 47, 57, 67, 77, 87, 97],
+  );
   assert.match(page, /for \(const stat of equipmentBaseStats\(item\)\)/);
   assert.doesNotMatch(page, /power: it\.power \+ 24/);
   assert.match(page, /實際戰力/);
