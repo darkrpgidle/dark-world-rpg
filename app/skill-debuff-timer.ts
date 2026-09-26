@@ -8,10 +8,15 @@ export type EnemyDebuff = {
   stacks: number;
   strength: number;
   nextTickAt?: number;
+  bleedDamageBonusPercent?: number;
 };
 
 export type EnemyDebuffs = Partial<Record<EnemyDebuffKind, EnemyDebuff>>;
-export type DebuffTick = { kind: "bleed" | "burn"; at: number; stacks: number };
+export type DebuffTick = {
+  kind: "bleed" | "burn"; at: number; stacks: number;
+  // Multiply eventual base bleed damage by (1 + bonus / 100); no base damage is defined here.
+  bleedDamageBonusPercent?: number;
+};
 export type DebuffUpdate = { state: EnemyDebuffs; ticks: DebuffTick[] };
 
 const durationByLevel = {
@@ -39,7 +44,11 @@ export function advanceEnemyDebuffs(state: EnemyDebuffs, now: number): DebuffUpd
     if ((debuff.kind === "bleed" || debuff.kind === "burn") && nextTickAt !== undefined) {
       // Include a tick exactly at expiry (a three-second debuff ticks at 1, 2 and 3 seconds).
       while (nextTickAt <= Math.min(now, debuff.expiresAt)) {
-        ticks.push({ kind: debuff.kind, at: nextTickAt, stacks: debuff.stacks });
+        ticks.push({
+          kind: debuff.kind, at: nextTickAt, stacks: debuff.stacks,
+          ...(debuff.kind === "bleed" && debuff.bleedDamageBonusPercent
+            ? { bleedDamageBonusPercent: debuff.bleedDamageBonusPercent } : {}),
+        });
         nextTickAt += 1000;
       }
     }
@@ -53,7 +62,10 @@ export function advanceEnemyDebuffs(state: EnemyDebuffs, now: number): DebuffUpd
 
 export function applyEnemyDebuff(
   state: EnemyDebuffs,
-  application: { kind: EnemyDebuffKind; level?: number; ascendedBleed?: boolean; strength?: number },
+  application: {
+    kind: EnemyDebuffKind; level?: number; ascendedBleed?: boolean; strength?: number;
+    bleedDamageBonusPercent?: number;
+  },
   now: number,
 ): DebuffUpdate {
   checkTime(now);
@@ -61,6 +73,11 @@ export function applyEnemyDebuff(
   if (!Number.isInteger(level) || level < 1 || level > 5) throw new RangeError("Debuff skill level must be 1–5");
   if (application.strength !== undefined && (!Number.isFinite(application.strength) || application.strength < 0)) {
     throw new RangeError("Debuff strength must be nonnegative and finite");
+  }
+  if (application.bleedDamageBonusPercent !== undefined &&
+      (application.kind !== "bleed" || !Number.isFinite(application.bleedDamageBonusPercent) ||
+        application.bleedDamageBonusPercent < 0)) {
+    throw new RangeError("Bleed damage bonus must be nonnegative, finite and applied to bleed");
   }
   // Settle outstanding damage before refreshing the duration; never discard a delayed tick.
   const update = advanceEnemyDebuffs(state, now);
@@ -77,6 +94,9 @@ export function applyEnemyDebuff(
       ? Math.max(old?.strength ?? 0, application.strength ?? 0)
       : application.strength ?? old?.strength ?? 0,
     ...(ticking ? { nextTickAt: old?.nextTickAt ?? now + 1000 } : {}),
+    ...(isBleed && (old?.bleedDamageBonusPercent || application.bleedDamageBonusPercent)
+      ? { bleedDamageBonusPercent: Math.max(old?.bleedDamageBonusPercent ?? 0, application.bleedDamageBonusPercent ?? 0) }
+      : {}),
   };
   return update;
 }
