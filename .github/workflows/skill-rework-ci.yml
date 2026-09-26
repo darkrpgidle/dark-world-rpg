@@ -23,5 +23,6 @@ jobs:
       # build and behavioral tests running so this check cannot hide them.
       - run: npx tsc --noEmit
         continue-on-error: true
-      - run: npm run build
-      - run: node --test tests/*.test.mjs
+      - run: SITES_ENV_READY=1 SITES_PROJECT_ROOT="$PWD" npm run build
+      - if: always()
+        run: node --test tests/*.test.mjs
