@@ -105,8 +105,9 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   const successfulHit = input.hits.some((hit) => hit.hit);
   const bladeAscended = (combat.build.ranks["血刃斬"] ?? 0) > 0 && input.ascended.has("血刃斬");
 
-  const active = input.skill !== "normal";
-  const rank = active ? (combat.build.ranks[input.skill] ?? 0) : 0;
+  const activeSkill = input.skill === "normal" ? null : input.skill;
+  const active = activeSkill !== null;
+  const rank = activeSkill ? (combat.build.ranks[activeSkill] ?? 0) : 0;
   if (active) {
     if (rank <= 0) return null;
     const selected = takeReadySkill(session, true);
@@ -121,7 +122,7 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     ? triggerWarriorBloodRoar(combat.buffs, roarRank, input.healthPercent, input.ascended.has("鮮血怒吼"))
     : null;
   let buffs = newlyTriggeredRoar ?? combat.buffs;
-  const rule = active ? WARRIOR_ACTIVE_RULES[input.skill] : null;
+  const rule = activeSkill ? WARRIOR_ACTIVE_RULES[activeSkill] : null;
   const baseDamagePercent = rule && "damage" in rule ? warriorSkillRankValue(rule.damage, rank) : active ? 0 : 100;
   const statusApplications: StatusApplication[] = [];
   let bleedChancePercent = 0;
@@ -181,8 +182,8 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     session = result.session;
     if (result.allowed) passiveDamageProcs.push(candidate);
   }
-  if (successfulHit && active) {
-    buffs = recordWarriorSkillHit(buffs, input.skill, previousArmorBreak, input.ascended.has(input.skill));
+  if (successfulHit && activeSkill) {
+    buffs = recordWarriorSkillHit(buffs, activeSkill, previousArmorBreak, input.ascended.has(activeSkill));
   }
   if (input.skill === "狂戰姿態") buffs = triggerWarriorStance(buffs, rank, input.ascended.has("狂戰姿態"));
 

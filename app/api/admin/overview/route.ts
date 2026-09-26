@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (!account.isGm) return Response.json({ error: "forbidden" }, { status: 403 });
   const db = await getDb();
   const activeSince = new Date(Date.now() - 90_000).toISOString();
-  const [accountRows, saveRows, onlineSessionRows, [accountCount], [saveCount], [sessionCount], latestSave, [deathCount], deathHotspots] = await Promise.all([
+  const [accountRows, saveRows, onlineSessionRows, [accountCount], [saveCount], [sessionCount], [latestSave], [deathCount], deathHotspots] = await Promise.all([
     db.select({ id: accounts.id, username: accounts.username }).from(accounts),
     db.select({ accountId: gameSaves.accountId, playerId: gameSaves.playerId, payload: gameSaves.payload }).from(gameSaves),
     db.select({ accountId: sessions.accountId, lastSeenAt: sessions.lastSeenAt }).from(sessions).where(gt(sessions.lastSeenAt, activeSince)),

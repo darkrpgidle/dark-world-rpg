@@ -136,7 +136,10 @@ export async function GET(request: Request) {
     return jsonNoStore({ error: "save_belongs_to_other_account" }, 403);
   // The server owns the checkpoint cadence. This also covers a player who has
   // not changed state recently or whose browser save timer was throttled.
-  try { await createServerCheckpointIfDue(db, save); } catch { /* never block loading a valid save */ }
+  if (save.accountId) {
+    try { await createServerCheckpointIfDue(db, { ...save, accountId: save.accountId }); }
+    catch { /* never block loading a valid save */ }
+  }
   const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
   return jsonNoStore({
     save: preserveServerSkillSave(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload)
@@ -421,7 +424,13 @@ export async function POST(request: Request) {
       .where(and(eq(saveSnapshots.accountId, account.id), eq(saveSnapshots.kind, "automatic")))
       .orderBy(desc(saveSnapshots.capturedAt))
       .offset(24);
-    if (automaticSnapshots.length) await db.batch(automaticSnapshots.map((snapshot) => db.delete(saveSnapshots).where(eq(saveSnapshots.id, snapshot.id))));
+    if (automaticSnapshots.length) {
+      const [first, ...remaining] = automaticSnapshots;
+      await db.batch([
+        db.delete(saveSnapshots).where(eq(saveSnapshots.id, first.id)),
+        ...remaining.map((snapshot) => db.delete(saveSnapshots).where(eq(saveSnapshots.id, snapshot.id))),
+      ]);
+    }
   } catch { /* recovery data is retained; cleanup can be retried later */ }
   return jsonNoStore({ ok: true, accepted: true, updatedAt });
 }

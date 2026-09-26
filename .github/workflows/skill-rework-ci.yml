@@ -19,10 +19,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Existing project-wide type errors are tracked separately. Keep the
-      # build and behavioral tests running so this check cannot hide them.
       - run: npx tsc --noEmit
-        continue-on-error: true
       - run: SITES_ENV_READY=1 SITES_PROJECT_ROOT="$PWD" npm run build
       - if: always()
         run: node --test tests/*.test.mjs

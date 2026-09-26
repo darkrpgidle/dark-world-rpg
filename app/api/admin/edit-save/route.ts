@@ -112,10 +112,11 @@ export async function POST(request: Request) {
   const [current] = await db.select().from(gameSaves).where(eq(gameSaves.accountId, accountId)).limit(1);
   const oldSave = current ? JSON.parse(current.payload) as Record<string, unknown> : null;
   const incoming = { ...(oldSave ?? baseSave(accountId)), ...body.save, accountId } as Record<string, unknown>;
-  incoming.level = number(incoming.level, 1, 1, 100);
+  const level = number(incoming.level, 1, 1, 100);
+  incoming.level = level;
   incoming.rebirthCount = number(incoming.rebirthCount, 0, 0, 20);
   syncRebirthTalents(incoming);
-  incoming.exp = incoming.level >= 100 ? 0 : number(incoming.exp, 0, 0, 1_000_000_000);
+  incoming.exp = level >= 100 ? 0 : number(incoming.exp, 0, 0, 1_000_000_000);
   for (const key of ["gold", "yuanbao", "enhanceStones", "reforgeStones", "bossTickets", "worldAttempts", "skillPoints"]) incoming[key] = number(incoming[key], 0);
   incoming.playerName = String(incoming.playerName ?? oldSave?.playerName ?? target.username).slice(0, 40);
   incoming.playerClass = allowedClasses.has(String(incoming.playerClass)) ? incoming.playerClass : "戰士";
