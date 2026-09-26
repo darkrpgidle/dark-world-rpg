@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { gameSaves, saveSnapshots } from "../../../db/schema";
 import { currentLogin } from "../auth-utils";
+import { applySkillSaveAction, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{20,80}$/.test(value);
 const normalize = (value: string) => value.trim().toLocaleLowerCase("zh-TW");
@@ -31,11 +32,12 @@ function resetPersonalBossTicketsIfNeeded(save: Record<string, unknown>) {
 
 function authoritativeResponse(save: { payload: string; updatedAt: string }) {
   try {
+    const payload = JSON.parse(save.payload) as Record<string, unknown>;
     return jsonNoStore({
       ok: true,
       accepted: false,
       updatedAt: save.updatedAt,
-      save: resetPersonalBossTicketsIfNeeded(JSON.parse(save.payload) as Record<string, unknown>),
+      save: preserveServerSkillSave(resetPersonalBossTicketsIfNeeded(payload), payload) ?? resetPersonalBossTicketsIfNeeded(payload),
     });
   } catch {
     return jsonNoStore({ ok: true, accepted: false, updatedAt: save.updatedAt });
@@ -50,8 +52,11 @@ function prepareAuthoritativePayload(
   clientSequence: number,
 ) {
   const next = { ...incoming, _saveSessionId: sessionId };
+  delete next._lastSkillActionId;
+  delete next._lastSkillRebirthLegacyCount;
+  let serverSave: Record<string, unknown> | null = null;
   try {
-    const serverSave = JSON.parse(serverPayload) as Record<string, unknown>;
+    serverSave = JSON.parse(serverPayload) as Record<string, unknown>;
     const serverSessionId = typeof serverSave._saveSessionId === "string" ? serverSave._saveSessionId : "";
     const serverClientId = typeof serverSave._saveClientId === "string" ? serverSave._saveClientId : "";
     const serverSequence = Math.max(0, Number(serverSave._saveSequence ?? 0));
@@ -69,8 +74,12 @@ function prepareAuthoritativePayload(
       }
       next.adminRevision = serverRevision;
     }
+    if (serverSave._lastSkillActionId) next._lastSkillActionId = serverSave._lastSkillActionId;
+    if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
+      next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
-  return JSON.stringify(next);
+  const protectedSave = preserveServerSkillSave(next, serverSave);
+  return protectedSave ? JSON.stringify(protectedSave) : null;
 }
 
 function nextUpdatedAt(previous: string) {
@@ -128,8 +137,10 @@ export async function GET(request: Request) {
   // The server owns the checkpoint cadence. This also covers a player who has
   // not changed state recently or whose browser save timer was throttled.
   try { await createServerCheckpointIfDue(db, save); } catch { /* never block loading a valid save */ }
+  const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
   return jsonNoStore({
-    save: resetPersonalBossTicketsIfNeeded(JSON.parse(save.payload) as Record<string, unknown>),
+    save: preserveServerSkillSave(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload)
+      ?? resetPersonalBossTicketsIfNeeded(savedPayload),
     updatedAt: save.updatedAt,
   });
 }
@@ -143,7 +154,9 @@ export async function POST(request: Request) {
     save?: unknown;
     payload?: unknown;
     expectedUpdatedAt?: string | null;
-    action?: "settle_idle" | "claim_idle";
+    action?: "settle_idle" | "claim_idle" | "skill";
+    skillAction?: SkillSaveAction;
+    skillActionId?: string;
   };
   const playerId = body.playerId ?? "";
   if (!validId(playerId))
@@ -299,6 +312,40 @@ export async function POST(request: Request) {
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
   }
+  if (body.action === "skill") {
+    if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
+    const actionId = body.skillActionId;
+    if (!actionId || !/^[a-f0-9-]{36}$/.test(actionId) || !body.skillAction)
+      return jsonNoStore({ error: "invalid_skill_action" }, 400);
+    let current = existing[0];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      let previous: Record<string, unknown>;
+      try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
+      catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
+      if (previous._lastSkillActionId === actionId)
+        return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
+          skillReworkBuild: previous.skillReworkBuild, skillAscensions: previous.skillAscensions });
+      const next = applySkillSaveAction(previous, body.skillAction);
+      if (!next) return jsonNoStore({ error: "skill_action_rejected" }, 409);
+      next._lastSkillActionId = actionId;
+      next._saveSessionId = sessionId;
+      const nextPayload = JSON.stringify(next);
+      if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
+      const updatedAt = nextUpdatedAt(current.updatedAt);
+      const result = await db.update(gameSaves)
+        .set({ accountId: account.id, payload: nextPayload, updatedAt })
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+      if ((result.rowsAffected ?? 0) === 1) {
+        return jsonNoStore({ ok: true, accepted: true, updatedAt,
+          skillReworkBuild: next.skillReworkBuild, skillAscensions: next.skillAscensions });
+      }
+      const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
+        .from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
+      if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
+      current = latest;
+    }
+    return authoritativeResponse(current);
+  }
   const requestId = typeof normalizedIncoming._saveRequestId === "string" ? normalizedIncoming._saveRequestId : "";
   const clientId = typeof normalizedIncoming._saveClientId === "string" ? normalizedIncoming._saveClientId : "";
   const clientSequence = Math.max(0, Number(normalizedIncoming._saveSequence ?? 0));
@@ -309,7 +356,11 @@ export async function POST(request: Request) {
         return jsonNoStore({ ok: true, updatedAt: existing[0].updatedAt });
     } catch { /* continue with the normal save path */ }
   }
-  let finalPayload = JSON.stringify({ ...normalizedIncoming, _saveSessionId: sessionId });
+  const initialSave = preserveServerSkillSave(normalizedIncoming, null);
+  if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
+  delete initialSave._lastSkillActionId;
+  delete initialSave._lastSkillRebirthLegacyCount;
+  let finalPayload = JSON.stringify({ ...initialSave, _saveSessionId: sessionId });
   let updatedAt = new Date().toISOString();
   if (existing[0]) {
     let current = existing[0];
@@ -322,6 +373,7 @@ export async function POST(request: Request) {
         return authoritativeResponse(current);
       }
       finalPayload = prepared;
+      if (finalPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
       updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: finalPayload, updatedAt })
@@ -348,6 +400,7 @@ export async function POST(request: Request) {
       });
     } catch { /* snapshot maintenance never turns a committed save into a failure */ }
   } else {
+    if (finalPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
     await db.batch([
       db.insert(gameSaves).values({ accountId: account.id, playerId, payload: finalPayload, updatedAt }),
       db.insert(saveSnapshots).values({

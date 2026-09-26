@@ -20,12 +20,16 @@ type Props = {
   characterClass: SkillClass;
   characterLevel: number;
   build: SkillBuild;
-  onChange: (build: SkillBuild) => void;
+  onUpgrade: (name: string) => void;
+  onEquip: (slot: number, name: string | null) => void;
   ascensions: SkillAscensionState;
-  onAscensionsChange: (next: SkillAscensionState) => void;
+  onSelectAscension: (tier: number, name: string) => void;
+  onConfirmAscensions: () => void;
+  busy: boolean;
 };
 
-export function SkillReworkPanel({ characterClass, characterLevel, build, onChange, ascensions, onAscensionsChange }: Props) {
+export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgrade, onEquip,
+  ascensions, onSelectAscension, onConfirmAscensions, busy }: Props) {
   const [pendingUpgrade, setPendingUpgrade] = useState<string | null>(null);
   const catalog = SKILL_REWORK_CATALOG[characterClass];
   const available = earnedSkillPoints(characterLevel) - spentSkillPoints(build);
@@ -45,11 +49,12 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onChan
             <select
               aria-label={`一般主動技能槽 ${index + 1}`}
               style={{ display: "block", width: "100%", minHeight: 44 }}
+              disabled={busy}
               value={name ?? ""}
               onChange={(event) => {
                 const selected = event.target.value || null;
                 const next = equipActiveSkill(build, characterClass, characterLevel, index, selected);
-                if (next) onChange(next);
+                if (next) onEquip(index, selected);
               }}
             >
               <option value="">未配置</option>
@@ -79,10 +84,10 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onChan
                 aria-label={`第 ${tier} 轉昇華`}
                 style={{ display: "block", width: "100%", minHeight: 44 }}
                 value={value ?? ""}
-                disabled={!ascensions.selectionOpen || tier === 5}
+                disabled={busy || !ascensions.selectionOpen || tier === 5}
                 onChange={(event) => {
                   const next = selectSkillAscension(ascensions, characterClass, tier, event.target.value);
-                  if (next) onAscensionsChange(next);
+                  if (next) onSelectAscension(tier, event.target.value);
                 }}
               >
                 <option value="">請選擇</option>
@@ -96,10 +101,10 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onChan
           })}
         </div>
         {ascensions.selectionOpen && <button className="btn btn-ghost" style={{ minHeight: 44, marginTop: 12 }}
-          disabled={ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
+          disabled={busy || ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
           onClick={() => {
             const next = confirmSkillAscensions(ascensions, characterClass);
-            if (next) onAscensionsChange(next);
+            if (next) onConfirmAscensions();
           }}>確認昇華配置</button>}
         <p>付費技能重置待元寶價格、重置卷道具及伺服器扣款規則定案後開放。</p>
       </section>
@@ -138,15 +143,15 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onChan
                   {pendingUpgrade === pendingKey ? (
                     <div>
                       <p role="status">確定消耗 1 點技能點，將「{skill.name}」升至 Lv{rank + 1}？目前剩餘 {available} 點。</p>
-                      <button className="btn btn-ghost" style={{ minHeight: 44 }} disabled={locked || rank >= 5 || available < 1} onClick={() => {
+                      <button className="btn btn-ghost" style={{ minHeight: 44 }} disabled={busy || locked || rank >= 5 || available < 1} onClick={() => {
                         const next = upgradeSkill(build, characterClass, characterLevel, skill.name);
-                        if (next) onChange(next);
+                        if (next) onUpgrade(skill.name);
                         setPendingUpgrade(null);
                       }}>確認升級</button>
                       <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => setPendingUpgrade(null)}>取消</button>
                     </div>
                   ) : (
-                    <button className="btn btn-ghost" style={{ minHeight: 44 }} disabled={locked || rank >= 5 || available < 1}
+                    <button className="btn btn-ghost" style={{ minHeight: 44 }} disabled={busy || locked || rank >= 5 || available < 1}
                       onClick={() => setPendingUpgrade(pendingKey)}>
                       {locked ? `Lv${skill.unlockLevel} 解鎖` : rank >= 5 ? "已滿級" : rank === 0 ? "學習 · 1 點" : "升級 · 1 點"}
                     </button>

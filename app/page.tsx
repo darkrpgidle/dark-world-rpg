@@ -129,7 +129,8 @@ import {
 import { SkillEffectCanvas } from "./skill-effect-canvas";
 import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
-import { beginSkillRebirth, createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
+import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
+import type { SkillSaveAction } from "./skill-save-policy";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
@@ -2237,6 +2238,9 @@ function Game({
   const [skillPoints, setSkillPoints] = useState(1);
   const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
   const [skillAscensions, setSkillAscensions] = useState<SkillAscensionState>(createSkillAscensions);
+  const [skillActionBusy, setSkillActionBusy] = useState(false);
+  const skillActionInFlightRef = useRef(false);
+  const skillActionRetryRef = useRef<{ key: string; id: string } | null>(null);
   const [skills, setSkills] = useState(() =>
     skillsByClass[playerClass].map((skill, index) => ({
       ...skill,
@@ -3788,9 +3792,50 @@ function Game({
   };
 
   const canRebirth = level >= 100 && (mapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
-  const rebirth = () => {
+  const runSkillAction = async (action: SkillSaveAction): Promise<boolean> => {
+    if (!saveReady || sessionSuperseded || skillActionInFlightRef.current) return false;
+    skillActionInFlightRef.current = true;
+    setSkillActionBusy(true);
+    const key = JSON.stringify(action);
+    const id = skillActionRetryRef.current?.key === key
+      ? skillActionRetryRef.current.id : crypto.randomUUID();
+    skillActionRetryRef.current = { key, id };
+    try {
+      const response = await fetch("/api/save", {
+        method: "POST",
+        headers: loginHeaders(loginId, true),
+        body: JSON.stringify({ playerId, action: "skill", skillAction: action, skillActionId: id }),
+      });
+      const result = await response.json();
+      if (response.status === 401 || result?.error === "maintenance") {
+        pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+          : result?.error === "session_replaced" ? "replaced" : "expired");
+        return false;
+      }
+      if (!response.ok || result?.ok !== true) {
+        skillActionRetryRef.current = null;
+        toast.error("新版技能操作未完成，請重新載入後再試");
+        return false;
+      }
+      setSkillReworkBuild(restoreSkillBuild(result.skillReworkBuild, playerClass, level));
+      setSkillAscensions(restoreSkillAscensions(result.skillAscensions, playerClass));
+      setSaveUpdatedAt(result.updatedAt ?? null);
+      skillActionRetryRef.current = null;
+      return true;
+    } catch {
+      toast.error("連線中斷，請重試新版技能操作");
+      return false;
+    } finally {
+      skillActionInFlightRef.current = false;
+      setSkillActionBusy(false);
+    }
+  };
+
+  const rebirth = async () => {
     if (!canRebirth) return;
-    const nextSkillRebirth = beginSkillRebirth(skillAscensions, playerClass, level);
+    // Legacy rebirth progression remains separate; the new preview unlocks
+    // ascensions only after this action has been accepted by the save server.
+    if (!(await runSkillAction({ kind: "begin_rebirth" }))) return;
     towerDeathPendingRef.current = false;
     resetCombatPerks();
     setRebirthCount((value) => Math.min(MAX_REBIRTHS, value + 1));
@@ -3811,8 +3856,6 @@ function Game({
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
     setSkills(skillsByClass[playerClass].map((skill, index) => ({ ...skill, level: index === 0 ? 1 : 0 })));
-    setSkillReworkBuild(nextSkillRebirth?.build ?? createSkillBuild());
-    if (nextSkillRebirth) setSkillAscensions(nextSkillRebirth.ascensions);
     setSkillPoints(1);
     setCompletedRuns(0);
     setStoredSeconds(0);
@@ -7883,9 +7926,12 @@ function Game({
                 characterClass={playerClass}
                 characterLevel={level}
                 build={skillReworkBuild}
-                onChange={setSkillReworkBuild}
+                onUpgrade={(name) => { void runSkillAction({ kind: "upgrade", name }); }}
+                onEquip={(slot, name) => { void runSkillAction({ kind: "equip", slot, name }); }}
                 ascensions={skillAscensions}
-                onAscensionsChange={setSkillAscensions}
+                onSelectAscension={(tier, name) => { void runSkillAction({ kind: "select_ascension", tier, name }); }}
+                onConfirmAscensions={() => { void runSkillAction({ kind: "confirm_ascensions" }); }}
+                busy={skillActionBusy}
               />
               <h3>目前戰鬥使用的技能</h3>
               <SkillGrowthTable skills={skills} />
