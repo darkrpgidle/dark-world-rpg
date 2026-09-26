@@ -124,18 +124,20 @@ export function recoverPrimaryAttackCharges(state: SkillCombatState, amount: num
 
 export function nextReadySkill(
   state: SkillCombatState, targetAvailable: boolean, targetStatuses: ReadonlySet<string> = new Set(),
+  temporarilyBlocked: ReadonlySet<string> = new Set(),
 ): string | null {
   if (!targetAvailable) return null;
   return state.ready.find((name) => {
     const status = SKILL_CHARGE_RULES[state.characterClass][name]?.status;
-    return !status || !targetStatuses.has(status);
+    return !temporarilyBlocked.has(name) && (!status || !targetStatuses.has(status));
   }) ?? null;
 }
 
 export function consumeReadySkill(
   state: SkillCombatState, targetAvailable: boolean, targetStatuses: ReadonlySet<string> = new Set(),
+  temporarilyBlocked: ReadonlySet<string> = new Set(),
 ): { skill: string; state: SkillCombatState } | null {
-  const skill = nextReadySkill(state, targetAvailable, targetStatuses);
+  const skill = nextReadySkill(state, targetAvailable, targetStatuses, temporarilyBlocked);
   if (!skill) return null;
   const next = copyState(state);
   next.ready = next.ready.filter((name) => name !== skill);

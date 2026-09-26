@@ -106,11 +106,12 @@ export function trySkillProc(session: SkillCombatSession, candidate: ProcCandida
 
 export function takeReadySkill(
   session: SkillCombatSession, targetAvailable: boolean,
+  temporarilyBlocked: ReadonlySet<string> = new Set(),
 ): { skill: string; session: SkillCombatSession } | null {
   const targetStatuses = new Set(Object.keys(session.enemy)
     .map((kind) => statusNameByKind[kind as EnemyDebuffKind])
     .filter((name): name is string => Boolean(name)));
-  const selected = consumeReadySkill(session.charge, targetAvailable, targetStatuses);
+  const selected = consumeReadySkill(session.charge, targetAvailable, targetStatuses, temporarilyBlocked);
   if (!selected) return null;
   return { skill: selected.skill, session: { ...session, charge: selected.state } };
 }
