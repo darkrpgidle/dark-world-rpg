@@ -6,6 +6,7 @@ import {
   createSkillCombatSession,
   resolveSkillAction,
   takeReadySkill,
+  transitionCombatSession,
   trySkillProc,
   type SkillCombatSession,
   type StatusApplication,
@@ -32,6 +33,7 @@ import { createWarriorDefenseState, type WarriorDefenseState } from "./skill-war
 export type WarriorCombat = {
   session: SkillCombatSession; buffs: WarriorBuffState; passives: WarriorPassiveState;
   defense: WarriorDefenseState; build: SkillBuild;
+  bloodBrandBurstUsed: boolean;
 };
 
 export function createWarriorCombat(build: SkillBuild, level: number): WarriorCombat {
@@ -40,8 +42,13 @@ export function createWarriorCombat(build: SkillBuild, level: number): WarriorCo
     buffs: createWarriorBuffState(),
     passives: createWarriorPassiveState(),
     defense: createWarriorDefenseState(),
+    bloodBrandBurstUsed: false,
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
   };
+}
+
+export function transitionWarriorNormalKill(combat: WarriorCombat): WarriorCombat {
+  return { ...combat, session: transitionCombatSession(combat.session, "normal-kill"), bloodBrandBurstUsed: false };
 }
 
 export type WarriorTurnInput = {
@@ -58,6 +65,7 @@ export type WarriorTurnResult = {
   baseDamagePercent: number;
   bonusDamagePercent: number;
   extraDamagePercents: number[];
+  ascensionDamageEvents: { id: "血祭印記"; percent: 100 }[];
   passiveDamageProcs: { id: "堅盾反射" | "泰坦餘震"; percent: number }[];
   lifestealPercent: number;
   attackSpeedBonusPercent: number;
@@ -125,6 +133,13 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     roll: input.roll ?? Math.random,
   });
   statusApplications.push(...passive.statuses);
+  const bloodBrandBurstUsed = marked ? combat.bloodBrandBurstUsed : false;
+  const bloodBrandBurst = marked && !bloodBrandBurstUsed
+    && (combat.build.ranks["血戰烙印"] ?? 0) > 0
+    && input.ascended.has("血戰烙印")
+    && statusApplications.some((status) => status.kind === "bleed");
+  const ascensionDamageEvents: WarriorTurnResult["ascensionDamageEvents"] = bloodBrandBurst
+    ? [{ id: "血祭印記", percent: 100 }] : [];
 
   // Buffs already present at the start of this action are consumed once. A
   // newly cast stance starts after this action, lasting eight later actions.
@@ -146,10 +161,17 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   if (input.skill === "狂戰姿態") buffs = triggerWarriorStance(buffs, rank, input.ascended.has("狂戰姿態"));
 
   return {
-    combat: { ...combat, session, buffs, passives: passive.state },
+    combat: {
+      ...combat, session, buffs, passives: passive.state,
+      bloodBrandBurstUsed: bloodBrandBurstUsed || bloodBrandBurst,
+    },
     baseDamagePercent,
     bonusDamagePercent: modifiers.damageBonusPercent + passive.damageBonusPercent,
-    extraDamagePercents: [...modifiers.extraDamagePercents, ...passiveDamageProcs.map((proc) => proc.percent)],
+    extraDamagePercents: [
+      ...modifiers.extraDamagePercents, ...ascensionDamageEvents.map((event) => event.percent),
+      ...passiveDamageProcs.map((proc) => proc.percent),
+    ],
+    ascensionDamageEvents,
     passiveDamageProcs,
     lifestealPercent: modifiers.lifestealPercent + passive.lifestealPercent,
     attackSpeedBonusPercent: modifiers.attackSpeedBonusPercent,
