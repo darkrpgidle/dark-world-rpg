@@ -3,6 +3,7 @@
 import type { SkillBuild } from "./skill-rework";
 import {
   advanceCombatSession, createSkillCombatSession, resolveSkillAction, takeReadySkill,
+  transitionCombatSession,
   trySkillProc,
   type SkillCombatSession, type StatusApplication,
 } from "./skill-combat-session";
@@ -24,6 +25,8 @@ export type RangerCombat = {
   passives: RangerPassiveState;
   defense: RangerDefenseState;
   nextSkillIgnoreDefensePending: boolean;
+  hunterMarkCriticalHits: number;
+  hunterExplosionPending: boolean;
 };
 
 export function createRangerCombat(build: SkillBuild, level: number): RangerCombat {
@@ -34,6 +37,15 @@ export function createRangerCombat(build: SkillBuild, level: number): RangerComb
     passives: createRangerPassiveState(),
     defense: createRangerDefenseState(),
     nextSkillIgnoreDefensePending: false,
+    hunterMarkCriticalHits: 0,
+    hunterExplosionPending: false,
+  };
+}
+
+export function transitionRangerNormalKill(combat: RangerCombat): RangerCombat {
+  return {
+    ...combat, session: transitionCombatSession(combat.session, "normal-kill"),
+    hunterMarkCriticalHits: 0, hunterExplosionPending: false,
   };
 }
 
@@ -51,6 +63,7 @@ export type RangerTurnResult = {
   totalDamagePercent: number;
   additionalArrowPercent: number;
   additionalArrowEvents: { id: "風痕追獵" | "六重風葬"; percent: number }[];
+  hunterExplosionEvents: { id: "死亡鎖定"; percent: number }[];
   attackChargeRecovered: number;
   skyMarks: number;
   mainArrowDamageBonusPercent: number;
@@ -96,6 +109,20 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     kind: rule ? "skill" : "normal", hits: input.hits,
   });
   const successfulHit = input.hits.some((hit) => hit.hit);
+  // A pending explosion belongs to the next active cast. A miss consumes that
+  // cast without dealing damage; a proc cannot count as another primary attack.
+  const hunterExplosionEvents: RangerTurnResult["hunterExplosionEvents"] =
+    rule && combat.hunterExplosionPending && successfulHit
+      ? [{ id: "死亡鎖定", percent: RANGER_ACTIVE_RULES.獵殺標記.huntExplosionDamage }] : [];
+  const markedCriticalHits = session.enemy.hunterMark && input.ascended.has("獵殺標記")
+    && (combat.build.ranks["獵殺標記"] ?? 0) > 0
+    ? input.hits.filter((hit) => hit.hit && hit.critical).length : 0;
+  const priorCriticalHits = session.enemy.hunterMark ? combat.hunterMarkCriticalHits : 0;
+  // Each arrow can crit, but all of them still form just one skill cast.
+  const totalCriticalHits = priorCriticalHits + markedCriticalHits;
+  const hunterExplosionPending = totalCriticalHits >= RANGER_ACTIVE_RULES.獵殺標記.criticalsRequired;
+  const hunterMarkCriticalHits = input.skill === "獵殺標記" && successfulHit
+    ? 0 : hunterExplosionPending ? 0 : totalCriticalHits;
   const passive = resolveRangerPassiveAttack(combat.passives, combat.build, {
     kind: rule ? "skill" : "normal",
     category: rule?.category,
@@ -160,11 +187,16 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   };
 
   return {
-    combat: { ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state, defense },
+    combat: {
+      ...combat, session, windDomain, nextSkillIgnoreDefensePending, passives: passive.state, defense,
+      hunterMarkCriticalHits,
+      hunterExplosionPending: hunterExplosionPending || (!rule && combat.hunterExplosionPending),
+    },
     damageSegmentPercents,
     totalDamagePercent,
     additionalArrowPercent: rapidSixthArrow || tailwindArrow,
     additionalArrowEvents,
+    hunterExplosionEvents,
     attackChargeRecovered,
     skyMarks,
     mainArrowDamageBonusPercent: skyMarks * RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrowDamagePerMark,
