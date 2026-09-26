@@ -86,6 +86,7 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   const previousBleed = Boolean(session.enemy.bleed);
   const marked = Boolean(session.enemy.bloodBrand);
   const successfulHit = input.hits.some((hit) => hit.hit);
+  const bladeAscended = (combat.build.ranks["血刃斬"] ?? 0) > 0 && input.ascended.has("血刃斬");
 
   const active = input.skill !== "normal";
   const rank = active ? (combat.build.ranks[input.skill] ?? 0) : 0;
@@ -113,10 +114,10 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   if (successfulHit && input.skill === "血刃斬") {
     const brandRank = combat.build.ranks["血戰烙印"] ?? 0;
     bleedChancePercent = warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血刃斬.bleedChance, rank)
-      + (input.ascended.has("血刃斬") && previousBleed ? 15 : 0)
+      + (bladeAscended && previousBleed ? 15 : 0)
       + (marked && brandRank > 0 ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血戰烙印.bleedChanceBonus, brandRank) : 0);
     if ((input.roll ?? Math.random)() * 100 < bleedChancePercent) {
-      statusApplications.push({ kind: "bleed", ascendedBleed: input.ascended.has("血刃斬") });
+      statusApplications.push({ kind: "bleed", ascendedBleed: bladeAscended });
     }
   }
   if (successfulHit && input.skill === "血戰烙印") statusApplications.push({ kind: "bloodBrand", level: rank });
@@ -129,10 +130,17 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     targetArmorBroken: previousArmorBreak,
     healthPercent: input.healthPercent,
     isUltimate: input.skill === "泰坦斷界斬",
-    ascendedBleed: input.ascended.has("血刃斬"),
+    ascendedBleed: bladeAscended,
     roll: input.roll ?? Math.random,
   });
   statusApplications.push(...passive.statuses);
+  // Ascension modifies the scheduled bleed tick, not the primary attack or
+  // the as-yet undecided base damage-per-second multiplier.
+  if (bladeAscended) {
+    for (const application of statusApplications) {
+      if (application.kind === "bleed") application.bleedDamageBonusPercent = 20;
+    }
+  }
   const bloodBrandBurstUsed = marked ? combat.bloodBrandBurstUsed : false;
   const bloodBrandBurst = marked && !bloodBrandBurstUsed
     && (combat.build.ranks["血戰烙印"] ?? 0) > 0
