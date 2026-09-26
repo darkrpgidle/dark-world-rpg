@@ -127,6 +127,8 @@ import {
   type SocketedGem,
 } from "./gem-system";
 import { SkillEffectCanvas } from "./skill-effect-canvas";
+import { SkillReworkPanel } from "./skill-rework-panel";
+import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
@@ -2232,6 +2234,7 @@ function Game({
     2: [],
   });
   const [skillPoints, setSkillPoints] = useState(1);
+  const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
   const [skills, setSkills] = useState(() =>
     skillsByClass[playerClass].map((skill, index) => ({
       ...skill,
@@ -2800,6 +2803,7 @@ function Game({
               setActiveLoadout(save.activeLoadout);
             }
             if (Array.isArray(save.skills)) setSkills(save.skills);
+            setSkillReworkBuild(restoreSkillBuild(save.skillReworkBuild, playerClass, savedLevel));
             const needsBossTicketReset = save.bossTicketResetVersion !== PERSONAL_BOSS_RESET_VERSION;
             setBossTickets(needsBossTicketReset ? 10 : (save.bossTickets ?? 10));
             setHighestFloor(save.highestFloor ?? savedWave);
@@ -3000,6 +3004,7 @@ function Game({
         loadouts,
         activeLoadout,
         skills,
+        skillReworkBuild,
         bossTickets,
         bossTicketResetVersion: PERSONAL_BOSS_RESET_VERSION,
         worldAttempts,
@@ -3120,6 +3125,7 @@ function Game({
     loadouts,
     activeLoadout,
     skills,
+    skillReworkBuild,
     bossTickets,
     worldAttempts,
     highestFloor,
@@ -3799,6 +3805,7 @@ function Game({
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
     setSkills(skillsByClass[playerClass].map((skill, index) => ({ ...skill, level: index === 0 ? 1 : 0 })));
+    setSkillReworkBuild(createSkillBuild());
     setSkillPoints(1);
     setCompletedRuns(0);
     setStoredSeconds(0);
@@ -7865,6 +7872,13 @@ function Game({
                   <Sparkles /> {skillPoints} 技能點
                 </span>
               </PageTitle>
+              <SkillReworkPanel
+                characterClass={playerClass}
+                characterLevel={level}
+                build={skillReworkBuild}
+                onChange={setSkillReworkBuild}
+              />
+              <h3>目前戰鬥使用的技能</h3>
               <SkillGrowthTable skills={skills} />
               <div className="skills-grid">
                 {skills.map((skill, i) => (
