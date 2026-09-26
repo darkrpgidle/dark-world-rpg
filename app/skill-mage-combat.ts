@@ -101,10 +101,10 @@ export type MageTurnResult = {
   abnormalKindsCounted: number;
   passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
   // A second meteor is resolved by the caller as its own hit/crit and VFX.
-  // Its 70% is relative to the original meteor's final damage.
+  // Its 70% is based on the original meteor's base multiplier, before crit.
   equipmentDamageEvents: {
     id: "滅世星雨";
-    damageRatio: number;
+    percent: number;
     guaranteedCritical: true;
     afterOriginalSegment: 1;
   }[];
@@ -245,7 +245,8 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     });
     session = checked.session;
     if (checked.allowed) equipmentDamageEvents.push({
-      id: "滅世星雨", damageRatio: 0.7, guaranteedCritical: true, afterOriginalSegment: 1,
+      id: "滅世星雨", percent: damageSegmentPercents[0] * 0.7,
+      guaranteedCritical: true, afterOriginalSegment: 1,
     });
   }
   const ascensionDamageEvents: MageTurnResult["ascensionDamageEvents"] = [];

@@ -34,13 +34,13 @@ function turn(combat, skill, now, hits = [{ hit: true }], options = {}) {
 test("meteor mythic adds one critical second meteor without another cast or charge", () => {
   const item = { mythicId: "skill-mage-cataclysm-crown" };
   const ready = normalUntilSkillReady(mage(["隕星術"]), "隕星術");
-  const base = turn(ready, "隕星術", 1000, [{ hit: true }], { roll: () => 0.99 });
+  const base = turn(ready, "隕星術", 1000, [{ hit: true, critical: true }], { roll: () => 0.99 });
   const rolls = [0.99, 0.34]; // burn fails; the equipment's 35% roll succeeds
-  const equipped = turn(ready, "隕星術", 1000, [{ hit: true }], {
+  const equipped = turn(ready, "隕星術", 1000, [{ hit: true, critical: true }], {
     equippedItems: [item], roll: () => rolls.shift(),
   });
   assert.deepEqual(equipped.equipmentDamageEvents, [{
-    id: "滅世星雨", damageRatio: 0.7, guaranteedCritical: true, afterOriginalSegment: 1,
+    id: "滅世星雨", percent: 182, guaranteedCritical: true, afterOriginalSegment: 1,
   }]);
   assert.deepEqual(equipped.damageSegmentPercents, base.damageSegmentPercents);
   assert.deepEqual(equipped.combat.session.charge, base.combat.session.charge);
