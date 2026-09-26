@@ -8,6 +8,7 @@ import {
   nextReadySkill,
   recordPrimaryAttack,
   recordSuccessfulDodge,
+  recoverPrimaryAttackCharges,
   transitionSkillCombat,
 } from "../app/skill-combat-queue.ts";
 
@@ -95,4 +96,19 @@ test("ultimate caps at 100, joins queue and resets only on cast or battle bounda
     assert.deepEqual(cleared.ready, []);
     assert.equal(cleared.charges["穿雲箭"], 0);
   }
+});
+
+test("ascension charge recovery only affects attack-count skills and preserves earlier ready order", () => {
+  const state = loadout("遊俠", ["破星狙擊", "穿雲箭", "風行領域"], "蒼穹箭雨");
+  state.charges["破星狙擊"] = 7;
+  state.charges["穿雲箭"] = 2;
+  state.charges["風行領域"] = 7;
+  state.ready = ["蒼穹箭雨"];
+  state.ultimateEnergy = 100;
+  const recovered = recoverPrimaryAttackCharges(state, 2);
+  assert.deepEqual(recovered.ready, ["蒼穹箭雨", "破星狙擊", "穿雲箭"]);
+  assert.deepEqual(recovered.charges, { 破星狙擊: 9, 穿雲箭: 4, 風行領域: 7 });
+  assert.equal(recovered.ultimateEnergy, 100);
+  assert.deepEqual(state.ready, ["蒼穹箭雨"]);
+  assert.throws(() => recoverPrimaryAttackCharges(state, -1), RangeError);
 });
