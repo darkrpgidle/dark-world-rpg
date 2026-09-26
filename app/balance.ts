@@ -94,6 +94,20 @@ export function enhancementGoldCost(
   return Math.max(1, Math.round(mapBase * qualityMultiplier * slotMultiplier * levelMultiplier));
 }
 
+export function enhancementBonusPercent(level: number) {
+  const safeLevel = clamp(
+    0,
+    balanceConfig.progression.maxEnhancement,
+    Math.round(level),
+  );
+  const rules = balanceConfig.equipment.enhancement;
+  return (
+    Math.min(4, safeLevel) * rules.firstFourPerLevel +
+    Math.max(0, Math.min(9, safeLevel) - 4) * rules.levelsFiveToNinePerLevel +
+    Math.max(0, safeLevel - 9) * rules.levelTenPlusPerLevel
+  );
+}
+
 export function enhancementStoneCost(targetLevel: number) {
   const level = clamp(1, balanceConfig.progression.maxEnhancement, Math.round(targetLevel));
   const rules = balanceConfig.equipment.enhancementAttempt.stoneCost;
