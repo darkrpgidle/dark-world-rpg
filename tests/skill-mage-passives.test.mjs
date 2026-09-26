@@ -12,6 +12,7 @@ const { createMageCombat, resolveMageTurn } = await import("../app/skill-mage-co
 const { magePassiveStats, resolveMagePassiveAttack } = await import("../app/skill-mage-passives.ts");
 const { trySkillProc } = await import("../app/skill-combat-session.ts");
 const { grantUltimateEnergy } = await import("../app/skill-combat-queue.ts");
+const { tryActivateMageShield } = await import("../app/skill-mage-shield.ts");
 
 function mage(names, slots = names.filter((name) => ["霜火新星", "奧術飛彈", "隕星術", "虛空崩解"].includes(name)), ranks = {}) {
   let build = createSkillBuild();
@@ -24,7 +25,6 @@ function mage(names, slots = names.filter((name) => ["霜火新星", "奧術飛�
 function turn(combat, skill, now, hits = [{ hit: true }], options = {}) {
   return resolveMageTurn(combat, {
     skill, hits, now, ascended: new Set(), roll: options.roll ?? (() => 1),
-    shieldValue: options.shieldValue,
     finalExplosionConfirmed: options.finalExplosionConfirmed,
   });
 }
@@ -90,7 +90,7 @@ test("precision adds points to a skill's one burn roll, preserving the existing 
 });
 
 test("burn guidance, shield transfer and resonance count only existing, distinct abnormal states", () => {
-  let combat = mage(["霜火新星", "奧術感知", "燃燼導引", "護盾轉流", "元素共振"],
+  let combat = mage(["霜火新星", "魔力護盾", "奧術感知", "燃燼導引", "護盾轉流", "元素共振"],
     ["霜火新星"], { 奧術感知: 5, 燃燼導引: 5, 護盾轉流: 5, 元素共振: 5 });
   combat = withStatus(combat, "burn", 0);
   combat = withStatus(combat, "bleed", 0);
@@ -99,14 +99,16 @@ test("burn guidance, shield transfer and resonance count only existing, distinct
   combat = withStatus(combat, "elementSigil", 0);
   assert.equal(combat.session.enemy.bleed.stacks, 2);
   combat = charge(combat, 4);
-  const shielded = turn(combat, "霜火新星", 400, [{ hit: true }], { shieldValue: 1 });
+  const withShield = tryActivateMageShield(combat,
+    { currentHealth: 500, maxHealthBeforeMagePassive: 1000, ascended: false }).combat;
+  const shielded = turn(withShield, "霜火新星", 400);
   assert.equal(shielded.abnormalKindsCounted, 3);
   assert.equal(shielded.passiveDirectDamageBonusPercent, 12 + 18 + 12 + 24);
-  assert.equal(turn(combat, "霜火新星", 400, [{ hit: true }], { shieldValue: 0 })
+  assert.equal(turn(combat, "霜火新星", 400)
     .passiveDirectDamageBonusPercent, 12 + 18 + 24);
-  assert.equal(turn(combat, "霜火新星", 400, [{ hit: false }], { shieldValue: 1 })
+  assert.equal(turn(withShield, "霜火新星", 400, [{ hit: false }])
     .passiveDirectDamageBonusPercent, 0);
-  assert.equal(turn(combat, "霜火新星", 8000, [{ hit: true }], { shieldValue: 1 })
+  assert.equal(turn(withShield, "霜火新星", 8000)
     .passiveDirectDamageBonusPercent, 12 + 12);
 });
 

@@ -13,11 +13,13 @@ import {
   mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
 import { resolveMagePassiveAttack } from "./skill-mage-passives";
+import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
 
 export type MageCombat = {
   session: SkillCombatSession;
   build: SkillBuild;
   overload: MageOverloadState;
+  shield: MageShieldState;
 };
 
 export function createMageCombat(build: SkillBuild, level: number): MageCombat {
@@ -25,6 +27,7 @@ export function createMageCombat(build: SkillBuild, level: number): MageCombat {
     session: createSkillCombatSession(build, "法師", level),
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
     overload: createMageOverload(),
+    shield: createMageShieldState(),
   };
 }
 
@@ -33,6 +36,7 @@ export function transitionMageCombat(combat: MageCombat, boundary: CombatBoundar
     ...combat,
     session: transitionCombatSession(combat.session, boundary),
     overload: boundary === "normal-kill" ? combat.overload : createMageOverload(),
+    shield: boundary === "normal-kill" ? combat.shield : createMageShieldState(),
   };
 }
 
@@ -53,7 +57,6 @@ export type MageTurnInput = {
   now: number;
   ascended: ReadonlySet<MageActiveName>;
   roll?: () => number;
-  shieldValue?: number; // the stage-21 shield adapter supplies the current value
   finalExplosionConfirmed?: boolean; // final original ultimate segment was the explosion
 };
 
@@ -75,6 +78,7 @@ export type MageTurnResult = {
   passiveUltimateEnergyGain: number;
   abnormalKindsCounted: number;
   passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
+  shieldAscensionDamageBonusPercent: number;
 };
 
 export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageTurnResult | null {
@@ -113,10 +117,13 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     || session.enemy.armorBreak || session.enemy.elementSigil);
   const conditionalDamageBonusPercent = input.skill === "虛空崩解" && targetAbnormal
     ? mageSkillRankValue(MAGE_ACTIVE_RULES.虛空崩解.damageBonusVsStatus, rank) : 0;
+  // Consume one of the three later active casts even on a miss or a status
+  // cast; a normal attack never spends this buff.
+  const shieldCast = consumeMageShieldActiveCast(combat.shield, isActive);
 
   const passive = resolveMagePassiveAttack(combat.build, {
     kind: isActive ? "skill" : "normal", hits: input.hits,
-    targetStatuses: session.enemy, shieldValue: input.shieldValue ?? 0,
+    targetStatuses: session.enemy, shieldValue: combat.shield.value,
     hasDirectDamage: input.skill === "normal" || input.skill === "霜火新星"
       || input.skill === "奧術飛彈" || input.skill === "隕星術"
       || input.skill === "虛空崩解" || input.skill === "星界寂滅",
@@ -177,7 +184,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
       : input.skill === "normal" ? [100] : [];
 
   return {
-    combat: { ...combat, session, overload },
+    combat: { ...combat, session, overload, shield: shieldCast.state },
     damageSegmentPercents,
     totalDamagePercent: input.skill === "星界寂滅"
       ? mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank) : 0,
@@ -192,5 +199,6 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     passiveUltimateEnergyGain: passive.ultimateEnergyGain,
     abnormalKindsCounted: passive.abnormalCount,
     passiveDamageProcs,
+    shieldAscensionDamageBonusPercent: shieldCast.activeDamageBonusPercent,
   };
 }
