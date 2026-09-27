@@ -58,21 +58,20 @@ test("bleed and burn tick on the existing target, then clear on normal kill", ()
 });
 
 
-test("a refreshed bleed settles its due tick with the earlier attack snapshot", () => {
+test("a passive bleed refresh settles its due tick with the earlier attack snapshot", () => {
   const battle = syncLiveCombat(null, "tower-snapshot", "enemy-1", {
-    ranks: { 血刃斬: 5 }, activeSlots: ["血刃斬", null, null],
+    ranks: { 裂傷本能: 5 }, activeSlots: [null, null, null],
   }, "戰士", 100, createSkillAscensions());
-  for (let i = 0; i < 4; i++) resolveLiveCombatAttack(battle,
-    { ...opts, now: 1000 + i * 100, attack: 100, roll: () => 0 });
-  for (let i = 0; i < 4; i++) resolveLiveCombatAttack(battle,
-    { ...opts, now: 1400 + i * 100, attack: 200, roll: () => 0 });
+  const first = resolveLiveCombatAttack(battle,
+    { ...opts, now: 1000, attack: 100, roll: () => 0 });
+  assert.ok(first.statuses.includes("bleed"));
   const refresh = resolveLiveCombatAttack(battle,
-    { ...opts, now: 2300, attack: 200, roll: () => 0 });
-  assert.equal(refresh.name, "血刃斬");
+    { ...opts, now: 2000, attack: 200, roll: () => 0 });
+  assert.equal(refresh.name, null);
   assert.ok(refresh.statuses.includes("bleed"));
   assert.deepEqual(refresh.ticks, [20]);
   assert.equal(battle.dotAttack.bleed, 200);
-  assert.deepEqual(advanceLiveCombat(battle, 3300), [80]);
+  assert.deepEqual(advanceLiveCombat(battle, 3000), [80]);
 });
 
 test("equipped defensive skills absorb or avoid an actual enemy attack", () => {
