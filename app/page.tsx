@@ -2312,6 +2312,9 @@ function Game({
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState(false);
   const [dailyClaimBusy, setDailyClaimBusy] = useState(false);
   const dailyClaimInFlightRef = useRef(false);
+  const [shopPurchaseBusy, setShopPurchaseBusy] = useState(false);
+  const shopPurchaseInFlightRef = useRef(false);
+  const shopPurchaseRetryRef = useRef<string | null>(null);
   const [worldDamage, setWorldDamage] = useState(0);
   const [worldRoundDamage, setWorldRoundDamage] = useState(0);
   const [worldBossSecondsLeft, setWorldBossSecondsLeft] = useState(WORLD_BOSS_ROUND_MS / 1_000);
@@ -3345,7 +3348,52 @@ function Game({
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [saveReady, playerId, loginId, sessionSuperseded, pauseSupersededSession, pushLog]);
 
-  const buyShopItem = (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
+  const buyShopItem = async (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
+    if (item === "reforge") {
+      if (shopPurchaseInFlightRef.current) return;
+      if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
+      const { price, stones } = balanceConfig.economy.yuanbaoReforgeBundle;
+      if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
+      shopPurchaseInFlightRef.current = true;
+      setShopPurchaseBusy(true);
+      const purchaseId = shopPurchaseRetryRef.current ?? crypto.randomUUID();
+      shopPurchaseRetryRef.current = purchaseId;
+      try {
+        const response = await fetch("/api/save", {
+          method: "POST",
+          headers: loginHeaders(loginId, true),
+          body: JSON.stringify({ playerId, action: "shop_reforge", purchaseId }),
+        });
+        const result = await response.json();
+        if (response.status === 401) {
+          pauseSupersededSession(result?.error === "session_replaced" ? "replaced" : "expired");
+          return;
+        }
+        if (!response.ok || result?.ok !== true || typeof result.accepted !== "boolean") {
+          toast.error(result?.error === "purchase_rejected" ? "元寶不足或存檔異常" : "購買失敗，請重試");
+          return;
+        }
+        if (result.accepted) {
+          setYuanbao((value) => value - price);
+          setReforgeStones((value) => value + stones);
+          pushLog("收益", `商城購買洗鍊石 ×${stones}，消耗元寶 ${price}`);
+          toast.success("購買成功", { description: `洗鍊石 +${stones}` });
+        } else {
+          if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+          if (Number.isSafeInteger(result.reforgeStones)) setReforgeStones(result.reforgeStones);
+          toast.info("該筆購買已完成");
+        }
+        if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+        setSaveUpdatedAt(result.updatedAt ?? null);
+        shopPurchaseRetryRef.current = null;
+      } catch {
+        toast.error("連線中斷，請重試同一筆購買");
+      } finally {
+        shopPurchaseInFlightRef.current = false;
+        setShopPurchaseBusy(false);
+      }
+      return;
+    }
     const yuanbaoPrices: Partial<Record<typeof item, number>> = {
       "title-ash": 80, "title-abyss": 180, "appearance-ember": 120,
       "appearance-arcane": 180, "appearance-abyss": 300, reforge: 10, gamble: 10,
@@ -3382,12 +3430,6 @@ function Game({
     }
     if (yuanbao < 10) return toast.error("元寶不足", { description: "需要 10 元寶" });
     setYuanbao((value) => value - 10);
-    if (item === "reforge") {
-      setReforgeStones((value) => value + 12);
-      pushLog("收益", "商城購買洗鍊石 ×12，消耗元寶 10");
-      toast.success("購買成功", { description: "洗鍊石 +12" });
-      return;
-    }
     const targetMap = Math.max(1, unlockedMapId);
     const reward = createGambleReward(targetMap, Math.random(), Date.now());
     if (reward.type === "reforge") {
@@ -8314,6 +8356,7 @@ function Game({
               onSelectTitle={setSelectedTitle}
               onSelectAppearance={setSelectedAppearance}
               onBuy={buyShopItem}
+              shopPurchaseBusy={shopPurchaseBusy || !saveReady || sessionSuperseded}
               onPaidSkillReset={async () => {
                 if (await runSkillAction({ kind: "paid_reset" })) {
                   pushLog("收益", "商城技能重置，消耗 300 元寶");
@@ -8682,6 +8725,7 @@ function Shop({
   onPaidSkillReset,
   skillResetBusy,
   skillResetAvailable,
+  shopPurchaseBusy,
 }: {
   yuanbao: number;
   gold: number;
@@ -8696,6 +8740,7 @@ function Shop({
   onPaidSkillReset: () => Promise<void>;
   skillResetBusy: boolean;
   skillResetAvailable: boolean;
+  shopPurchaseBusy: boolean;
 }) {
   const [currency, setCurrency] = useState<"yuanbao" | "gold">("yuanbao");
   const [yuanbaoPage, setYuanbaoPage] = useState<1 | 2>(1);
@@ -8728,7 +8773,7 @@ function Shop({
         </div>
       ) : (
         <div className="shop-grid">
-          <Panel className="shop-card"><h3>洗鍊石 ×12</h3><p>資源補給｜補充裝備洗鍊所需的稀有資源。</p><button className="btn btn-primary" onClick={() => onBuy("reforge")}>10 元寶購買</button></Panel>
+          <Panel className="shop-card"><h3>洗鍊石 ×12</h3><p>資源補給｜補充裝備洗鍊所需的稀有資源。</p><button className="btn btn-primary" disabled={shopPurchaseBusy} onClick={() => onBuy("reforge")}>10 元寶購買</button></Panel>
           <Panel className="shop-card"><h3>賭狗禮包</h3><p>資源補給｜已攻略最高地圖的隨機部位裝備。</p><small>史詩 40%・洗鍊石 ×10 30%・傳奇 20%・神話 10%</small><button className="btn btn-primary" onClick={() => onBuy("gamble")}>10 元寶開啟</button></Panel>
           <Panel className="shop-card">
             <h3>新版技能重置</h3><p>重置已分配的新版技能點與出戰槽；昇華選擇保留。</p>

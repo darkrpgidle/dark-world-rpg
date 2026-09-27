@@ -4,6 +4,7 @@ import { gameSaves, saveSnapshots, sessions } from "../../../db/schema";
 import { activeSaveSession } from "../../save-session-guard";
 import { applyDailyHuntClaim, preserveServerDailyHuntClaim, taipeiDailyDate } from "../../daily-hunt-claim";
 import { advanceOnlineYuanbao, preserveServerOnlineYuanbao } from "../../online-yuanbao";
+import { buyYuanbaoReforgeBundle, preserveServerShopPurchases } from "../../shop-purchase";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
@@ -41,7 +42,7 @@ function authoritativeResponse(save: { payload: string; updatedAt: string }) {
       accepted: false,
       updatedAt: save.updatedAt,
       save: preserveServerSkillSave(
-        preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload), payload), payload,
+        preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload), payload), payload), payload,
       ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload),
     });
   } catch {
@@ -88,7 +89,7 @@ function prepareAuthoritativePayload(
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
-  const protectedSave = preserveServerSkillSave(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(next, serverSave), serverSave), serverSave);
+  const protectedSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(next, serverSave), serverSave), serverSave), serverSave);
   return protectedSave ? JSON.stringify(protectedSave) : null;
 }
 
@@ -153,7 +154,7 @@ export async function GET(request: Request) {
   const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
   return jsonNoStore({
     save: preserveServerSkillSave(
-      preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload), savedPayload), savedPayload,
+      preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload), savedPayload), savedPayload), savedPayload,
     ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload),
     updatedAt: save.updatedAt,
   });
@@ -168,11 +169,12 @@ export async function POST(request: Request) {
     save?: unknown;
     payload?: unknown;
     expectedUpdatedAt?: string | null;
-    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "skill";
+    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "skill";
     dailyDate?: string;
     dailyKills?: number;
     skillAction?: SkillSaveAction;
     skillActionId?: string;
+    purchaseId?: string;
   };
   const playerId = body.playerId ?? "";
   if (!validId(playerId))
@@ -339,6 +341,40 @@ export async function POST(request: Request) {
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
   }
+  if (body.action === "shop_reforge") {
+    if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
+    const purchaseId = body.purchaseId;
+    if (!purchaseId || !/^[a-f0-9-]{36}$/.test(purchaseId))
+      return jsonNoStore({ error: "invalid_purchase_id" }, 400);
+    let current = existing[0];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      let previous: Record<string, unknown>;
+      try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
+      catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
+      const purchase = buyYuanbaoReforgeBundle(previous, purchaseId);
+      if (!purchase) return jsonNoStore({ error: "purchase_rejected" }, 409);
+      if (!purchase.accepted)
+        return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
+          yuanbao: previous.yuanbao, reforgeStones: previous.reforgeStones,
+          adminRevision: previous.adminRevision });
+      const next: Record<string, unknown> = { ...purchase.save, _saveSessionId: sessionId };
+      const nextPayload = JSON.stringify(next);
+      if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
+      const updatedAt = nextUpdatedAt(current.updatedAt);
+      const result = await db.update(gameSaves)
+        .set({ accountId: account.id, payload: nextPayload, updatedAt })
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
+      if ((result.rowsAffected ?? 0) === 1)
+        return jsonNoStore({ ok: true, accepted: true, updatedAt,
+          yuanbao: next.yuanbao, reforgeStones: next.reforgeStones, adminRevision: next.adminRevision });
+      if (await writerRevoked()) return replacedResponse();
+      const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
+        updatedAt: gameSaves.updatedAt }).from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
+      if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
+      current = latest;
+    }
+    return authoritativeResponse(current);
+  }
   if (body.action === "heartbeat_online") {
     if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
     let current = existing[0];
@@ -448,7 +484,7 @@ export async function POST(request: Request) {
         return jsonNoStore({ ok: true, updatedAt: existing[0].updatedAt });
     } catch { /* continue with the normal save path */ }
   }
-  const initialSave = preserveServerSkillSave(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(normalizedIncoming, null), null), null);
+  const initialSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(normalizedIncoming, null), null), null), null);
   if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
   delete initialSave._lastSkillActionId;
   initialSave._paidSkillResetActionIds = [];

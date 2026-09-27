@@ -833,6 +833,11 @@ test("awards online yuanbao every ten minutes through the save service", () => {
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
+test("buys the yuanbao reforge bundle through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoReforgeBundle, { price: 10, stones: 12 });
+  assert.match(page, /action: "shop_reforge", purchaseId/);
+});
+
 test("claims the 500-kill daily target through the save service", () => {
   const reward = balanceConfig.economy.dailyHuntReward;
   assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });
