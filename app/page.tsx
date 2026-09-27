@@ -132,6 +132,7 @@ import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoint
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
 import { advanceLiveCombat, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
 import { settleCombatHealth } from "./skill-health-settlement";
+import { createBossDamageLedger, settleBossDamageEvent } from "./skill-boss-damage";
 import { warriorPassiveDefenses } from "./skill-warrior-passives";
 import { rangerPassiveStats } from "./skill-ranger-passives";
 import { magePassiveStats } from "./skill-mage-passives";
@@ -5724,25 +5725,29 @@ function Game({
       bossEnemyHpRef.current = 0;
       return 0;
     };
+    let bossDamageLedger = createBossDamageLedger(activeBossBattle.hp, bossEnemyHpRef.current);
+    const settleBossHit = (rawDamage: number, source: "attack" | "burn") => {
+      if (bossRoundEndedRef.current) return settleBossDamageEvent(bossDamageLedger, 0);
+      const settled = settleBossDamageEvent(bossDamageLedger, rawDamage);
+      bossDamageLedger = settled.ledger;
+      bossEnemyHpRef.current = settled.remainingPercent;
+      if (settled.newVictory) resolveBossVictory(source);
+      setBossEnemyHp(settled.remainingPercent);
+      return settled;
+    };
     const timer = setInterval(
       () => {
         if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
         const liveTickDamage = liveCombatRef.current
           ? advanceLiveCombat(liveCombatRef.current, Date.now()).reduce((sum, damage) => sum + damage, 0) : 0;
         if (liveTickDamage > 0) {
-          const preview = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, liveTickDamage);
-          setBossEnemyHp((hp) => {
-            if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
-            const settled = settleCombatHealth(hp, activeBossBattle.hp, liveTickDamage);
-            if (settled.defeated) return resolveBossVictory("burn");
-            bossEnemyHpRef.current = settled.remainingPercent;
-            return settled.remainingPercent;
-          });
-          if (activeBossBattle.mode === "world" && preview.actualDamage > 0) {
-            setWorldDamage((value) => value + preview.actualDamage);
-            setWorldRoundDamage((value) => value + preview.actualDamage);
+          const settled = settleBossHit(liveTickDamage, "burn");
+          if (activeBossBattle.mode === "world" && settled.actualDamage > 0) {
+            setWorldDamage((value) => value + settled.actualDamage);
+            setWorldRoundDamage((value) => value + settled.actualDamage);
           }
-          setLastBossDamage(preview.actualDamage);
+          setLastBossDamage(settled.actualDamage);
+          if (settled.defeated) return;
         }
         playerClock += tickMs;
         bossClock += tickMs;
@@ -5754,25 +5759,18 @@ function Game({
         ) {
           activeWorldBurn.nextAt = Date.now() + 1_000;
           const rawBurnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
-          const burnPreview = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, rawBurnDamage);
-          setBossEnemyHp((hp) => {
-            if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
-            const settled = settleCombatHealth(hp, activeBossBattle.hp, rawBurnDamage);
-            if (settled.defeated) return resolveBossVictory("burn");
-            bossEnemyHpRef.current = settled.remainingPercent;
-            return settled.remainingPercent;
-          });
-          if (burnPreview.actualDamage > 0) {
-            setWorldDamage((value) => value + burnPreview.actualDamage);
-            setWorldRoundDamage((value) => value + burnPreview.actualDamage);
-            setLastBossDamage(burnPreview.actualDamage);
+          const burnSettlement = settleBossHit(rawBurnDamage, "burn");
+          if (burnSettlement.actualDamage > 0) {
+            setWorldDamage((value) => value + burnSettlement.actualDamage);
+            setWorldRoundDamage((value) => value + burnSettlement.actualDamage);
+            setLastBossDamage(burnSettlement.actualDamage);
             const burnKey = Date.now();
-            setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnPreview.actualDamage }]);
+            setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnSettlement.actualDamage }]);
             window.setTimeout(() => {
               setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
             }, 1_200);
           }
-          if (burnPreview.defeated) return;
+          if (burnSettlement.defeated) return;
         }
         const playerInterval = 100000 / Math.max(1, combatAttackSpeed);
         const bossInterval = 100000 / bossAttackSpeed;
@@ -6018,9 +6016,9 @@ function Game({
           ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100 : 0;
         const calculatedPlayerDamage = playerActs
           ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage : 0;
-        const bossHealthSettlement = settleCombatHealth(
-          bossEnemyHpRef.current, activeBossBattle.hp, calculatedPlayerDamage,
-        );
+        const bossHealthSettlement = playerActs
+          ? settleBossHit(calculatedPlayerDamage, "attack")
+          : settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, 0);
         const playerDamage = playerActs
           ? settleCutoverAction(cutoverRoute, {
               battleId: cutoverRoute.battleId,
@@ -6054,17 +6052,10 @@ function Game({
           bossDamage = defense.damage;
           if (defense.counterDamagePercent > 0) {
             const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100);
-            setBossEnemyHp((hp) => {
-              if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
-              const settled = settleCombatHealth(hp, activeBossBattle.hp, counter);
-              if (settled.defeated) return resolveBossVictory("attack");
-              bossEnemyHpRef.current = settled.remainingPercent;
-              return settled.remainingPercent;
-            });
-            if (activeBossBattle.mode === "world") {
-              const actual = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, counter).actualDamage;
-              setWorldDamage((value) => value + actual);
-              setWorldRoundDamage((value) => value + actual);
+            const counterSettlement = settleBossHit(counter, "attack");
+            if (activeBossBattle.mode === "world" && counterSettlement.actualDamage > 0) {
+              setWorldDamage((value) => value + counterSettlement.actualDamage);
+              setWorldRoundDamage((value) => value + counterSettlement.actualDamage);
             }
           }
         }
@@ -6118,18 +6109,9 @@ function Game({
             bossPlayerHpRef.current = nextHealth;
             return nextHealth;
           });
-        const bossHpLoss = playerActs ? bossHealthSettlement.percentDamage : 0;
-        const abyssSpecialTriggered = abyssSpecialReady && bossEnemyHpRef.current > bossHpLoss;
+        const abyssSpecialTriggered = abyssSpecialReady && !bossRoundEndedRef.current;
         if (bossActs && !abyssSpecialTriggered)
-          setLastBossCounterDamage(bossEnemyHpRef.current <= bossHpLoss ? 0 : bossDamage);
-        if (playerActs) setBossEnemyHp((hp) => {
-          if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
-          const healthSettlement = settleCombatHealth(hp, activeBossBattle.hp, calculatedPlayerDamage);
-          if (healthSettlement.defeated) return resolveBossVictory("attack");
-          const nextHp = healthSettlement.remainingPercent;
-          bossEnemyHpRef.current = nextHp;
-          return nextHp;
-        });
+          setLastBossCounterDamage(bossRoundEndedRef.current ? 0 : bossDamage);
         if (abyssSpecialTriggered) {
           const sequence = ++abyssBossSequenceRef.current;
           bossCinematicLockRef.current = true;
@@ -6170,7 +6152,7 @@ function Game({
           }, 2_200);
         }
         if (bossActs && !abyssSpecialTriggered) setBossPlayerHp((hp) => {
-          if (bossEnemyHpRef.current <= bossHpLoss) return hp;
+          if (bossRoundEndedRef.current) return hp;
           const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
           if (healthSettlement.defeated) {
             if (bossRoundEndedRef.current) return hp;
