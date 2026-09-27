@@ -8178,12 +8178,8 @@ function Game({
             <div className="page-section">
               <PageTitle
                 title={`${playerClass}技能`}
-                sub="升級並配置新版技能；已學被動自動生效。"
-              >
-                <span className="skill-points">
-                  <Sparkles /> {earnedSkillPoints(level) - spentSkillPoints(skillReworkBuild)} 技能點
-                </span>
-              </PageTitle>
+                sub="專精配置"
+              />
               <SkillReworkPanel
                 characterClass={playerClass}
                 characterLevel={level}
