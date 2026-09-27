@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import test from "node:test";
-import {
+
+registerHooks({ resolve(specifier, context, nextResolve) {
+  if (specifier.startsWith("./") && !specifier.endsWith(".ts")) return nextResolve(`${specifier}.ts`, context);
+  return nextResolve(specifier, context);
+} });
+const {
   WARRIOR_ACTIVE_RULES, WARRIOR_PASSIVE_RULES, createWarriorBuffState,
   consumeWarriorPrimaryAttack, recordWarriorSkillHit,
   triggerWarriorBloodRoar, triggerWarriorStance, warriorSkillRankValue,
-} from "../app/skill-warrior-rules.ts";
+} = await import("../app/skill-warrior-rules.ts");
 
 test("all warrior skill levels and ascensions match the rework table", () => {
   assert.equal(Object.keys(WARRIOR_ACTIVE_RULES).length, 8);
