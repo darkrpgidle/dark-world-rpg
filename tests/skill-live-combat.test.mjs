@@ -64,7 +64,7 @@ test("a refreshed bleed settles its due tick with the earlier attack snapshot", 
   }, "戰士", 100, createSkillAscensions());
   for (let i = 0; i < 4; i++) resolveLiveCombatAttack(battle,
     { ...opts, now: 1000 + i * 100, attack: 100, roll: () => 0 });
-  for (let i = 0; i < 3; i++) resolveLiveCombatAttack(battle,
+  for (let i = 0; i < 4; i++) resolveLiveCombatAttack(battle,
     { ...opts, now: 1400 + i * 100, attack: 200, roll: () => 0 });
   const refresh = resolveLiveCombatAttack(battle,
     { ...opts, now: 2300, attack: 200, roll: () => 0 });
