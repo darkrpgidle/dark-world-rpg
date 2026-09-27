@@ -2,7 +2,7 @@
 // remain the caller's responsibility. One call describes one original cast.
 import type { SkillBuild } from "./skill-rework";
 import type { PrimaryAttackEvent } from "./skill-combat-queue";
-import type { EnemyDebuffs } from "./skill-debuff-timer";
+import { countEnemyAbnormalKinds, type EnemyDebuffs } from "./skill-debuff-timer";
 import type { StatusApplication } from "./skill-combat-session";
 import { MAGE_PASSIVE_RULES, mageSkillRankValue, type MagePassiveName } from "./skill-mage-rules";
 
@@ -34,13 +34,8 @@ export type MagePassiveAttackInput = {
   roll: () => number;
 };
 
-// Shared provisional classification for mage damage bonuses. Stage 27 will
-// reconcile it with the final cross-class abnormal-status specification.
-export const MAGE_ABNORMAL_KINDS = ["bleed", "burn", "armorBreak", "elementSigil"] as const;
-
-export function countMageAbnormalKinds(targetStatuses: EnemyDebuffs): number {
-  return MAGE_ABNORMAL_KINDS.filter((kind) => Boolean(targetStatuses[kind])).length;
-}
+// Preserve the existing caller API while all classes use one classification.
+export { countEnemyAbnormalKinds as countMageAbnormalKinds } from "./skill-debuff-timer";
 
 export function resolveMagePassiveAttack(build: SkillBuild, input: MagePassiveAttackInput) {
   const hit = input.hits.some((segment) => segment.hit);
@@ -48,9 +43,9 @@ export function resolveMagePassiveAttack(build: SkillBuild, input: MagePassiveAt
   const directHit = activeHit && input.hasDirectDamage;
   const targetBurning = Boolean(input.targetStatuses.burn);
   // Different abnormal categories count once each. Brands/marks are not
-  // themselves abnormalities; stage 27 will unify this classification.
+  // themselves abnormalities.
   const abnormalCount = Math.min(MAGE_PASSIVE_RULES.元素共振.maxDistinctStatuses,
-    countMageAbnormalKinds(input.targetStatuses));
+    countEnemyAbnormalKinds(input.targetStatuses));
 
   const statuses: StatusApplication[] = [];
   const normalBurnChance = value(build, "焰脈", "normalBurnChance");
