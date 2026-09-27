@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { gameSaves, saveSnapshots } from "../../../db/schema";
+import { gameSaves, saveSnapshots, sessions } from "../../../db/schema";
+import { activeSaveSession } from "../../save-session-guard";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
@@ -206,6 +207,14 @@ export async function POST(request: Request) {
   // authority. A new explicit login replaces this ID and the old window can
   // no longer update the canonical save.
   const sessionId = auth.login.sessionId;
+  const writerCondition = () => activeSaveSession(sessionId, account.id);
+  const writerRevoked = async () => {
+    const [active] = await db.select({ tokenHash: sessions.tokenHash }).from(sessions)
+      .where(and(eq(sessions.tokenHash, sessionId), eq(sessions.accountId, account.id),
+        gt(sessions.expiresAt, new Date().toISOString()))).limit(1);
+    return !active;
+  };
+  const replacedResponse = () => jsonNoStore({ error: "session_replaced" }, 401);
 
   // Background tabs are throttled by browsers, so do not rely on their timer
   // cadence for idle rewards.  The server is the clock: on resume it settles
@@ -232,10 +241,11 @@ export async function POST(request: Request) {
         const pausedUpdatedAt = nextUpdatedAt(current.updatedAt);
         const pausedResult = await db.update(gameSaves)
           .set({ accountId: account.id, payload: pausedPayload, updatedAt: pausedUpdatedAt })
-          .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+          .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
         if ((pausedResult.rowsAffected ?? 0) === 1) {
           return jsonNoStore({ ok: true, accepted: true, updatedAt: pausedUpdatedAt, save: pausedSave, idleSecondsAdded: 0 });
         }
+        if (await writerRevoked()) return replacedResponse();
         const [latest] = await db
           .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
           .from(gameSaves)
@@ -263,7 +273,7 @@ export async function POST(request: Request) {
       const updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: settledPayload, updatedAt })
-        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
       if ((result.rowsAffected ?? 0) === 1) {
         try {
           await createServerCheckpointIfDue(db, {
@@ -280,6 +290,7 @@ export async function POST(request: Request) {
           idleSecondsAdded: elapsedSeconds,
         });
       }
+      if (await writerRevoked()) return replacedResponse();
       const [latest] = await db
         .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
         .from(gameSaves)
@@ -308,8 +319,9 @@ export async function POST(request: Request) {
       const updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: claimedPayload, updatedAt })
-        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
       if ((result.rowsAffected ?? 0) === 1) return jsonNoStore({ ok: true, accepted: true, updatedAt, claimedSeconds });
+      if (await writerRevoked()) return replacedResponse();
       const [latest] = await db
         .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
         .from(gameSaves)
@@ -343,12 +355,13 @@ export async function POST(request: Request) {
       const updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: nextPayload, updatedAt })
-        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
       if ((result.rowsAffected ?? 0) === 1) {
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
           skillReworkBuild: next.skillReworkBuild, skillAscensions: next.skillAscensions,
           yuanbao: next.yuanbao, adminRevision: next.adminRevision });
       }
+      if (await writerRevoked()) return replacedResponse();
       const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
         .from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
       if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
@@ -389,11 +402,12 @@ export async function POST(request: Request) {
       updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: finalPayload, updatedAt })
-        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
       if ((result.rowsAffected ?? 0) === 1) {
         saved = true;
         break;
       }
+      if (await writerRevoked()) return replacedResponse();
       const [latest] = await db
         .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
         .from(gameSaves)
@@ -413,16 +427,25 @@ export async function POST(request: Request) {
     } catch { /* snapshot maintenance never turns a committed save into a failure */ }
   } else {
     if (finalPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
-    await db.batch([
-      db.insert(gameSaves).values({ accountId: account.id, playerId, payload: finalPayload, updatedAt }),
-      db.insert(saveSnapshots).values({
-        playerId,
-        accountId: account.id,
-        payload: finalPayload,
-        kind: "automatic",
-        capturedAt: updatedAt,
-      }),
-    ]);
+    // The first save also checks the live session inside the write statement.
+    const inserted = await db.run(sql`
+      INSERT OR IGNORE INTO game_saves (account_id, player_id, payload, updated_at)
+      SELECT ${account.id}, ${playerId}, ${finalPayload}, ${updatedAt}
+      WHERE ${writerCondition()}
+    `);
+    if ((inserted.meta?.changes ?? 0) !== 1) {
+      if (await writerRevoked()) return replacedResponse();
+      const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
+        updatedAt: gameSaves.updatedAt }).from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
+      if (latest?.accountId === account.id) return authoritativeResponse(latest);
+      return jsonNoStore({ error: "save_retry_required" }, 503);
+    }
+    try {
+      await db.insert(saveSnapshots).values({
+        playerId, accountId: account.id, payload: finalPayload,
+        kind: "automatic", capturedAt: updatedAt,
+      });
+    } catch { /* a committed save still succeeds if snapshot maintenance fails */ }
   }
   // Keep cleanup best-effort: a successful save must not be reported as a
   // failure merely because old automatic snapshots could not be trimmed.
