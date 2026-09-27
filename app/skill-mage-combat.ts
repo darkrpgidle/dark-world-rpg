@@ -26,6 +26,7 @@ export type MageCombat = {
   build: SkillBuild;
   overload: MageOverloadState;
   shield: MageShieldState;
+  shieldActivatedThisBattle: boolean;
   sigil: MageSigilState;
 };
 
@@ -35,6 +36,7 @@ export function createMageCombat(build: SkillBuild, level: number): MageCombat {
     build: { ranks: { ...build.ranks }, activeSlots: [...build.activeSlots] },
     overload: createMageOverload(),
     shield: createMageShieldState(),
+    shieldActivatedThisBattle: false,
     sigil: createMageSigilState(),
   };
 }
@@ -45,6 +47,7 @@ export function transitionMageCombat(combat: MageCombat, boundary: CombatBoundar
     session: transitionCombatSession(combat.session, boundary),
     overload: boundary === "normal-kill" ? combat.overload : createMageOverload(),
     shield: boundary === "normal-kill" ? combat.shield : createMageShieldState(),
+    shieldActivatedThisBattle: boundary === "normal-kill" ? combat.shieldActivatedThisBattle : false,
     sigil: boundary === "normal-kill"
       ? transitionMageSigilTarget(combat.sigil, false) : createMageSigilState(),
   };
