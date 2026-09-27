@@ -120,7 +120,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     const result = resolveWarriorTurn(battle.combat as WarriorCombat, {
       skill: (name ?? "normal") as Parameters<typeof resolveWarriorTurn>[1]["skill"],
       hits, now: options.now, healthPercent: options.healthPercent,
-      ascended: battle.ascended as ReadonlySet<Parameters<typeof resolveWarriorTurn>[1]["skill"]>,
+      ascended: battle.ascended as ReadonlySet<Exclude<Parameters<typeof resolveWarriorTurn>[1]["skill"], "normal">>,
       roll: random,
     });
     if (!result) throw new Error("Warrior action and charge queue disagree");
@@ -135,7 +135,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     const result = resolveRangerTurn(battle.combat as RangerCombat, {
       skill: (name ?? "normal") as Parameters<typeof resolveRangerTurn>[1]["skill"],
       hits, now: options.now,
-      ascended: battle.ascended as ReadonlySet<Parameters<typeof resolveRangerTurn>[1]["skill"]>,
+      ascended: battle.ascended as ReadonlySet<Exclude<Parameters<typeof resolveRangerTurn>[1]["skill"], "normal">>,
       roll: random,
     });
     if (!result) throw new Error("Ranger action and charge queue disagree");
@@ -155,7 +155,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     const result = resolveMageTurn(battle.combat as MageCombat, {
       skill: (name ?? "normal") as Parameters<typeof resolveMageTurn>[1]["skill"],
       hits, now: options.now,
-      ascended: battle.ascended as ReadonlySet<Parameters<typeof resolveMageTurn>[1]["skill"]>,
+      ascended: battle.ascended as ReadonlySet<Exclude<Parameters<typeof resolveMageTurn>[1]["skill"], "normal">>,
       roll: random,
     });
     if (!result) throw new Error("Mage action and charge queue disagree");

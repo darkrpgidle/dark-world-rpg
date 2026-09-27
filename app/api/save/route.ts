@@ -238,6 +238,13 @@ export async function POST(request: Request) {
     .limit(1);
   if (existing[0] && existing[0].accountId !== account.id)
     return jsonNoStore({ error: "save_belongs_to_other_account" }, 403);
+  if (existing[0]) {
+    try {
+      const saved = JSON.parse(existing[0].payload) as Record<string, unknown>;
+      if (!Number.isInteger(saved.skillReworkVersion) || Number(saved.skillReworkVersion) < 2)
+        return jsonNoStore({ error: "skill_reset_login_required" }, 409);
+    } catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
+  }
   // The session row, not a cookie timestamp or save payload, owns write
   // authority. A new explicit login replaces this ID and the old window can
   // no longer update the canonical save.

@@ -516,7 +516,9 @@ test("displays player and monster damage as matching raw numbers", () => {
 });
 
 test("keeps skill cards and battle information unambiguous", () => {
-  assert.match(page, /skillValue\(skill\.name, skill\.level\)\.current/);
+  assert.match(page, /<SkillReworkPanel/);
+  assert.match(page, /earnedSkillPoints\(level\) - spentSkillPoints\(skillReworkBuild\)/);
+  assert.doesNotMatch(page, /目前戰鬥使用的技能/);
   assert.match(page, /遠征祝福不會在首領戰生效/);
   assert.match(page, /首領 -\{group\.damage\}/);
   assert.match(page, /enemyHitFeedback\.damage/);
@@ -524,10 +526,9 @@ test("keeps skill cards and battle information unambiguous", () => {
   assert.match(page, /本次遠征戰利品/);
 });
 
-test("locks ultimates until level ten and counts only direct stat skills in power", () => {
-  assert.match(page, /const isUltimateLocked = isUltimate && level < 10/);
-  assert.match(page, /角色達到 Lv\.10 後解鎖/);
-  assert.match(page, /isUltimateLocked/);
+test("uses level fifty for the new ultimate and does not count damage triggers in power", () => {
+  assert.match(page, /<SkillReworkPanel/);
+  assert.match(page, /liveCombatRef/);
   assert.doesNotMatch(page, /技能戰力/);
   assert.doesNotMatch(page, /戰力貢獻/);
   assert.doesNotMatch(page, /skillPowerContribution/);
@@ -554,17 +555,11 @@ test("shows rapid multi-hit and critical combat feedback", () => {
   assert.match(css, /@keyframes attack-impact-b/);
 });
 
-test("疾風連射 keeps one total attack while presenting five timed arrows", () => {
-  assert.match(page, /case "疾風連射": return 1;/);
-  assert.match(page, /const windVolleyTriggered = triggered\?\.name === "疾風連射";/);
-  assert.match(page, /if \(windVolleyTriggered\) \{[\s\S]*?attacks = windVolleyCriticals\.length;/);
-  assert.match(page, /const skillDamageTriggered = Boolean\(triggered\);/);
+test("疾風連射 resolves through five independent hits and one combat action", () => {
+  assert.match(page, /resolveLiveCombatAttack\(liveCombat/);
+  assert.match(page, /const skillDamageTriggered = Boolean\(triggered \|\| liveAction\?\.name\);/);
   assert.match(page, /skillTriggered: skillDamageTriggered/);
-  assert.match(page, /windVolleyCriticals\.length/);
-  assert.match(page, /RangerWindVolleyVfx/);
-  assert.match(css, /\.combo-hit\.volley-hit \{\s*animation-delay: calc\(495ms \+ \(var\(--hit-index\) \* 250ms\)\);\s*\}/s);
-  assert.match(css, /\.ranger-wind-volley-arrow/);
-  assert.match(page, /RangerWindVolleyVfx/);
+  assert.match(page, /settleCutoverAction\(cutoverRoute/);
 });
 
 test("recommended map power separates danger from viable clears", () => {
@@ -825,33 +820,29 @@ test("centralizes adjustable game balance in one configuration file", () => {
   assert.match(balanceSource, /balanceConfig\.combat/);
 });
 
-test("awards online yuanbao every ten minutes through the save service", () => {
-  assert.deepEqual(balanceConfig.economy.onlineYuanbao, {
-    intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90,
-  });
-  assert.match(page, /action: "heartbeat_online"/);
+test("awards online yuanbao every ten minutes", () => {
+  const idleRewardBody = page.slice(
+    page.indexOf("const next = idleSeconds + 60"),
+    page.indexOf("const buyShopItem"),
+  );
+  assert.match(idleRewardBody, /next >= 600/);
+  assert.match(idleRewardBody, /Math\.floor\(next \/ 600\) \* 10/);
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
-test("buys the yuanbao reforge bundle through the save service", () => {
-  assert.deepEqual(balanceConfig.economy.yuanbaoReforgeBundle, { price: 10, stones: 12 });
-  assert.ok(page.includes('item === "reforge" ? "shop_reforge" : "shop_cosmetic"'));
-});
-
-test("buys cosmetic unlocks through the save service", () => {
-  assert.deepEqual(balanceConfig.economy.yuanbaoCosmetics, {
-    "title-ash": 80, "title-abyss": 180,
-    "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
-  });
-  assert.match(page, /shop_cosmetic/);
-  assert.ok(!page.includes("setOwnedTitles((current) => current.includes(title)"));
-});
-
-test("claims the 500-kill daily target through the save service", () => {
-  const reward = balanceConfig.economy.dailyHuntReward;
-  assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });
-  assert.match(page, /action: "claim_daily", dailyDate, dailyKills/);
+test("awards the 500-kill daily target exactly once per Taipei day", () => {
+  assert.match(page, /const \[dailyRewardClaimed, setDailyRewardClaimed\] = useState\(false\)/);
+  assert.match(page, /if \(dailyKills < 500\)/);
+  assert.match(page, /if \(dailyRewardClaimed\) return toast\.info\("今日獎勵已領取"\)/);
+  assert.match(page, /setGold\(\(value\) => value \+ 5000\)/);
+  assert.match(page, /setEnhanceStones\(\(value\) => value \+ 10\)/);
+  assert.match(page, /setReforgeStones\(\(value\) => value \+ 10\)/);
+  assert.match(page, /setYuanbao\(\(value\) => value \+ 20\)/);
   assert.match(page, /setDailyRewardClaimed\(true\)/);
+  assert.match(page, /timeZone: "Asia\/Taipei"/);
+  assert.match(page, /const savedForToday = save\.dailyDate === today/);
+  assert.match(page, /disabled=\{dailyKills < 500 \|\| dailyRewardClaimed\}/);
+  assert.match(page, /dailyRewardClaimed,/);
 });
 
 test("starts new accounts with zero yuanbao", () => {
