@@ -79,7 +79,7 @@ test("sky rain checks nine independent segments and counts only rain-arrow criti
   hits.push({ hit: true, critical: true });
   const cast = turn(combat, "蒼穹箭雨", 0, hits, new Set(["蒼穹箭雨"]));
   assert.equal(cast.totalDamagePercent, 400);
-  assert.deepEqual(cast.damageSegmentPercents, []);
+  assert.deepEqual(cast.damageSegmentPercents, [...Array(8).fill(30), 160]);
   assert.equal(cast.skyMarks, 8);
   assert.equal(cast.mainArrowDamageBonusPercent, 48);
   assert.equal(cast.combat.session.charge.ultimateEnergy, 3);
