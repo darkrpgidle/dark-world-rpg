@@ -2,13 +2,13 @@
 // Damage segments and other active/passive effects join the event adapter later.
 export const RANGER_ACTIVE_RULES = {
   穿雲箭: { category: "basic", damage: [150, 160, 170, 185, 200], ignoreDefense: [20, 24, 28, 32, 35], ascension: "破界穿心", nextSkillIgnoreDefense: 15 },
-  追風箭: { category: "basic", damage: [120, 130, 140, 150, 165], chargeReductionChance: [10, 13, 16, 19, 22], ascension: "風痕追獵", ascendedArrowDamage: 60 },
-  幻影步: { category: "defense", healthBelow: 55, enemyAttacksRequired: 5, dodgeBonus: [10, 13, 16, 19, 22], nextCritChance: [10, 15, 20, 25, 30], ascension: "無痕幻身", nextSkillCritDamage: 35 },
+  追風箭: { category: "basic", damage: [120, 130, 140, 150, 165], chargeReductionChance: [10, 13, 16, 19, 22], recoveredOwnCharge: 1, ascension: "風痕追獵", ascendedArrowDamage: 60 },
+  幻影步: { category: "defense", healthBelow: 55, enemyAttacksRequired: 5, affectedEnemyAttacks: 3, dodgeBonus: [10, 13, 16, 19, 22], nextCritChance: [10, 15, 20, 25, 30], ascension: "無痕幻身", nextSkillCritDamage: 35 },
   獵殺標記: { category: "status", durationSeconds: [7, 8, 9, 10, 12], criticalChanceBonus: [5, 7, 9, 11, 14], ascension: "死亡鎖定", criticalsRequired: 3, huntExplosionDamage: 120 },
   疾風連射: { category: "burst", arrows: 5, damagePerArrow: [55, 60, 65, 70, 78], ascension: "六重風葬", sixthArrowDamage: 90 },
   風行領域: { category: "mechanic", successfulPrimaryHitsRequired: 8, actions: 8, attackSpeedBonus: [12, 16, 20, 24, 30], normalDamagePenalty: 10, ascension: "疾風界域", speedPerGaleStack: 3, maxGaleStacks: 5 },
   破星狙擊: { category: "burst", damage: [280, 310, 340, 380, 420], criticalDamageBonus: [10, 20, 30, 40, 50], ascension: "星隕貫殺", ascendedChargeRecovery: 2 },
-  蒼穹箭雨: { category: "ultimate", rainArrows: 8, mainArrows: 1, totalDamage: [400, 450, 505, 565, 630], ascension: "萬矢天罰", skyMarksMax: 8, mainArrowDamagePerMark: 6 },
+  蒼穹箭雨: { category: "ultimate", rainArrows: 8, mainArrows: 1, rainArrowDamage: [30, 34, 38, 42, 46], totalDamage: [400, 450, 505, 565, 630], ascension: "萬矢天罰", skyMarksMax: 8, mainArrowDamagePerMark: 6 },
 } as const;
 
 export const RANGER_PASSIVE_RULES = {
