@@ -70,9 +70,13 @@ if (process.argv.length !== 4) {
       throw new Error("Two independent export files are required");
     const [original, recovered] = await Promise.all(process.argv.slice(2).map(async path =>
       checkExport(JSON.parse(await readFile(path, "utf8")))));
-    const verified = original.sha256 === recovered.sha256;
-    process.stdout.write(`${JSON.stringify({ verified, sha256: original.sha256,
-      recordCounts: original.recordCounts, reviewRequired: original.reviewRequired })}\n`);
+    const integrityMatches = original.sha256 === recovered.sha256;
+    const reviewRequired = original.reviewRequired || recovered.reviewRequired;
+    // Matching bytes do not approve migration when source ownership or
+    // historical rebirth values still need manual reconciliation.
+    const verified = integrityMatches && !reviewRequired;
+    process.stdout.write(`${JSON.stringify({ verified, integrityMatches, sha256: original.sha256,
+      recordCounts: original.recordCounts, reviewRequired })}\n`);
     if (!verified) process.exitCode = 1;
   } catch (error) {
     process.stderr.write(`${error instanceof Error &&
