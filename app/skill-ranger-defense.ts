@@ -27,7 +27,7 @@ export function createRangerDefenseState(): RangerDefenseState {
 }
 
 export function rangerDefenseActivation(build: SkillBuild, ascended: boolean) {
-  const rank = build.ranks["幻影步"] ?? 0;
+  const rank = build.activeSlots.includes("幻影步") ? build.ranks["幻影步"] ?? 0 : 0;
   if (!rank) return null;
   return {
     dodgeChancePoints: rangerSkillRankValue(RANGER_ACTIVE_RULES.幻影步.dodgeBonus, rank),
@@ -50,7 +50,8 @@ export function recordRangerEnemyAttack(combat: RangerCombat, input: RangerEnemy
   if (!Number.isInteger(input.segments) || input.segments < 1) {
     throw new RangeError("Enemy attack must contain at least one segment");
   }
-  const rank = combat.build.ranks["幻影步"] ?? 0;
+  const rank = combat.build.activeSlots.includes("幻影步")
+    ? combat.build.ranks["幻影步"] ?? 0 : 0;
   const total = rank && input.countsAsReceivedHit
     ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
   const healthTriggerArmed = input.healthPercent >= RANGER_ACTIVE_RULES.幻影步.healthBelow
@@ -95,7 +96,8 @@ export function recordRangerSuccessfulDodge(
   combat: RangerCombat,
   input: { phantomStepActive: boolean; ascended: boolean },
 ) {
-  const rank = combat.build.ranks["幻影步"] ?? 0;
+  const rank = combat.build.activeSlots.includes("幻影步")
+    ? combat.build.ranks["幻影步"] ?? 0 : 0;
   const active = rank > 0 && input.phantomStepActive && combat.defense.phantomActiveForAttack;
   return {
     combat: {
