@@ -5,6 +5,7 @@ import { activeSaveSession } from "../../save-session-guard";
 import { applyDailyHuntClaim, preserveServerDailyHuntClaim, taipeiDailyDate } from "../../daily-hunt-claim";
 import { advanceOnlineYuanbao, preserveServerOnlineYuanbao } from "../../online-yuanbao";
 import { buyYuanbaoCosmetic, buyYuanbaoReforgeBundle, cosmeticSku, preserveServerShopPurchases } from "../../shop-purchase";
+import { preserveServerResourceRevision } from "../../server-resource-revision";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
@@ -64,7 +65,9 @@ function prepareAuthoritativePayload(
   delete next._lastSkillRebirthLegacyCount;
   let serverSave: Record<string, unknown> | null = null;
   try {
-    serverSave = JSON.parse(serverPayload) as Record<string, unknown>;
+    const parsed = JSON.parse(serverPayload) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("invalid stored payload");
+    serverSave = parsed as Record<string, unknown>;
     const serverSessionId = typeof serverSave._saveSessionId === "string" ? serverSave._saveSessionId : "";
     const serverClientId = typeof serverSave._saveClientId === "string" ? serverSave._saveClientId : "";
     const serverSequence = Math.max(0, Number(serverSave._saveSequence ?? 0));
@@ -74,14 +77,6 @@ function prepareAuthoritativePayload(
     // idempotent.
     if (clientId && serverSessionId === sessionId && serverClientId === clientId && clientSequence <= serverSequence)
       return null;
-    const serverRevision = Number(serverSave.adminRevision ?? 0);
-    const incomingRevision = Number(next.adminRevision ?? 0);
-    if (serverRevision > incomingRevision) {
-      for (const field of ["gold", "yuanbao", "enhanceStones", "reforgeStones", "level", "exp"]) {
-        if (field in serverSave) next[field] = serverSave[field];
-      }
-      next.adminRevision = serverRevision;
-    }
     if (serverSave._lastSkillActionId) next._lastSkillActionId = serverSave._lastSkillActionId;
     if (Array.isArray(serverSave._paidSkillResetActionIds))
       next._paidSkillResetActionIds = serverSave._paidSkillResetActionIds;
@@ -89,7 +84,9 @@ function prepareAuthoritativePayload(
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
-  const protectedSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(next, serverSave), serverSave), serverSave), serverSave);
+  const guarded = preserveServerResourceRevision(next, serverSave);
+  if (!guarded) return null;
+  const protectedSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(guarded, serverSave), serverSave), serverSave), serverSave);
   return protectedSave ? JSON.stringify(protectedSave) : null;
 }
 
@@ -494,7 +491,7 @@ export async function POST(request: Request) {
         return jsonNoStore({ ok: true, updatedAt: existing[0].updatedAt });
     } catch { /* continue with the normal save path */ }
   }
-  const initialSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(normalizedIncoming, null), null), null), null);
+  const initialSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(preserveServerResourceRevision(normalizedIncoming, null)!, null), null), null), null);
   if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
   delete initialSave._lastSkillActionId;
   initialSave._paidSkillResetActionIds = [];
