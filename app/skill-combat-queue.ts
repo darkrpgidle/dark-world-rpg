@@ -134,6 +134,21 @@ export function recoverPrimaryAttackCharges(state: SkillCombatState, amount: num
   return next;
 }
 
+// A named skill's recharge effect only changes that skill. Newly ready casts
+// enter after previously queued casts and cannot fire during this action.
+export function recoverOwnPrimaryCharge(state: SkillCombatState, name: string, amount: number): SkillCombatState {
+  if (!Number.isInteger(amount) || amount < 0) throw new RangeError("Charge recovery must be a nonnegative integer");
+  const rule = SKILL_CHARGE_RULES[state.characterClass][name];
+  if (!rule || rule.event !== "primary" || !(name in state.charges)) {
+    throw new RangeError("Own-charge recovery requires an equipped primary-charge skill");
+  }
+  const next = copyState(state);
+  if (!amount || next.ready.includes(name)) return next;
+  next.charges[name] = Math.min(rule.threshold, next.charges[name] + amount);
+  if (next.charges[name] === rule.threshold) next.ready.push(name);
+  return next;
+}
+
 export function nextReadySkill(
   state: SkillCombatState, targetAvailable: boolean, targetStatuses: ReadonlySet<string> = new Set(),
   temporarilyBlocked: ReadonlySet<string> = new Set(),
