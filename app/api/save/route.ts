@@ -353,7 +353,7 @@ export async function POST(request: Request) {
           gold: previous.gold, enhanceStones: previous.enhanceStones,
           reforgeStones: previous.reforgeStones, yuanbao: previous.yuanbao,
           adminRevision: previous.adminRevision, dailyRewardClaimed: true });
-      const next = { ...outcome.save, _saveSessionId: sessionId };
+      const next: Record<string, unknown> = { ...outcome.save, _saveSessionId: sessionId };
       const nextPayload = JSON.stringify(next);
       if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
       const updatedAt = nextUpdatedAt(current.updatedAt);
