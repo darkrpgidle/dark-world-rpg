@@ -13,6 +13,9 @@ test("54 fixed combat samples are reproducible, bounded and distinct from live a
   assert.equal(output.repeated.length, 54);
   assert.equal(output.assumptions.trialsPerScenario, 30);
   assert.equal(output.metrics.length, 54);
+  assert.equal(output.matchedMapComparisons.length, 36);
+  assert.match(output.assumptions.equipment, /詞綴固定中位數/);
+  assert.match(output.assumptions.equipment, /依地圖可取得等級配攻擊與生命寶石各10顆/);
   assert.match(output.assumptions.excluded, /模擬不計為正式帳號實戰驗收/);
   const cases = new Set(output.samples.map(s =>
     [s.characterClass, s.level, s.equipment, s.encounter].join("|")));
@@ -30,4 +33,13 @@ test("54 fixed combat samples are reproducible, bounded and distinct from live a
     assert.ok(s.wins >= 0 && s.wins <= 30);
     assert.ok(s.meanDamage >= 0 && s.meanDps >= 0 && s.meanSkillCasts >= 0);
   }
+  for (const s of output.matchedMapComparisons) {
+    assert.equal(s.mapId, 5, "level comparison must hold the map constant");
+    assert.equal(s.trials, 30);
+    assert.ok(s.wins >= 0 && s.wins <= 30);
+    assert.ok(s.meanDamage >= 0 && s.meanSkillCasts >= 0);
+  }
+  const matchedKeys = output.matchedMapComparisons.map(s =>
+    [s.characterClass, s.level, s.equipment, s.encounter, s.mapId].join("|"));
+  assert.equal(new Set(matchedKeys).size, 36);
 });
