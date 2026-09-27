@@ -740,9 +740,10 @@ test("shows the same damage that is removed from the monster's real hp", () => {
   assert.match(page, /Math\.round\(healthSettlement\.actualDamage\)/);
   assert.match(page, /currentEnemyHealth\.toLocaleString\(\).*currentEnemyMaximumHealth\.toLocaleString\(\).*HP/s);
   assert.match(page, /共 \$\{totalDisplayedDamage\.toLocaleString\(\)\} 傷害/);
-  assert.match(page, /const bossHpLoss =/);
-  assert.match(page, /bossHpLoss/);
-  assert.match(page, /const bossHealthSettlement = settleCombatHealth/);
+  assert.match(page, /settleBossHit\(calculatedPlayerDamage, "attack"\)/);
+  assert.match(page, /settleBossHit\(liveTickDamage, "burn"\)/);
+  assert.match(page, /settleBossHit\(rawBurnDamage, "burn"\)/);
+  assert.match(page, /settleBossHit\(counter, "attack"\)/);
   assert.match(page, /return healthSettlement\.remainingPercent/);
   assert.match(page, /className="player-health-label"/);
   assert.match(page, /width: `\$\{Math\.max\(0, Math\.min\(100, value\)\)\}%`/);
