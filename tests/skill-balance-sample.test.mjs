@@ -10,6 +10,8 @@ test("54 fixed combat samples are reproducible, bounded and distinct from live a
   const output = run();
   assert.deepEqual(output, run());
   assert.equal(output.samples.length, 54);
+  assert.equal(output.repeated.length, 54);
+  assert.equal(output.assumptions.trialsPerScenario, 30);
   assert.equal(output.metrics.length, 54);
   assert.match(output.assumptions.excluded, /模擬不計為正式帳號實戰驗收/);
   const cases = new Set(output.samples.map(s =>
@@ -22,5 +24,10 @@ test("54 fixed combat samples are reproducible, bounded and distinct from live a
     assert.ok(s.remainingHealth >= 0 && s.remainingHealth <= s.maximumHealth);
     if (s.encounter === "世界首領60秒" && !s.defeatedEnemy)
       assert.equal(s.remainingHealth, 0, "60-second finisher resolves the fight");
+  }
+  for (const s of output.repeated) {
+    assert.equal(s.trials, 30);
+    assert.ok(s.wins >= 0 && s.wins <= 30);
+    assert.ok(s.meanDamage >= 0 && s.meanDps >= 0 && s.meanSkillCasts >= 0);
   }
 });
