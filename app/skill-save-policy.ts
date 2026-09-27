@@ -48,7 +48,7 @@ export function preserveServerSkillSave(
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
-  const next = { ...incoming, ...canonical };
+  const next: Record<string, unknown> = { ...incoming, ...canonical };
   if (server && Object.prototype.hasOwnProperty.call(server, "legacyRebirthCount")) {
     // Preserve stored values verbatim for audit; only a future server migration
     // may assign this field. Never infer it from the client's rebirthCount.
