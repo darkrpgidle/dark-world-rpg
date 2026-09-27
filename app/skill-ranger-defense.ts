@@ -1,5 +1,5 @@
 // Ranger enemy attack and confirmed dodge events on the isolated rework path.
-// The surrounding battle engine decides duration and which outcomes count as hits.
+// One enemy attack may contain multiple segments but counts only once.
 import type { SkillBuild } from "./skill-rework";
 import type { RangerCombat } from "./skill-ranger-combat";
 import { recordSuccessfulDodge } from "./skill-combat-queue";
@@ -8,6 +8,10 @@ import { RANGER_ACTIVE_RULES, rangerSkillRankValue } from "./skill-ranger-rules"
 
 export type RangerDefenseState = {
   receivedAttacks: number;
+  healthTriggerArmed: boolean;
+  phantomAttacksRemaining: number;
+  phantomActiveForAttack: boolean;
+  phantomAscended: boolean;
   guaranteedDodgePending: boolean;
   nextHitCriticalChancePoints: number;
   nextSkillCriticalDamagePending: boolean;
@@ -15,7 +19,9 @@ export type RangerDefenseState = {
 
 export function createRangerDefenseState(): RangerDefenseState {
   return {
-    receivedAttacks: 0, guaranteedDodgePending: false,
+    receivedAttacks: 0, healthTriggerArmed: true,
+    phantomAttacksRemaining: 0, phantomActiveForAttack: false,
+    phantomAscended: false, guaranteedDodgePending: false,
     nextHitCriticalChancePoints: 0, nextSkillCriticalDamagePending: false,
   };
 }
@@ -34,7 +40,8 @@ export type RangerEnemyAttack = {
   segments: number;
   countsAsReceivedHit: boolean;
   healthPercent: number;
-  // The caller handles retrigger eligibility; the skill's duration is not specified.
+  // Whether this event can use the HP trigger (for instance, when a new
+  // incoming attack begins); a single low-HP interval triggers only once.
   canActivateFromHealth: boolean;
   ascended: boolean;
 };
@@ -46,21 +53,41 @@ export function recordRangerEnemyAttack(combat: RangerCombat, input: RangerEnemy
   const rank = combat.build.ranks["幻影步"] ?? 0;
   const total = rank && input.countsAsReceivedHit
     ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
-  const activation = rank && ((input.canActivateFromHealth && input.healthPercent < 55)
-    || total >= RANGER_ACTIVE_RULES.幻影步.enemyAttacksRequired)
+  const healthTriggerArmed = input.healthPercent >= RANGER_ACTIVE_RULES.幻影步.healthBelow
+    ? true : combat.defense.healthTriggerArmed;
+  const continuing = rank > 0 && combat.defense.phantomAttacksRemaining > 0;
+  const activation = rank && !continuing
+    && ((input.canActivateFromHealth && healthTriggerArmed
+      && input.healthPercent < RANGER_ACTIVE_RULES.幻影步.healthBelow)
+      || total >= RANGER_ACTIVE_RULES.幻影步.enemyAttacksRequired)
     ? rangerDefenseActivation(combat.build, input.ascended) : null;
+  const phantomActiveForAttack = Boolean(activation) || continuing;
+  const phantomAttacksRemaining = activation
+    ? RANGER_ACTIVE_RULES.幻影步.affectedEnemyAttacks - 1
+    : continuing ? combat.defense.phantomAttacksRemaining - 1 : 0;
+  const passiveDodgeChancePoints = rangerPassiveStats(combat.build).dodgeChancePoints;
   return {
     combat: {
       ...combat,
       defense: {
         ...combat.defense,
         receivedAttacks: activation ? 0 : total,
-        guaranteedDodgePending: combat.defense.guaranteedDodgePending
-          || Boolean(activation?.grantsGuaranteedDodge),
+        healthTriggerArmed: activation && input.healthPercent < RANGER_ACTIVE_RULES.幻影步.healthBelow
+          ? false : healthTriggerArmed,
+        phantomAttacksRemaining,
+        phantomActiveForAttack,
+        phantomAscended: activation ? input.ascended : continuing && combat.defense.phantomAscended,
+        guaranteedDodgePending: Boolean(activation?.grantsGuaranteedDodge)
+          || (continuing && combat.defense.guaranteedDodgePending),
       },
     },
     activation,
-    passiveDodgeChancePoints: rangerPassiveStats(combat.build).dodgeChancePoints,
+    phantomActiveForAttack,
+    guaranteedDodgeForAttack: Boolean(activation?.grantsGuaranteedDodge)
+      || (continuing && combat.defense.guaranteedDodgePending),
+    passiveDodgeChancePoints,
+    dodgeChancePoints: passiveDodgeChancePoints + (phantomActiveForAttack
+      ? rangerSkillRankValue(RANGER_ACTIVE_RULES.幻影步.dodgeBonus, rank) : 0),
   };
 }
 
@@ -69,7 +96,7 @@ export function recordRangerSuccessfulDodge(
   input: { phantomStepActive: boolean; ascended: boolean },
 ) {
   const rank = combat.build.ranks["幻影步"] ?? 0;
-  const active = rank > 0 && input.phantomStepActive;
+  const active = rank > 0 && input.phantomStepActive && combat.defense.phantomActiveForAttack;
   return {
     combat: {
       ...combat,
@@ -85,7 +112,7 @@ export function recordRangerSuccessfulDodge(
           ? rangerSkillRankValue(RANGER_ACTIVE_RULES.幻影步.nextCritChance, rank)
           : combat.defense.nextHitCriticalChancePoints,
         nextSkillCriticalDamagePending: combat.defense.nextSkillCriticalDamagePending
-          || (active && input.ascended),
+          || (active && combat.defense.phantomAscended && input.ascended),
       },
     },
     consumedGuaranteedDodge: combat.defense.guaranteedDodgePending,
