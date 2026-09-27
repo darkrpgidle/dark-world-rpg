@@ -4377,6 +4377,7 @@ function Game({
                 const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
                   healthPercent: playerHealth, maxHealth: characterStats.hp,
                   damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
                 });
                 monsterDamage = liveDefense.damage;
                 if (liveDefense.counterDamagePercent > 0) {
@@ -4823,7 +4824,8 @@ function Game({
                 : 1;
             const finalMultiplier =
               (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
-              executionMythicBonus;
+              executionMythicBonus *
+              (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner") && h < 25 ? 2 : 1);
             const finalHpDamage = settleCutoverAction(cutoverRoute, {
               battleId: cutoverRoute.battleId,
               sequence: currentAction,
@@ -5030,6 +5032,7 @@ function Game({
                 const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
                   healthPercent: playerHealth, maxHealth: characterStats.hp,
                   damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
                 });
                 monsterDamage = liveDefense.damage;
                 if (liveDefense.counterDamagePercent > 0) {
@@ -5796,6 +5799,8 @@ function Game({
           criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
         }) : null;
         let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
+        if (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner")
+            && bossEnemyHpRef.current < 25) bossSkillMultiplier *= 2;
         let bossSkill: Skill | null = liveAction?.name
           ? { name: liveAction.name, desc: "", level: skillReworkBuild.ranks[liveAction.name] ?? 1, max: 5, cost: 0 } : null;
         let bossDefenseIgnore = (hasPerk("special-blackfang") ? 8 : 0) + (liveAction?.defenseIgnore ?? 0);
@@ -6048,6 +6053,7 @@ function Game({
         if (bossActs && liveCombatRef.current && !bossHealthSettlement.defeated) {
           const defense = resolveLiveEnemyAttack(liveCombatRef.current, {
             healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,
+             defense: characterStats.defense, equippedItems: equippedGearRef.current,
           });
           bossDamage = defense.damage;
           if (defense.counterDamagePercent > 0) {
