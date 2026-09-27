@@ -192,10 +192,13 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     statuses.push(...result.statusApplications.map((item) => item.kind));
     ticks = result.dueTicks;
   }
+  // Settle ticks due before this cast refreshes a status. They belong to the
+  // previous attack snapshot, even when the refreshed status has the same kind.
+  const dueTickDamage = ticks.map((tick) => liveTickDamage(battle, tick));
   for (const kind of statuses) if (kind === "bleed" || kind === "burn")
     battle.dotAttack[kind] = options.attack;
   return { name, hits, damagePercent, defenseIgnore, lifestealPercent,
-    statuses, ticks: ticks.map((tick) => liveTickDamage(battle, tick)), critical };
+    statuses, ticks: dueTickDamage, critical };
 }
 
 export function resolveLiveEnemyAttack(
