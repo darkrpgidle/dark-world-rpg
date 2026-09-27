@@ -8,6 +8,8 @@
 export const balanceConfig = {
   // 第 18 批：法師新版技能數值；僅供獨立重製規則使用，尚未接入正式戰鬥。
   skillRework: {
+    // 第 27 批試行：每秒基礎持續傷害以施加時的面板攻擊為基準。
+    dot: { bleedPerStackAttackPercent: 20, burnAttackPercent: 30 },
     warrior: {
       active: {
         // Ascended 崩鎧重擊: twice this cast's armor-break value,
