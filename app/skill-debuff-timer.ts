@@ -2,6 +2,21 @@
 // Damage multipliers for bleed and burn remain subject to balance testing.
 export type EnemyDebuffKind = "bleed" | "burn" | "armorBreak" | "bloodBrand" | "hunterMark" | "elementSigil";
 
+// Shared classification for skills that depend on different enemy
+// abnormalities. The sigil itself counts as an existing category for damage
+// bonuses, but placing the sigil does not trigger its own first-affliction
+// effect. Brands and marks are targeting aids, not abnormalities.
+export const ABNORMAL_DEBUFF_KINDS = ["bleed", "burn", "armorBreak", "elementSigil"] as const;
+export type AbnormalDebuffKind = typeof ABNORMAL_DEBUFF_KINDS[number];
+
+export function countEnemyAbnormalKinds(statuses: EnemyDebuffs): number {
+  return ABNORMAL_DEBUFF_KINDS.filter((kind) => Boolean(statuses[kind])).length;
+}
+
+export function isAppliedAffliction(kind: EnemyDebuffKind): boolean {
+  return kind === "bleed" || kind === "burn" || kind === "armorBreak";
+}
+
 export type EnemyDebuff = {
   kind: EnemyDebuffKind;
   expiresAt: number;
