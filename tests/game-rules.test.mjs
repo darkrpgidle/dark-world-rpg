@@ -835,7 +835,7 @@ test("awards online yuanbao every ten minutes through the save service", () => {
 
 test("buys the yuanbao reforge bundle through the save service", () => {
   assert.deepEqual(balanceConfig.economy.yuanbaoReforgeBundle, { price: 10, stones: 12 });
-  assert.match(page, /action: "shop_reforge", purchaseId/);
+  assert.ok(page.includes('item === "reforge" ? "shop_reforge" : "shop_cosmetic"'));
 });
 
 test("buys cosmetic unlocks through the save service", () => {
