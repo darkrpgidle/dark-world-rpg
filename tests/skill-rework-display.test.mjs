@@ -37,3 +37,18 @@ test("all sixty skills show their exact five source ranks and every active has a
   }
   assert.equal(skillDisplay("戰士", "不存在"), null);
 });
+
+test("the skill page reads current damage-over-time ratios and shield limit", async () => {
+  const { balanceConfig } = await import("../app/balance-config.ts");
+  const dot = balanceConfig.skillRework.dot;
+  assert.ok(skillDisplay("戰士", "血刃斬").fixed
+    .some((text) => text.includes(`${dot.bleedPerStackAttackPercent}%`)));
+  assert.ok(skillDisplay("戰士", "裂傷本能").fixed
+    .some((text) => text.includes(`${dot.bleedPerStackAttackPercent}%`)));
+  for (const name of ["霜火新星", "隕星術", "焰脈"]) {
+    assert.ok(skillDisplay("法師", name).fixed
+      .some((text) => text.includes(`${dot.burnAttackPercent}%`)), name);
+  }
+  assert.ok(skillDisplay("法師", "魔力護盾").fixed
+    .some((text) => text.includes("每場戰鬥最多生成一次")));
+});
