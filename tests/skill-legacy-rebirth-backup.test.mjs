@@ -43,6 +43,7 @@ test("independent exports with reordered records pass and reveal only counts and
     assert.equal(result.status, 0, result.stderr);
     const output = JSON.parse(result.stdout);
     assert.equal(output.verified, true);
+    assert.equal(output.integrityMatches, true);
     assert.equal(output.sha256.length, 64);
     assert.deepEqual(output.recordCounts, { accounts: 1, saves: 1, snapshots: 2 });
     assert.equal(result.stdout.includes("rebirthCount"), false);
@@ -72,12 +73,29 @@ test("the same file, duplicate rows or malformed exports cannot pass as a recove
   });
 });
 
-test("a faithful copy of unverifiable history still requires GM review", async () => {
+test("a faithful copy of unverifiable history is not marked verified", async () => {
   await withExports(async ({ source, recovered, data }) => {
     data.snapshots[0].payload = JSON.stringify({ rebirthCount: 21 });
     await Promise.all([writeFile(source, JSON.stringify(data)), writeFile(recovered, JSON.stringify(data))]);
     const result = verify(source, recovered);
-    assert.equal(result.status, 0);
-    assert.equal(JSON.parse(result.stdout).reviewRequired, true);
+    assert.equal(result.status, 1);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.integrityMatches, true);
+    assert.equal(output.reviewRequired, true);
+    assert.equal(output.verified, false);
+  });
+});
+
+test("matching exports with unknown account ownership cannot pass preflight", async () => {
+  await withExports(async ({ source, recovered, data }) => {
+    data.snapshots[0].accountId = "unknown-account";
+    await Promise.all([writeFile(source, JSON.stringify(data)), writeFile(recovered, JSON.stringify(data))]);
+    const result = verify(source, recovered);
+    assert.equal(result.status, 1);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.verified, false);
+    assert.equal(output.integrityMatches, true);
+    assert.equal(output.reviewRequired, true);
+    assert.deepEqual(output.recordCounts, { accounts: 1, saves: 1, snapshots: 1 });
   });
 });
