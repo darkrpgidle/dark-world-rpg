@@ -1,3 +1,4 @@
+import { balanceConfig } from "./balance-config";
 import { MAGE_ACTIVE_RULES, MAGE_PASSIVE_RULES } from "./skill-mage-rules";
 import { RANGER_ACTIVE_RULES, RANGER_PASSIVE_RULES } from "./skill-ranger-rules";
 import { WARRIOR_ACTIVE_RULES, WARRIOR_PASSIVE_RULES } from "./skill-warrior-rules";
@@ -107,6 +108,16 @@ export function skillDisplay(characterClass: SkillClass, name: string) {
     .map(([key, value]) => ({ label: labels[key] ?? key, values: (value as number[]).map((n) => `${n}${units[key] ?? "%"}`) }));
   const fixed = Object.entries(values).filter(([key, value]) => typeof value === "number" && key in labels)
     .map(([key, value]) => `${labels[key]}：${value}${units[key] ?? "%"}`);
+  const dot = balanceConfig.skillRework.dot;
+  if (characterClass === "戰士" && (name === "血刃斬" || name === "裂傷本能")) {
+    fixed.push(`流血每層每秒：施加時攻擊力的 ${dot.bleedPerStackAttackPercent}%（持續 3 秒）`);
+  }
+  if (characterClass === "法師" && (name === "霜火新星" || name === "隕星術" || name === "焰脈")) {
+    fixed.push(`灼燒每秒：施加時攻擊力的 ${dot.burnAttackPercent}%（持續 3 秒）`);
+  }
+  if (characterClass === "法師" && name === "魔力護盾") {
+    fixed.push("每場戰鬥最多生成一次；普通推圖換怪不重置");
+  }
   return { ranks, fixed, ascensionName: typeof values.ascension === "string" ? values.ascension : null,
     ascensionEffect: ascensionEffects[characterClass][name] ?? null };
 }
