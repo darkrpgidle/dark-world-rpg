@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { gameSaves, saveSnapshots } from "../../../db/schema";
 import { currentLogin } from "../auth-utils";
-import { applySkillSaveAction, hasAppliedSkillAction, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
+import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{20,80}$/.test(value);
 const normalize = (value: string) => value.trim().toLocaleLowerCase("zh-TW");
@@ -54,6 +54,7 @@ function prepareAuthoritativePayload(
   const next: Record<string, unknown> = { ...incoming, _saveSessionId: sessionId };
   delete next._lastSkillActionId;
   delete next._paidSkillResetActionIds;
+  delete next._skillActionIds;
   delete next._lastSkillRebirthLegacyCount;
   let serverSave: Record<string, unknown> | null = null;
   try {
@@ -78,6 +79,7 @@ function prepareAuthoritativePayload(
     if (serverSave._lastSkillActionId) next._lastSkillActionId = serverSave._lastSkillActionId;
     if (Array.isArray(serverSave._paidSkillResetActionIds))
       next._paidSkillResetActionIds = serverSave._paidSkillResetActionIds;
+    if (Array.isArray(serverSave._skillActionIds)) next._skillActionIds = serverSave._skillActionIds;
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
@@ -328,16 +330,13 @@ export async function POST(request: Request) {
       let previous: Record<string, unknown>;
       try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
       catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
-      if (hasAppliedSkillAction(previous, actionId))
+      const applied = applySkillSaveActionOnce(previous, body.skillAction, actionId);
+      if (!applied) return jsonNoStore({ error: "skill_action_rejected" }, 409);
+      if (!applied.accepted)
         return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
           skillReworkBuild: previous.skillReworkBuild, skillAscensions: previous.skillAscensions,
           yuanbao: previous.yuanbao, adminRevision: previous.adminRevision });
-      const next = applySkillSaveAction(previous, body.skillAction);
-      if (!next) return jsonNoStore({ error: "skill_action_rejected" }, 409);
-      next._lastSkillActionId = actionId;
-      if (body.skillAction.kind === "paid_reset")
-        next._paidSkillResetActionIds = [...(Array.isArray(previous._paidSkillResetActionIds)
-          ? previous._paidSkillResetActionIds : []), actionId];
+      const next = applied.save;
       next._saveSessionId = sessionId;
       const nextPayload = JSON.stringify(next);
       if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
@@ -371,6 +370,7 @@ export async function POST(request: Request) {
   if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
   delete initialSave._lastSkillActionId;
   initialSave._paidSkillResetActionIds = [];
+  initialSave._skillActionIds = [];
   delete initialSave._lastSkillRebirthLegacyCount;
   let finalPayload = JSON.stringify({ ...initialSave, _saveSessionId: sessionId });
   let updatedAt = new Date().toISOString();

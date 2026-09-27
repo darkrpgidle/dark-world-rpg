@@ -6,7 +6,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   if (specifier.startsWith("./") && !specifier.endsWith(".ts")) return nextResolve(`${specifier}.ts`, context);
   return nextResolve(specifier, context);
 } });
-const { applySkillSaveAction, hasAppliedSkillAction, preserveServerSkillSave, restoreSkillSave } = await import("../app/skill-save-policy.ts");
+const { applySkillSaveAction, applySkillSaveActionOnce, hasAppliedSkillAction, preserveServerSkillSave, restoreSkillSave } = await import("../app/skill-save-policy.ts");
 const { createSkillBuild } = await import("../app/skill-rework.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
 const { preserveLegacyRebirthCount } = await import("../app/legacy-rebirth-storage.ts");
@@ -145,4 +145,61 @@ test("paid reset receipt prevents replay after an intervening skill action", () 
   assert.equal(hasAppliedSkillAction(save, resetId), true);
   assert.equal(hasAppliedSkillAction(save, laterId), true);
   assert.equal(hasAppliedSkillAction(save, "123e4567-e89b-12d3-a456-426614174002"), false);
+});
+
+
+test("intervening upgrade cannot replay an earlier accepted skill action after reconnect", () => {
+  const firstId = "123e4567-e89b-12d3-a456-426614174100";
+  const secondId = "123e4567-e89b-12d3-a456-426614174101";
+  const first = applySkillSaveActionOnce(base(), { kind: "upgrade", name: "裂地斬" }, firstId);
+  const second = applySkillSaveActionOnce(first.save, { kind: "upgrade", name: "裂地斬" }, secondId);
+  assert.equal(second.save.skillReworkBuild.ranks.裂地斬, 2);
+  const reconnected = JSON.parse(JSON.stringify(second.save));
+  const replay = applySkillSaveActionOnce(reconnected, { kind: "upgrade", name: "裂地斬" }, firstId);
+  assert.equal(replay.accepted, false);
+  assert.deepEqual(replay.save, reconnected);
+  assert.equal(replay.save.skillReworkBuild.ranks.裂地斬, 2);
+});
+
+test("autosave cannot erase or forge durable skill action receipts", () => {
+  const id = "123e4567-e89b-12d3-a456-426614174102";
+  const server = applySkillSaveActionOnce(base(), { kind: "upgrade", name: "裂地斬" }, id).save;
+  const stale = { ...base(), _skillActionIds: ["forged"], skillReworkBuild: createSkillBuild() };
+  const saved = preserveServerSkillSave(stale, server);
+  assert.deepEqual(saved._skillActionIds, [id]);
+  assert.deepEqual(saved.skillReworkBuild, server.skillReworkBuild);
+  assert.equal(hasAppliedSkillAction(saved, id), true);
+  assert.deepEqual(preserveServerSkillSave(stale, null)._skillActionIds, []);
+});
+
+test("reset receipt remains idempotent after another allocation and normal autosave", () => {
+  const upgradeId = "123e4567-e89b-12d3-a456-426614174103";
+  const resetId = "123e4567-e89b-12d3-a456-426614174104";
+  const laterId = "123e4567-e89b-12d3-a456-426614174105";
+  const upgraded = applySkillSaveActionOnce({ ...base(), yuanbao: 600 },
+    { kind: "upgrade", name: "裂地斬" }, upgradeId).save;
+  const reset = applySkillSaveActionOnce(upgraded, { kind: "paid_reset" }, resetId).save;
+  const allocated = applySkillSaveActionOnce(reset, { kind: "upgrade", name: "裂地斬" }, laterId).save;
+  const reconnected = preserveServerSkillSave({ ...base(), yuanbao: 300, _skillActionIds: [] },
+    JSON.parse(JSON.stringify(allocated)));
+  const replay = applySkillSaveActionOnce(reconnected, { kind: "paid_reset" }, resetId);
+  assert.equal(replay.accepted, false);
+  assert.equal(replay.save.yuanbao, 300);
+  assert.equal(replay.save.skillReworkBuild.ranks.裂地斬, 1);
+  assert.deepEqual(replay.save._skillActionIds, [upgradeId, resetId, laterId]);
+});
+
+test("recent receipt history stays bounded and carries forward a legacy last action", () => {
+  const legacyId = "123e4567-e89b-12d3-a456-426614174106";
+  const newId = "123e4567-e89b-12d3-a456-426614174107";
+  const migrated = applySkillSaveActionOnce({ ...base(), _lastSkillActionId: legacyId },
+    { kind: "upgrade", name: "裂地斬" }, newId).save;
+  assert.deepEqual(migrated._skillActionIds, [legacyId, newId]);
+  const longHistory = Array.from({ length: 256 }, (_, i) =>
+    `123e4567-e89b-12d3-a456-${String(i).padStart(12, "0")}`);
+  const next = applySkillSaveActionOnce({ ...base(), _skillActionIds: longHistory },
+    { kind: "upgrade", name: "裂地斬" }, newId).save;
+  assert.equal(next._skillActionIds.length, 256);
+  assert.equal(next._skillActionIds.at(-1), newId);
+  assert.equal(next._skillActionIds.includes(longHistory[0]), false);
 });

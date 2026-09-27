@@ -10,9 +10,11 @@ import { preserveLegacyRebirthCount } from "./legacy-rebirth-storage";
 import { balanceConfig } from "./balance-config";
 
 export const SKILL_REWORK_SAVE_VERSION = 1;
+const MAX_RECENT_SKILL_ACTION_IDS = 256;
 
 export function hasAppliedSkillAction(save: Record<string, unknown>, actionId: string): boolean {
   return save._lastSkillActionId === actionId ||
+    (Array.isArray(save._skillActionIds) && save._skillActionIds.includes(actionId)) ||
     (Array.isArray(save._paidSkillResetActionIds) && save._paidSkillResetActionIds.includes(actionId));
 }
 
@@ -59,6 +61,7 @@ export function preserveServerSkillSave(
   return preserveLegacyRebirthCount({ ...incoming, ...canonical,
     _paidSkillResetActionIds: server && Array.isArray(server._paidSkillResetActionIds)
       ? server._paidSkillResetActionIds : [],
+    _skillActionIds: server && Array.isArray(server._skillActionIds) ? server._skillActionIds : [],
   }, server);
 }
 
@@ -123,4 +126,25 @@ export function applySkillSaveAction(
   return { ...save, skillReworkVersion: SKILL_REWORK_SAVE_VERSION, skillReworkBuild: build,
     skillAscensions: ascensions,
     ...(action.kind === "begin_rebirth" ? { _lastSkillRebirthLegacyCount: save.rebirthCount } : {}) };
+}
+
+
+/** Save the receipt with the action in one CAS update; a replay returns the current state. */
+export function applySkillSaveActionOnce(
+  save: Record<string, unknown>, action: SkillSaveAction, actionId: string,
+): { accepted: boolean; save: Record<string, unknown> } | null {
+  if (!/^[a-f0-9-]{36}$/.test(actionId)) return null;
+  if (hasAppliedSkillAction(save, actionId)) return { accepted: false, save };
+  const next = applySkillSaveAction(save, action);
+  if (!next) return null;
+  next._lastSkillActionId = actionId;
+  const recent = Array.isArray(save._skillActionIds) ? save._skillActionIds : [];
+  // Carry forward the last receipt from saves created before the bounded history existed.
+  const last = save._lastSkillActionId;
+  const history = typeof last === "string" && !recent.includes(last) ? [...recent, last] : recent;
+  next._skillActionIds = [...history, actionId].slice(-MAX_RECENT_SKILL_ACTION_IDS);
+  if (action.kind === "paid_reset")
+    next._paidSkillResetActionIds = [...(Array.isArray(save._paidSkillResetActionIds)
+      ? save._paidSkillResetActionIds : []), actionId];
+  return { accepted: true, save: next };
 }
