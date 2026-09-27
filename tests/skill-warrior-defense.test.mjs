@@ -34,9 +34,27 @@ test("one enemy attack event counts once even with many segments; fourth event a
   assert.deepEqual(fourth.activation, {
     blockChancePercent: 15, counterChancePercent: 10, grantsGuaranteedBlock: true,
   });
-  assert.deepEqual(fourth.combat.defense,
-    { receivedAttacks: 0, guaranteedBlockPending: true, ascendedCounterStacks: 0 });
-  assert.equal(enemy(fourth.combat, true).combat.defense.receivedAttacks, 1);
+  assert.deepEqual(fourth.combat.defense, {
+    receivedAttacks: 0, activeAttacksRemaining: 2, activeForAttack: true,
+    guaranteedBlockPending: true, ascendedCounterStacks: 0,
+  });
+  const second = enemy(fourth.combat, true);
+  assert.equal(second.activation, null);
+  assert.equal(second.activeForAttack, true);
+  assert.equal(second.combat.defense.receivedAttacks, 1);
+  assert.equal(second.combat.defense.activeAttacksRemaining, 1);
+  const third = enemy(second.combat, false, 3);
+  assert.equal(third.activeForAttack, true);
+  assert.equal(third.combat.defense.activeAttacksRemaining, 0);
+  assert.equal(third.blockChancePercent, 15);
+  const quiet = enemy(third.combat, true);
+  assert.equal(quiet.activation, null);
+  assert.equal(quiet.activeForAttack, false);
+  assert.equal(quiet.blockChancePercent, 0);
+  assert.equal(quiet.combat.defense.guaranteedBlockPending, false);
+  const again = enemy(quiet.combat, true);
+  assert.ok(again.activation);
+  assert.equal(again.combat.defense.activeAttacksRemaining, 2);
 });
 
 test("blocked and dodged enemy attacks count once regardless of damage outcome", () => {
