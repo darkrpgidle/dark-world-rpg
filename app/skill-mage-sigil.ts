@@ -1,7 +1,7 @@
 // Stage 22: one ascended chaos-seal trigger per active enemy sigil.
 // The pending three-cast buff belongs to the mage, independently of the
 // target-local, wall-clock sigil that originally granted it.
-import type { EnemyDebuffKind } from "./skill-debuff-timer";
+import { isAppliedAffliction, type EnemyDebuffKind } from "./skill-debuff-timer";
 import { MAGE_ACTIVE_RULES } from "./skill-mage-rules";
 
 export type MageSigilState = {
@@ -44,8 +44,7 @@ export function recordMageSigilStatuses(
   if (markerApplied && !input.hadCurrentSigil) {
     return { ...state, markedAscended: input.newlyAppliedSigilAscended, firstAnomalyUsed: false };
   }
-  const abnormalApplied = input.appliedKinds.some((kind) =>
-    kind === "burn" || kind === "bleed" || kind === "armorBreak");
+  const abnormalApplied = input.appliedKinds.some(isAppliedAffliction);
   if (!input.hadCurrentSigil || !state.markedAscended || state.firstAnomalyUsed || !abnormalApplied) return state;
   return {
     ...state, firstAnomalyUsed: true,
