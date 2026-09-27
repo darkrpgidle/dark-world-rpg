@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
-import { registerHooks } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
-
-registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith("./") && !specifier.endsWith(".ts")) return nextResolve(`${specifier}.ts`, context);
-  return nextResolve(specifier, context);
-} });
 
 const { activeSaveSession } = await import("../app/save-session-guard.ts");
 const dialect = new SQLiteSyncDialect();
