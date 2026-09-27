@@ -4,7 +4,7 @@ import { balanceConfig } from "./balance-config";
 export const WARRIOR_ACTIVE_RULES = {
   裂地斬: { category: "basic", damage: [150, 160, 170, 185, 200], armorBreak: [15, 18, 21, 25, 30], ascension: "地脈崩裂" },
   血刃斬: { category: "basic", damage: [130, 140, 150, 160, 175], bleedChance: [20, 25, 30, 35, 40], ascension: "猩紅撕裂" },
-  不屈戰意: { category: "defense", blockChance: [15, 18, 21, 24, 28], counterChance: [10, 12, 14, 17, 20], enemyAttacksRequired: 4, ascension: "鋼魂壁壘" },
+  不屈戰意: { category: "defense", blockChance: [15, 18, 21, 24, 28], counterChance: [10, 12, 14, 17, 20], enemyAttacksRequired: 4, affectedEnemyAttacks: 3, ascension: "鋼魂壁壘" },
   血戰烙印: { category: "status", durationSeconds: [6, 7, 8, 9, 10], bleedChanceBonus: [10, 13, 16, 19, 22], ascension: "血祭印記" },
   鮮血怒吼: { category: "burst", damageBonus: [25, 32, 39, 47, 55], lifesteal: [10, 15, 20, 25, 30], healthBelow: 40, attacks: 5, ascension: "血怒終焉" },
   狂戰姿態: { category: "mechanic", attackSpeedBonus: [10, 14, 18, 22, 26], damageBonus: [8, 11, 14, 17, 20], defensePenalty: 15, attacks: 8, ascension: "無盡狂怒" },
