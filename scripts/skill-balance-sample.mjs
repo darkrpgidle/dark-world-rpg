@@ -59,7 +59,7 @@ function snapshot(scenario) {
   const equippedItems = equipment === "神話" ? mythic[characterClass] : [];
   return { stats, build, mapId, equippedItems };
 }
-function sample(scenario, index) {
+function sample(scenario, index, trial = 0) {
   const { characterClass, level, encounter } = scenario;
   const { stats, build, mapId, equippedItems } = snapshot(scenario);
   const map = maps[mapId - 1];
@@ -74,7 +74,7 @@ function sample(scenario, index) {
     (balanceConfig.lateGameMonsterScaling.health[mapId] ?? 1)));
   const maxHp = Math.round(stats.hp * (1 + liveCombatMaxHealthBonus(
     syncLiveCombat(null, `sample:${index}`, "initial", build, characterClass, level, createSkillAscensions())) / 100));
-  const random = rng(1777 + index * 101);
+  const random = rng(1777 + index * 101 + trial * 1000003);
   const combat = syncLiveCombat(null, `sample:${index}`, monsterName, build, characterClass, level, createSkillAscensions());
   let playerHp = maxHp, enemyPercent = 100, dealt = 0, enemyLedger = boss ? createBossDamageLedger(maxEnemyHp) : null;
   let playerClock = 0, enemyClock = 0, elapsedMs = 0, kills = 0;
@@ -162,11 +162,20 @@ function sample(scenario, index) {
 const samples = skillBalanceScenarios().map(sample);
 const summary = summarizeSkillBalance(samples);
 if (summary.measured !== 54 || summary.missing.length) throw new Error("Incomplete balance sample");
+const repeated = skillBalanceScenarios().map((scenario, index) => {
+  const runs = Array.from({ length: 30 }, (_, trial) => sample(scenario, index, trial));
+  return { ...scenario, trials: runs.length, wins: runs.filter(s => s.defeatedEnemy).length,
+    meanDamage: Math.round(runs.reduce((total, s) => total + s.damageDealt, 0) / runs.length),
+    meanDps: Math.round(runs.reduce((total, s) => total + s.damageDealt / s.elapsedSeconds, 0) / runs.length),
+    meanSkillCasts: Number((runs.reduce((total, s) => total +
+      Object.values(s.skillCasts).reduce((a, b) => a + b, 0), 0) / runs.length).toFixed(1)) };
+});
 if (process.argv.includes("--json")) console.log(JSON.stringify({ assumptions: {
-  seed: 1777, equipment: "10件同地圖、傳奇/神話+5(50級)/+10(100級)、無隨機詞綴與寶石",
+  seed: "1777+情境序號×101+重複序號×1000003", trialsPerScenario: 30,
+  equipment: "10件同地圖、傳奇/神話+5(50級)/+10(100級)、無隨機詞綴與寶石",
   maps: "Lv50=地圖5、Lv100=地圖9，普通怪第14層；個人首領真身；世界首領深淵王60秒",
   excluded: "轉生、祝福、套裝、伺服器獎勵與瀏覽器渲染；模擬不計為正式帳號實戰驗收",
-}, samples, metrics: summary.rows.map(row => row.metrics) }, null, 2));
+}, samples, repeated, metrics: summary.rows.map(row => row.metrics) }, null, 2));
 else console.log(JSON.stringify({ scenarios: summary.measured, results: samples.map(s => ({
   class: s.characterClass, level: s.level, equipment: s.equipment, encounter: s.encounter,
   map: s.mapId, dps: Math.round(s.damageDealt / s.elapsedSeconds), survived: s.remainingHealth > 0,
