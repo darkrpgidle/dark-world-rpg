@@ -1,7 +1,9 @@
 // Live adapter for the existing tower and boss HP settlement.
 // Combat rules own charge, status and passive state; the caller owns HP, rewards and visuals.
 import { enabledAscensions, type SkillAscensionState } from "./skill-ascensions";
-import { advanceCombatSession, takeReadySkill } from "./skill-combat-session";
+import { advanceCombatSession, takeReadySkill, trySkillProc } from "./skill-combat-session";
+import { grantUltimateEnergy } from "./skill-combat-queue";
+import { hasCatalogItem } from "./mythic-data";
 import { calculateDebuffTickRawDamage, type DebuffTick } from "./skill-debuff-timer";
 import { createWarriorCombat, resolveWarriorTurn, transitionWarriorNormalKill, type WarriorCombat } from "./skill-warrior-combat";
 import { createRangerCombat, resolveRangerTurn, transitionRangerNormalKill, type RangerCombat } from "./skill-ranger-combat";
@@ -21,6 +23,9 @@ export type LiveCombatBattle = {
   characterClass: SkillClass; build: SkillBuild; ascended: ReadonlySet<string>;
   combat: WarriorCombat | RangerCombat | MageCombat;
   dotAttack: { bleed: number; burn: number };
+  fallenCityDamagePending: number; hunterEyeCritDamagePending: boolean;
+  queenCarryForNextTarget: boolean; queenCarry: number;
+  akashaStacks: number; akashaReady: boolean;
 };
 export type LiveCombatAction = {
   name: string | null; hits: PrimaryAttackEvent["hits"];
@@ -56,12 +61,16 @@ export function syncLiveCombat(
           : transitionMageCombat(previous.combat as MageCombat, "normal-kill");
       previous.target = target;
       previous.dotAttack = { bleed: 0, burn: 0 };
+      previous.queenCarry = previous.queenCarryForNextTarget ? 2 : 0;
+      previous.queenCarryForNextTarget = false;
     }
     return previous;
   }
   return { owner, target, signature, characterClass, build: canonical,
     ascended: new Set(enabledAscensions(ascensions, characterClass)),
-    combat: createCombat(characterClass, canonical, level), dotAttack: { bleed: 0, burn: 0 } };
+    combat: createCombat(characterClass, canonical, level), dotAttack: { bleed: 0, burn: 0 },
+    fallenCityDamagePending: 0, hunterEyeCritDamagePending: false,
+    queenCarryForNextTarget: false, queenCarry: 0, akashaStacks: 0, akashaReady: false };
 }
 
 export function nextLiveSkill(battle: LiveCombatBattle): string | null {
@@ -111,14 +120,19 @@ function segmentCount(name: string | null): number {
 export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: AttackOptions): LiveCombatAction {
   const name = nextLiveSkill(battle);
   const random = options.roll ?? Math.random;
+  const hasMythic = (id: string) => hasCatalogItem(options.equippedItems ?? [], id);
+  const energyBefore = battle.combat.session.charge.ultimateEnergy;
   const ranger = battle.characterClass === "遊俠" ? battle.combat as RangerCombat : null;
   const nextCritRank = battle.build.ranks["影步反射"] ?? 0;
   const pendingCrit = ranger?.passives.nextPrimaryCriticalPending && nextCritRank
     ? rangerSkillRankValue(RANGER_PASSIVE_RULES.影步反射.nextPrimaryCriticalChancePoints, nextCritRank) : 0;
-  const critChance = Math.min(100, options.criticalChance + (ranger?.session.enemy.hunterMark?.strength ?? 0)
+  const eagleEye = rangerPassiveStats(battle.build).criticalChancePoints;
+  const critChance = Math.min(100, options.criticalChance
+    + (ranger ? eagleEye * (hasMythic("skill-ranger-hunter-eye") ? 1.5 : 1) : 0)
+    + (ranger?.session.enemy.hunterMark?.strength ?? 0)
     + (ranger?.defense.nextHitCriticalChancePoints ?? 0) + pendingCrit);
   const snipeRank = name === "破星狙擊" ? battle.build.ranks[name] ?? 0 : 0;
-  const criticalDamage = options.criticalDamage + (snipeRank
+  const criticalDamage = options.criticalDamage + (name && ranger?.passives && battle.hunterEyeCritDamagePending ? 40 : 0) + (snipeRank
     ? rangerSkillRankValue(RANGER_ACTIVE_RULES.破星狙擊.criticalDamageBonus, snipeRank) : 0)
     + (name && ranger?.defense.nextSkillCriticalDamagePending ? RANGER_ACTIVE_RULES.幻影步.nextSkillCritDamage : 0);
   const hits = Array.from({ length: segmentCount(name) }, () => {
@@ -142,9 +156,24 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     });
     if (!result) throw new Error("Warrior action and charge queue disagree");
     battle.combat = result.combat;
+    if (hasMythic("skill-warrior-executioner")) {
+      const earned = Math.max(0, battle.combat.session.charge.ultimateEnergy - energyBefore);
+      if (earned > 0) battle.combat.session = { ...battle.combat.session,
+        charge: grantUltimateEnergy(battle.combat.session.charge, Math.floor(earned / 4)) };
+    }
     damagePercent = percent(result.effectiveBaseDamagePercent * (1 + result.bonusDamagePercent / 100));
     for (const extra of result.extraDamagePercents) if (hits.some((part) => part.hit) && random() * 100 < options.hitChance)
       damagePercent += extra * (random() * 100 < critChance ? 1 + options.criticalDamage / 100 : 1);
+    if (battle.fallenCityDamagePending > 0) {
+      const extra = battle.fallenCityDamagePending;
+      battle.fallenCityDamagePending = 0;
+      if (hits.some((part) => part.hit)) {
+        const checked = trySkillProc(battle.combat.session,
+          { id: "skill-warrior-fallen-city", kind: "damage", source: "primary", family: "equipment" });
+        battle.combat.session = checked.session;
+        if (checked.allowed) damagePercent += 100 * extra / Math.max(1, options.attack);
+      }
+    }
     lifestealPercent = result.lifestealPercent;
     statuses.push(...result.statusApplications.map((item) => item.kind));
     ticks = result.dueTicks;
@@ -157,6 +186,11 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     });
     if (!result) throw new Error("Ranger action and charge queue disagree");
     battle.combat = result.combat;
+    if (name) battle.hunterEyeCritDamagePending = false;
+    if (battle.queenCarry > 0 && result.statusApplications.some((item) => item.kind === "hunterMark")) {
+      (battle.combat as RangerCombat).hunterMarkCriticalHits = battle.queenCarry;
+      battle.queenCarry = 0;
+    }
     damagePercent = result.damageSegmentPercents.reduce((sum, value, index) =>
       sum + percent(value * (1 + result.damageBonusPercent / 100) +
         (result.criticalDirectDamageBonusPercentBySegment[index] ?? 0) +
@@ -164,7 +198,20 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     if (name === null) damagePercent *= 1 - result.normalDamagePenaltyPercent / 100;
     for (const extra of [...result.additionalArrowEvents, ...result.hunterExplosionEvents,
       ...result.passiveDamageProcs]) if (random() * 100 < options.hitChance)
-      damagePercent += extra.percent * (random() * 100 < critChance ? 1 + options.criticalDamage / 100 : 1);
+      damagePercent += extra.percent * (extra.id === "死亡鎖定" && hasMythic("skill-ranger-queen-contract") ? 1.5 : 1)
+        * (random() * 100 < critChance ? 1 + options.criticalDamage / 100 : 1);
+    if (result.hunterExplosionEvents.length && hasMythic("skill-ranger-queen-contract"))
+      battle.queenCarryForNextTarget = true;
+    if (critical && hasMythic("skill-ranger-hunter-eye") && random() < 0.2) {
+      const checked = trySkillProc(battle.combat.session,
+        { id: "skill-ranger-hunter-eye", kind: "damage", source: "primary", family: "equipment" });
+      battle.combat.session = checked.session;
+      if (checked.allowed && random() * 100 < options.hitChance) {
+        const extraCritical = random() * 100 < critChance;
+        damagePercent += 60 * (extraCritical ? 1 + options.criticalDamage / 100 : 1);
+        if (extraCritical) battle.hunterEyeCritDamagePending = true;
+      }
+    }
     defenseIgnore += result.ignoreDefensePercent;
     statuses.push(...result.statusApplications.map((item) => item.kind));
     ticks = result.dueTicks;
@@ -177,6 +224,9 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     });
     if (!result) throw new Error("Mage action and charge queue disagree");
     battle.combat = result.combat;
+    const akashaEquipped = hasMythic("skill-mage-akasha-pages");
+    const replayReady = akashaEquipped && battle.akashaReady && Boolean(name)
+      && hits.some((part) => part.hit) && result.damageSegmentPercents.length > 0;
     const segments = result.damageSegmentPercents.length ? result.damageSegmentPercents
       : name === "星界寂滅" ? [result.totalDamagePercent] : [];
     const bonus = result.conditionalDamageBonusPercent + result.voidAscensionDamageBonusPercent +
@@ -186,6 +236,19 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     damagePercent = segments.reduce((sum, value, index) => sum + percent(value * (1 + bonus / 100) *
       (index === segments.length - 1 && name === "星界寂滅"
         ? 1 + result.finalExplosionDamageBonusPercent / 100 : 1), index), 0);
+    if (replayReady) {
+      const checked = trySkillProc(battle.combat.session,
+        { id: "skill-mage-akasha-pages", kind: "damage", source: "primary", family: "equipment" });
+      battle.combat.session = checked.session;
+      if (checked.allowed) {
+        damagePercent += damagePercent * 0.6;
+        battle.akashaReady = false;
+        battle.akashaStacks = 0;
+      }
+    } else if (akashaEquipped && !battle.akashaReady && name && hits.some((part) => part.hit)) {
+      battle.akashaStacks++;
+      if (battle.akashaStacks >= 4) battle.akashaReady = true;
+    }
     for (const extra of [...result.ascensionDamageEvents, ...result.equipmentDamageEvents,
       ...result.passiveDamageProcs]) if (random() * 100 < options.hitChance)
       damagePercent += extra.percent * (("guaranteedCritical" in extra && extra.guaranteedCritical)
@@ -204,7 +267,8 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
 
 export function resolveLiveEnemyAttack(
   battle: LiveCombatBattle, input: { healthPercent: number; maxHealth: number; damage: number;
-    baseDodgeChance?: number; roll?: () => number },
+    baseDodgeChance?: number; defense?: number;
+    equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[]; roll?: () => number },
 ): { damage: number; counterDamagePercent: number; blocked: boolean; dodged: boolean } {
   const random = input.roll ?? Math.random;
   if (battle.characterClass === "戰士") {
@@ -218,6 +282,8 @@ export function resolveLiveEnemyAttack(
       random() * 100 < outcome.blockChancePercent + outcome.passive.blockChancePoints;
     if (blocked) {
       battle.combat = recordWarriorSuccessfulBlock(battle.combat as WarriorCombat, battle.ascended.has("不屈戰意")).combat;
+      if (hasCatalogItem(input.equippedItems ?? [], "skill-warrior-fallen-city"))
+        battle.fallenCityDamagePending = Math.max(0, input.defense ?? 0) * 1.5;
       if (random() * 100 < outcome.counterChancePercent) {
         const counter = recordWarriorCounter(battle.combat as WarriorCombat);
         battle.combat = counter.combat;
