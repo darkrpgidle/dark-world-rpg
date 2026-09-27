@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { skillDisplay } from "./skill-rework-display";
 import {
   ascensionOptions, confirmSkillAscensions, selectSkillAscension, type SkillAscensionState,
@@ -31,6 +31,9 @@ type Props = {
 export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgrade, onEquip,
   ascensions, onSelectAscension, onConfirmAscensions, busy }: Props) {
   const [pendingUpgrade, setPendingUpgrade] = useState<string | null>(null);
+  const [pendingAscensionConfirmation, setPendingAscensionConfirmation] = useState(false);
+  useEffect(() => { setPendingAscensionConfirmation(false); },
+    [characterClass, ascensions.rebirthCount, ascensions.selectionOpen]);
   const catalog = SKILL_REWORK_CATALOG[characterClass];
   const available = earnedSkillPoints(characterLevel) - spentSkillPoints(build);
   const learnedActive = catalog.filter((skill) => skill.kind === "active"
@@ -40,7 +43,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
   return (
     <section className="panel" aria-label="新版技能配置" style={{ padding: 18, marginBottom: 20 }}>
       <h3>新版技能配置</h3>
-      <p>重製配置預覽：下方舊版技能仍用於戰鬥；新版昇華目前只顯示效果，尚未提供選擇。</p>
+      <p>新版配點與昇華可在這裡配置；目前戰鬥仍使用下方的既有技能。</p>
       <p>可用技能點：<strong>{available}</strong>／已取得：{earnedSkillPoints(characterLevel)}（每 2 等 1 點）</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
         {build.activeSlots.map((name, index) => (
@@ -87,7 +90,10 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                 disabled={busy || !ascensions.selectionOpen || tier === 5}
                 onChange={(event) => {
                   const next = selectSkillAscension(ascensions, characterClass, tier, event.target.value);
-                  if (next) onSelectAscension(tier, event.target.value);
+                  if (next) {
+                    setPendingAscensionConfirmation(false);
+                    onSelectAscension(tier, event.target.value);
+                  }
                 }}
               >
                 <option value="">請選擇</option>
@@ -100,12 +106,28 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
             </label>;
           })}
         </div>
-        {ascensions.selectionOpen && <button className="btn btn-ghost" style={{ minHeight: 44, marginTop: 12 }}
-          disabled={busy || ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
-          onClick={() => {
-            const next = confirmSkillAscensions(ascensions, characterClass);
-            if (next) onConfirmAscensions();
-          }}>確認昇華配置</button>}
+        {ascensions.selectionOpen && (
+          <div style={{ marginTop: 12 }}>
+            {pendingAscensionConfirmation ? (
+              <div role="group" aria-label="確認昇華配置">
+                <p role="status">確認後，昇華選擇會鎖定至下一次轉生。確定使用目前配置嗎？</p>
+                <button className="btn btn-ghost" style={{ minHeight: 44 }}
+                  disabled={busy || ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
+                  onClick={() => {
+                    const next = confirmSkillAscensions(ascensions, characterClass);
+                    if (next) onConfirmAscensions();
+                    setPendingAscensionConfirmation(false);
+                  }}>確定鎖定昇華</button>
+                <button className="btn btn-ghost" style={{ minHeight: 44 }}
+                  disabled={busy} onClick={() => setPendingAscensionConfirmation(false)}>返回修改</button>
+              </div>
+            ) : (
+              <button className="btn btn-ghost" style={{ minHeight: 44 }}
+                disabled={busy || ascensions.choices.slice(0, ascensions.rebirthCount).some((value) => value === null)}
+                onClick={() => setPendingAscensionConfirmation(true)}>確認昇華配置</button>
+            )}
+          </div>
+        )}
         <p>付費技能重置待元寶價格、重置卷道具及伺服器扣款規則定案後開放。</p>
       </section>
       {(["active", "passive"] as const).map((kind) => (
@@ -118,7 +140,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
               const display = skillDisplay(characterClass, skill.name);
               const pendingKey = `${characterClass}:${skill.name}`;
               return (
-                <article className="panel skill-card" key={skill.name} style={{ padding: 12 }}>
+                <article className="panel skill-card" key={skill.name} style={{ padding: 12, minWidth: 0 }}>
                   <div>
                     <small>{skill.category === "ultimate" ? "固定終極" : kind === "passive" ? "投入後自動生效" : "可配置主動"}</small>
                     <h5>{skill.name}</h5>
@@ -128,7 +150,8 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                       <details>
                         <summary style={{ cursor: "pointer", minHeight: 44, paddingTop: 10 }}>查看 Lv1～5 數值與效果</summary>
                         {display.fixed.map((value) => <p key={value}>{value}</p>)}
-                        <div style={{ overflowX: "auto" }}>
+                        <div role="region" aria-label={`${skill.name}技能數值表，可左右捲動`} tabIndex={0}
+                          style={{ overflowX: "auto", maxWidth: "100%" }}>
                           <table style={{ width: "100%", minWidth: 330, borderCollapse: "collapse", textAlign: "left" }}>
                             <thead><tr><th scope="col">效果</th>{[1, 2, 3, 4, 5].map((n) => <th scope="col" key={n}>Lv{n}</th>)}</tr></thead>
                             <tbody>{display.ranks.map((entry) => (
