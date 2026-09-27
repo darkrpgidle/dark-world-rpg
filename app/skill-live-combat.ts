@@ -25,7 +25,7 @@ export type LiveCombatBattle = {
   dotAttack: { bleed: number; burn: number };
   fallenCityDamagePending: number; hunterEyeCritDamagePending: boolean;
   queenCarryForNextTarget: boolean; queenCarry: number;
-  akashaStacks: number; akashaReady: boolean;
+  akashaStacks: number; akashaReady: boolean; executionEnergyRemainder: number;
 };
 export type LiveCombatAction = {
   name: string | null; hits: PrimaryAttackEvent["hits"];
@@ -70,7 +70,8 @@ export function syncLiveCombat(
     ascended: new Set(enabledAscensions(ascensions, characterClass)),
     combat: createCombat(characterClass, canonical, level), dotAttack: { bleed: 0, burn: 0 },
     fallenCityDamagePending: 0, hunterEyeCritDamagePending: false,
-    queenCarryForNextTarget: false, queenCarry: 0, akashaStacks: 0, akashaReady: false };
+    queenCarryForNextTarget: false, queenCarry: 0, akashaStacks: 0, akashaReady: false,
+    executionEnergyRemainder: 0 };
 }
 
 export function nextLiveSkill(battle: LiveCombatBattle): string | null {
@@ -128,7 +129,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     ? rangerSkillRankValue(RANGER_PASSIVE_RULES.影步反射.nextPrimaryCriticalChancePoints, nextCritRank) : 0;
   const eagleEye = rangerPassiveStats(battle.build).criticalChancePoints;
   const critChance = Math.min(100, options.criticalChance
-    + (ranger ? eagleEye * (hasMythic("skill-ranger-hunter-eye") ? 1.5 : 1) : 0)
+    + (ranger && hasMythic("skill-ranger-hunter-eye") ? eagleEye * 0.5 : 0)
     + (ranger?.session.enemy.hunterMark?.strength ?? 0)
     + (ranger?.defense.nextHitCriticalChancePoints ?? 0) + pendingCrit);
   const snipeRank = name === "破星狙擊" ? battle.build.ranks[name] ?? 0 : 0;
@@ -157,9 +158,12 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     if (!result) throw new Error("Warrior action and charge queue disagree");
     battle.combat = result.combat;
     if (hasMythic("skill-warrior-executioner")) {
+      if (name === "泰坦斷界斬") battle.executionEnergyRemainder = 0;
       const earned = Math.max(0, battle.combat.session.charge.ultimateEnergy - energyBefore);
-      if (earned > 0) battle.combat.session = { ...battle.combat.session,
-        charge: grantUltimateEnergy(battle.combat.session.charge, Math.floor(earned / 4)) };
+      const quarters = earned + battle.executionEnergyRemainder;
+      battle.executionEnergyRemainder = quarters % 4;
+      if (quarters >= 4) battle.combat.session = { ...battle.combat.session,
+        charge: grantUltimateEnergy(battle.combat.session.charge, Math.floor(quarters / 4)) };
     }
     damagePercent = percent(result.effectiveBaseDamagePercent * (1 + result.bonusDamagePercent / 100));
     for (const extra of result.extraDamagePercents) if (hits.some((part) => part.hit) && random() * 100 < options.hitChance)
@@ -187,7 +191,8 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     if (!result) throw new Error("Ranger action and charge queue disagree");
     battle.combat = result.combat;
     if (name) battle.hunterEyeCritDamagePending = false;
-    if (battle.queenCarry > 0 && result.statusApplications.some((item) => item.kind === "hunterMark")) {
+    if (battle.queenCarry > 0 && hasMythic("skill-ranger-queen-contract")
+        && result.statusApplications.some((item) => item.kind === "hunterMark")) {
       (battle.combat as RangerCombat).hunterMarkCriticalHits = battle.queenCarry;
       battle.queenCarry = 0;
     }
@@ -202,7 +207,8 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
         * (random() * 100 < critChance ? 1 + options.criticalDamage / 100 : 1);
     if (result.hunterExplosionEvents.length && hasMythic("skill-ranger-queen-contract"))
       battle.queenCarryForNextTarget = true;
-    if (critical && hasMythic("skill-ranger-hunter-eye") && random() < 0.2) {
+    if (critical && (battle.build.ranks["鷹眼"] ?? 0) > 0
+        && hasMythic("skill-ranger-hunter-eye") && random() < 0.2) {
       const checked = trySkillProc(battle.combat.session,
         { id: "skill-ranger-hunter-eye", kind: "damage", source: "primary", family: "equipment" });
       battle.combat.session = checked.session;
@@ -224,7 +230,8 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     });
     if (!result) throw new Error("Mage action and charge queue disagree");
     battle.combat = result.combat;
-    const akashaEquipped = hasMythic("skill-mage-akasha-pages");
+    const akashaEquipped = (battle.build.ranks["奧術循環"] ?? 0) > 0
+      && hasMythic("skill-mage-akasha-pages");
     const replayReady = akashaEquipped && battle.akashaReady && Boolean(name)
       && hits.some((part) => part.hit) && result.damageSegmentPercents.length > 0;
     const segments = result.damageSegmentPercents.length ? result.damageSegmentPercents
