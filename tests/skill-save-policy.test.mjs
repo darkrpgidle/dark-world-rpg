@@ -9,6 +9,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 const { applySkillSaveAction, preserveServerSkillSave, restoreSkillSave } = await import("../app/skill-save-policy.ts");
 const { createSkillBuild } = await import("../app/skill-rework.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
+const { preserveLegacyRebirthCount } = await import("../app/legacy-rebirth-storage.ts");
 
 const base = () => ({ playerClass: "戰士", level: 100, rebirthCount: 0, mapBestFloors: { 9: 30 } });
 
@@ -48,6 +49,19 @@ test("client autosaves cannot assign or overwrite the future server-owned legacy
   assert.equal(preserveServerSkillSave(client, { ...issued, legacyRebirthCount: "needs-review" }).legacyRebirthCount,
     "needs-review");
   assert.equal(client.legacyRebirthCount, 20);
+});
+
+test("GM edits and historical snapshot restores retain only the present server legacy count", () => {
+  const current = { rebirthCount: 0, legacyRebirthCount: 5, gold: 10 };
+  const edited = preserveLegacyRebirthCount({ ...current, gold: 99, legacyRebirthCount: 20 }, current);
+  const restored = preserveLegacyRebirthCount({ rebirthCount: 9, gold: 2 }, current);
+  assert.deepEqual(edited, { rebirthCount: 0, legacyRebirthCount: 5, gold: 99 });
+  assert.deepEqual(restored, { rebirthCount: 9, gold: 2, legacyRebirthCount: 5 });
+  assert.equal(Object.hasOwn(preserveLegacyRebirthCount({ legacyRebirthCount: 10 }, { rebirthCount: 10 }),
+    "legacyRebirthCount"), false);
+  assert.equal(preserveLegacyRebirthCount({ legacyRebirthCount: 5 },
+    { legacyRebirthCount: "needs-review" }).legacyRebirthCount, "needs-review");
+  assert.equal(current.gold, 10);
 });
 
 test("server upgrade and equip enforce earned points, unlocked levels and exact slots", () => {

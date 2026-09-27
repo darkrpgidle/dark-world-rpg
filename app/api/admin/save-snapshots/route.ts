@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { accounts, gameSaves, gmActionLogs, saveSnapshots, sessions } from "../../../../db/schema";
 import { currentAccount } from "../../auth-utils";
+import { preserveLegacyRebirthCount } from "../../../legacy-rebirth-storage";
 
 type SavePreview = {
   playerName?: string;
@@ -142,7 +143,11 @@ export async function POST(request: Request) {
   let restored: Record<string, unknown>;
   let currentRevision = 0;
   try { restored = normalizeSnapshotPayload(snapshot.payload, target.id); } catch { return Response.json({ error: "invalid_snapshot" }, { status: 409 }); }
-  try { currentRevision = Number((JSON.parse(currentSave.payload) as Record<string, unknown>).adminRevision ?? 0); } catch { return Response.json({ error: "invalid_current_save" }, { status: 409 }); }
+  try {
+    const current = JSON.parse(currentSave.payload) as Record<string, unknown>;
+    currentRevision = Number(current.adminRevision ?? 0);
+    restored = preserveLegacyRebirthCount(restored, current);
+  } catch { return Response.json({ error: "invalid_current_save" }, { status: 409 }); }
   const now = new Date().toISOString();
   restored.adminRevision = Math.max(Number(restored.adminRevision ?? 0), currentRevision) + 1;
   const restoredPayload = JSON.stringify(restored);

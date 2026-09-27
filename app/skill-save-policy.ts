@@ -6,6 +6,7 @@ import {
   beginSkillRebirth, confirmSkillAscensions, createSkillAscensions,
   restoreSkillAscensions, selectSkillAscension, type SkillAscensionState,
 } from "./skill-ascensions";
+import { preserveLegacyRebirthCount } from "./legacy-rebirth-storage";
 
 export const SKILL_REWORK_SAVE_VERSION = 1;
 
@@ -48,15 +49,7 @@ export function preserveServerSkillSave(
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
-  const next: Record<string, unknown> = { ...incoming, ...canonical };
-  if (server && Object.prototype.hasOwnProperty.call(server, "legacyRebirthCount")) {
-    // Preserve stored values verbatim for audit; only a future server migration
-    // may assign this field. Never infer it from the client's rebirthCount.
-    next.legacyRebirthCount = server.legacyRebirthCount;
-  } else {
-    delete next.legacyRebirthCount;
-  }
-  return next;
+  return preserveLegacyRebirthCount({ ...incoming, ...canonical }, server);
 }
 
 export function applySkillSaveAction(
