@@ -43,7 +43,6 @@ export function AdminMonitor({
   const [activeTab, setActiveTab] = useState<"overview" | "players" | "snapshots" | "editor" | "grants">("overview");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [resetting, setResetting] = useState(false);
   const [overview, setOverview] = useState<{
     serverTime: string;
     database: {
@@ -123,25 +122,8 @@ export function AdminMonitor({
           </>
           )}
           <button className="btn btn-primary" onClick={() => void refresh()} disabled={loading}>重新整理</button>
-          <button
-          className="btn btn-danger"
-          disabled={loading || resetting}
-          onClick={async () => {
-            setResetting(true);
-            try {
-              const response = await fetch("/api/admin/reset", { method: "POST" });
-              const result = await response.json().catch(() => ({}));
-              if (!response.ok) throw new Error(result.error ?? "reset_failed");
-              toast.success("玩家資料已重置", { description: "GM 帳號已保留，其他玩家帳號與存檔已清除。" });
-              await refresh();
-            } catch {
-              toast.error("玩家資料重置失敗");
-            } finally {
-              setResetting(false);
-            }
-          }}
-          >
-            {resetting ? "重置中……" : "重置所有玩家資料"}
+          <button className="btn btn-danger" disabled title="舊轉生補償、資料備份與還原驗證完成後才能重置">
+            重置所有玩家資料（暫停）
           </button>
         </>}
         {activeTab === "players" && <AdminPlayerManagement />}
