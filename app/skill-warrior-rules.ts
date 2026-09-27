@@ -1,5 +1,6 @@
 // Warrior skill rework: exact Lv1–5 values and isolated action-count buffs.
 // Bleed damage per second remains configurable after balance testing.
+import { balanceConfig } from "./balance-config";
 export const WARRIOR_ACTIVE_RULES = {
   裂地斬: { category: "basic", damage: [150, 160, 170, 185, 200], armorBreak: [15, 18, 21, 25, 30], ascension: "地脈崩裂" },
   血刃斬: { category: "basic", damage: [130, 140, 150, 160, 175], bleedChance: [20, 25, 30, 35, 40], ascension: "猩紅撕裂" },
@@ -7,7 +8,8 @@ export const WARRIOR_ACTIVE_RULES = {
   血戰烙印: { category: "status", durationSeconds: [6, 7, 8, 9, 10], bleedChanceBonus: [10, 13, 16, 19, 22], ascension: "血祭印記" },
   鮮血怒吼: { category: "burst", damageBonus: [25, 32, 39, 47, 55], lifesteal: [10, 15, 20, 25, 30], healthBelow: 40, attacks: 5, ascension: "血怒終焉" },
   狂戰姿態: { category: "mechanic", attackSpeedBonus: [10, 14, 18, 22, 26], damageBonus: [8, 11, 14, 17, 20], defensePenalty: 15, attacks: 8, ascension: "無盡狂怒" },
-  碎甲猛擊: { category: "burst", damage: [240, 265, 290, 320, 350], armorBreak: [20, 24, 28, 32, 36], ascension: "崩鎧重擊" },
+  碎甲猛擊: { category: "burst", damage: [240, 265, 290, 320, 350], armorBreak: [20, 24, 28, 32, 36],
+    ...balanceConfig.skillRework.warrior.active.碎甲猛擊, ascension: "崩鎧重擊" },
   泰坦斷界斬: { category: "ultimate", damage: [400, 450, 500, 560, 630], armorBreak: [20, 24, 28, 32, 36], ascension: "天地斷絕" },
 } as const;
 
@@ -34,6 +36,12 @@ export function warriorSkillRankValue(values: readonly number[], rank: number): 
     throw new RangeError("Warrior skill rank must be 1–5");
   }
   return values[rank - 1];
+}
+
+export function warriorRepeatedArmorBreakBonus(rank: number): number {
+  const rule = WARRIOR_ACTIVE_RULES.碎甲猛擊;
+  return Math.min(rule.repeatedArmorBreakBonusCap,
+    warriorSkillRankValue(rule.armorBreak, rank) * rule.repeatedArmorBreakFactor);
 }
 
 export type WarriorBuffState = {
