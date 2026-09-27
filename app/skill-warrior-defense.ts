@@ -7,12 +7,15 @@ import { WARRIOR_ACTIVE_RULES, warriorSkillRankValue } from "./skill-warrior-rul
 
 export type WarriorDefenseState = {
   receivedAttacks: number;
+  activeAttacksRemaining: number;
+  activeForAttack: boolean;
   guaranteedBlockPending: boolean;
   ascendedCounterStacks: number;
 };
 
 export function createWarriorDefenseState(): WarriorDefenseState {
-  return { receivedAttacks: 0, guaranteedBlockPending: false, ascendedCounterStacks: 0 };
+  return { receivedAttacks: 0, activeAttacksRemaining: 0, activeForAttack: false,
+    guaranteedBlockPending: false, ascendedCounterStacks: 0 };
 }
 
 export function warriorDefenseActivation(build: SkillBuild, ascended: boolean) {
@@ -40,23 +43,37 @@ export function recordWarriorEnemyAttack(combat: WarriorCombat, input: WarriorEn
   }
   const rank = combat.build.ranks["不屈戰意"] ?? 0;
   const total = rank ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
-  const activation = rank && total >= WARRIOR_ACTIVE_RULES.不屈戰意.enemyAttacksRequired
+  const continuing = rank > 0 && combat.defense.activeAttacksRemaining > 0;
+  const activation = rank && !continuing && total >= WARRIOR_ACTIVE_RULES.不屈戰意.enemyAttacksRequired
     ? warriorDefenseActivation(combat.build, input.ascended) : null;
+  const activeForAttack = Boolean(activation) || continuing;
+  const activeAttacksRemaining = activation
+    ? WARRIOR_ACTIVE_RULES.不屈戰意.affectedEnemyAttacks - 1
+    : continuing ? combat.defense.activeAttacksRemaining - 1 : 0;
   const defense: WarriorDefenseState = {
     receivedAttacks: activation ? 0 : total,
-    guaranteedBlockPending: combat.defense.guaranteedBlockPending || Boolean(activation?.grantsGuaranteedBlock),
+    activeAttacksRemaining,
+    activeForAttack,
+    guaranteedBlockPending: Boolean(activation?.grantsGuaranteedBlock)
+      || (continuing && combat.defense.guaranteedBlockPending),
     ascendedCounterStacks: combat.defense.ascendedCounterStacks,
   };
   return {
     combat: { ...combat, defense },
     activation,
+    activeForAttack,
+    blockChancePercent: activeForAttack
+      ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.不屈戰意.blockChance, rank) : 0,
+    counterChancePercent: activeForAttack
+      ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.不屈戰意.counterChance, rank) : 0,
     passive: warriorPassiveDefenses(combat.build, input.healthPercent),
   };
 }
 
 // Called only after the surrounding battle engine confirms a successful block.
 export function recordWarriorSuccessfulBlock(combat: WarriorCombat, ascended = false) {
-  const ascendedCounterStacks = ascended && (combat.build.ranks["不屈戰意"] ?? 0) > 0
+  const ascendedCounterStacks = ascended && combat.defense.activeForAttack
+    && (combat.build.ranks["不屈戰意"] ?? 0) > 0
     ? Math.min(3, combat.defense.ascendedCounterStacks + 1) : combat.defense.ascendedCounterStacks;
   return {
     combat: {
