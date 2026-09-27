@@ -173,7 +173,7 @@ export function consumeReadySkill(
   return { skill, state: next };
 }
 
-export type CombatBoundary = "normal-kill" | "death" | "map-change" | "boss-start" | "pvp-start";
+export type CombatBoundary = "normal-kill" | "death" | "map-change" | "boss-start" | "pvp-start" | "reconnect";
 
 export function transitionSkillCombat(state: SkillCombatState, boundary: CombatBoundary): SkillCombatState {
   if (boundary === "normal-kill") return copyState(state);
