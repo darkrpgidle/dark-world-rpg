@@ -32,7 +32,8 @@ export function tryActivateMageShield(
   if (!Number.isFinite(effectiveMaxHealth)) throw new RangeError("Effective mage maximum health overflow");
   if (input.currentHealth > effectiveMaxHealth) throw new RangeError("Mage current health exceeds effective maximum");
   const rank = combat.build.ranks["魔力護盾"] ?? 0;
-  const eligible = rank > 0 && input.currentHealth > 0 && combat.shield.value <= 0
+  const eligible = rank > 0 && !combat.shieldActivatedThisBattle
+    && input.currentHealth > 0 && combat.shield.value <= 0
     && input.currentHealth / effectiveMaxHealth * 100 < MAGE_ACTIVE_RULES.魔力護盾.healthBelow;
   if (!eligible) return { combat, activated: false, effectiveMaxHealth, initialShieldValue: 0 };
 
@@ -46,7 +47,8 @@ export function tryActivateMageShield(
     enhancedCastsRemaining: input.ascended ? MAGE_ACTIVE_RULES.魔力護盾.followingActiveCasts : 0,
   };
   return {
-    combat: { ...combat, shield }, activated: true, effectiveMaxHealth, initialShieldValue,
+    combat: { ...combat, shield, shieldActivatedThisBattle: true },
+    activated: true, effectiveMaxHealth, initialShieldValue,
   };
 }
 
