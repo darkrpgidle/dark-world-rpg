@@ -186,6 +186,21 @@ test("normal kill retains player shield and unused buff; death and new battle bo
   }
 });
 
+test("shield activates once per battle even after break and ordinary kills; new battle resets eligibility", () => {
+  let combat = activate(mage({ 魔力護盾: 1 }), 500).combat;
+  combat = recordMageIncomingAttack(combat, [120]).combat;
+  assert.equal(combat.shield.value, 0);
+  assert.equal(activate(combat, 500).activated, false);
+  const nextMonster = transitionMageCombat(combat, "normal-kill");
+  assert.equal(nextMonster.shieldActivatedThisBattle, true);
+  assert.equal(activate(nextMonster, 500).activated, false);
+  for (const boundary of ["death", "map-change", "boss-start", "pvp-start", "reconnect"]) {
+    const fresh = transitionMageCombat(combat, boundary);
+    assert.equal(fresh.shieldActivatedThisBattle, false);
+    assert.equal(activate(fresh, 500).activated, true);
+  }
+});
+
 test("invalid health and damage inputs cannot create shield or grant energy", () => {
   const combat = mage({ 魔力護盾: 1 });
   for (const input of [
