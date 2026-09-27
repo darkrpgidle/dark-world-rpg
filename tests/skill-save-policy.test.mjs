@@ -31,6 +31,25 @@ test("generic autosaves preserve canonical skill fields, including after stale a
   assert.equal(preserveServerSkillSave({ ...incoming, playerClass: "法師" }, saved), null);
 });
 
+test("client autosaves cannot assign or overwrite the future server-owned legacy count", () => {
+  const client = { ...base(), rebirthCount: 12, legacyRebirthCount: 20 };
+  const oldServer = { ...base(), rebirthCount: 4 };
+  const fresh = preserveServerSkillSave(client, null);
+  const unissued = preserveServerSkillSave(client, oldServer);
+  assert.equal(Object.hasOwn(fresh, "legacyRebirthCount"), false);
+  assert.equal(Object.hasOwn(unissued, "legacyRebirthCount"), false);
+  assert.equal(unissued.rebirthCount, 12); // The old combat flow is unchanged until the reset.
+
+  const issued = { ...oldServer, legacyRebirthCount: 5 };
+  assert.equal(preserveServerSkillSave(client, issued).legacyRebirthCount, 5);
+  assert.equal(preserveServerSkillSave({ ...client, legacyRebirthCount: undefined }, issued).legacyRebirthCount, 5);
+  assert.equal(applySkillSaveAction(issued, { kind: "upgrade", name: "裂地斬" }).legacyRebirthCount, 5);
+  // A previously stored malformed value remains visible for investigation.
+  assert.equal(preserveServerSkillSave(client, { ...issued, legacyRebirthCount: "needs-review" }).legacyRebirthCount,
+    "needs-review");
+  assert.equal(client.legacyRebirthCount, 20);
+});
+
 test("server upgrade and equip enforce earned points, unlocked levels and exact slots", () => {
   const low = { ...base(), level: 2 };
   const rank1 = applySkillSaveAction(low, { kind: "upgrade", name: "裂地斬" });

@@ -38,7 +38,8 @@ export function restoreSkillSave(save: Record<string, unknown>): SkillSaveFields
 }
 
 // Generic autosaves never own these fields. This keeps a stale window or a
-// forged whole-save payload from silently replacing a confirmed configuration.
+// forged whole-save payload from silently replacing a confirmed configuration
+// or creating the future server-issued legacy compensation counter.
 export function preserveServerSkillSave(
   incoming: Record<string, unknown>, server: Record<string, unknown> | null,
 ): Record<string, unknown> | null {
@@ -47,7 +48,15 @@ export function preserveServerSkillSave(
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
-  return { ...incoming, ...canonical };
+  const next = { ...incoming, ...canonical };
+  if (server && Object.prototype.hasOwnProperty.call(server, "legacyRebirthCount")) {
+    // Preserve stored values verbatim for audit; only a future server migration
+    // may assign this field. Never infer it from the client's rebirthCount.
+    next.legacyRebirthCount = server.legacyRebirthCount;
+  } else {
+    delete next.legacyRebirthCount;
+  }
+  return next;
 }
 
 export function applySkillSaveAction(

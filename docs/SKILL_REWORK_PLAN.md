@@ -204,4 +204,5 @@
 - `scripts/preview-legacy-rebirth.mjs` 對授權匯出的 JSON 本機唯讀試跑：`{ "capturedAt": "UTC ISO 時間", "accounts": [{ "id": "資料庫帳號 ID" }], "saves": [{ "playerId", "accountId", "payload", "updatedAt" }], "snapshots": [{ "id", "playerId", "accountId", "payload", "capturedAt" }] }`。指令 `node scripts/preview-legacy-rebirth.mjs authorized-export.json` 只輸出帳號 ID、候選階級、來源與拒絕原因，不回傳原始存檔。當結果含拒絕／缺少紀錄時，以非零結束碼提醒核對；此時及無異常時 `canApply` 均為 false。
 - `GET /api/admin/legacy-rebirth-preview?accountId=<帳號 ID>` 是 GM 專用唯讀入口，查詢單一帳號的正式存檔和歷史快照，回傳候選階級及來源紀錄識別，不傳整份存檔。複數存檔、角色跨帳號，或快照超過 100 筆時拒絕試算，避免截斷歷史造成錯誤結論；結果固定 `canApply: false`，不寫入或發獎。正式資料庫連線尚未成功，線上帳號核對仍待驗收。
 - `node scripts/verify-legacy-rebirth-backup.mjs pre-reset-export.json recovered-export.json` 可在隔離環境將資料還原並重新匯出後，比對兩份匯出內容的 SHA-256 與帳號／存檔／快照筆數；記錄順序不同仍能比對，遺失或竄改資料會失敗。輸出僅含摘要、筆數及待人工核對旗標。這是還原資料的離線**核對工具**，不會替正式資料庫建立備份、執行還原或證明全庫可復原；須先取得兩份獨立匯出，完成正式備份與隔離環境還原演練。
+- 一般存檔入口已預留 `legacyRebirthCount` 的服務端所有權：首次存檔或現存舊存檔無該欄時忽略客戶端輸入，伺服器已有欄位時自動存檔只能原樣保留，舊視窗亦不能覆寫；畸形舊值不自行抹除，以便人工調查。這批沒有寫入正式補償次數，也沒有重置 `rebirthCount`。
 - 候選階級只對應規格建議的 1／3／5／10 轉門檻；四階稱號名稱及所有 Buff 數值未定案，沒有加入玩家存檔或戰鬥加成。正式備份與還原演練、實際帳號快照核對、服務端原子遷移及防重複發放仍未執行；目前存檔含客戶端提供的舊轉生次數，試算結果不能直接作為發獎授權。
