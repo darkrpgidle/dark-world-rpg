@@ -11,7 +11,7 @@ export function preserveServerResourceRevision(
   if (!Number.isSafeInteger(serverRevision) || serverRevision < 0 ||
       typeof incomingRevision !== "number" || !Number.isSafeInteger(incomingRevision) ||
       incomingRevision < 0 || incomingRevision > serverRevision) return null;
-  const next = { ...incoming, adminRevision: serverRevision };
+  const next: Record<string, unknown> = { ...incoming, adminRevision: serverRevision };
   if (incomingRevision < serverRevision) {
     for (const field of guardedResources) if (field in server) next[field] = server[field];
   }
