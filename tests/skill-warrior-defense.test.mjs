@@ -39,12 +39,12 @@ test("one enemy attack event counts once even with many segments; fourth event a
   assert.equal(enemy(fourth.combat, true).combat.defense.receivedAttacks, 1);
 });
 
-test("blocked and dodged attacks are counted only when the caller explicitly chooses", () => {
+test("blocked and dodged enemy attacks count once regardless of damage outcome", () => {
   let combat = warrior(["不屈戰意"]);
   combat = enemy(combat, false, 3).combat;
-  assert.equal(combat.defense.receivedAttacks, 0);
-  combat = enemy(combat, true, 3).combat;
   assert.equal(combat.defense.receivedAttacks, 1);
+  combat = enemy(combat, true, 3).combat;
+  assert.equal(combat.defense.receivedAttacks, 2);
   assert.throws(() => enemy(combat, true, 0), RangeError);
 });
 
