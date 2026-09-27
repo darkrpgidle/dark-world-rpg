@@ -4456,7 +4456,7 @@ function Game({
           const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
             now: Date.now(), healthPercent: playerHp, attack: characterStats.attack,
             hitChance: effectiveHit, criticalChance: characterStats.crit,
-            criticalDamage: characterStats.critDamage,
+            criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
           }) : null;
           let triggered: Skill | null = null;
           let triggeredMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
@@ -4680,7 +4680,7 @@ function Game({
               (bloodRoarWasActive ? 1 + bloodRoarDamageBonus(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0) / 100 : 1),
             skillDamage: characterStats.skillDamage +
               (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
-              (skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
+              (!liveAction && skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
             eliteDamage: 0,
             bossReduction: characterStats.bossReduction,
             lowHealthDamage: characterStats.lowHealthDamage,
@@ -5793,7 +5793,7 @@ function Game({
           hitChance: hitChanceFromRatings(characterStats.hit,
             20 + activeBossBattle.level * balanceConfig.combat.evasionModel.bossEvasionPerLevel),
           criticalChance: characterStats.crit,
-          criticalDamage: characterStats.critDamage,
+          criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
         }) : null;
         let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
         let bossSkill: Skill | null = liveAction?.name
@@ -6002,7 +6002,7 @@ function Game({
           skillDamage:
             characterStats.skillDamage +
             (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
-            (bossSkill && hasPerk("skill-mage-eternal-core") ? 25 : 0),
+            (!liveAction && bossSkill && hasPerk("skill-mage-eternal-core") ? 25 : 0),
           monsterAttack: bossBaseline.monsterDamage,
           monsterDefense: bossBaseline.monsterDefense,
           monsterMultiplier: activeBossBattle.multiplier,
