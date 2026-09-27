@@ -131,6 +131,7 @@ import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
 import { settleCombatHealth } from "./skill-health-settlement";
+import { createCombatVictoryGuard } from "./skill-combat-victory";
 import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import type { SkillSaveAction } from "./skill-save-policy";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
@@ -2320,6 +2321,7 @@ function Game({
   const logIdRef = useRef(10_000);
   const lootIdRef = useRef(20_000);
   const towerDeathPendingRef = useRef(false);
+  const towerVictoryGuardRef = useRef(createCombatVictoryGuard());
   const bloodRoarStateRef = useRef({ battleKey: "", remaining: 0, used: false });
   const bloodRoarHideTimerRef = useRef<number | null>(null);
   const bloodRoarVisualTokenRef = useRef(0);
@@ -3963,9 +3965,145 @@ function Game({
     if (markedRemaining > 0 && hasSkillMythic("致命標記")) {
       showCombatStatus({ name: "致命標記 ×2", target: "enemy", remaining: markedRemaining + 1, unit: "攻擊", tone: "gold" });
     }
+    const targetKey = `${runStartedAt}:${mapId}:${wave}`;
+    const resolveTowerKill = (executionFinisher: boolean, markExplosionWasActive: boolean, tier: "normal" | "elite" | "guardian" | "boss") => {
+      if (!towerVictoryGuardRef.current.claim(targetKey)) return executionFinisher ? 0 : 100;
+      if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
+      combatPerksRef.current.firstEnemyAttackReady = true;
+      combatPerksRef.current.revengeStacks = 0;
+      combatPerksRef.current.ironWallBonus = 0;
+      combatPerksRef.current.arcaneEchoReady = false;
+      combatPerksRef.current.arcaneStacks = 0;
+      if (markExplosionWasActive && hasPerk("skill-ranger-queen-contract")) {
+        nextEnemyMarkStacksRef.current = 2;
+      }
+      // A mark belongs to its current target. Clear an un detonated
+      // mark immediately when that target dies; an explosion already
+      // in progress is allowed to finish independently.
+      setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setEnemyDefeated(true);
+      window.setTimeout(() => setEnemyDefeated(false), executionFinisher ? 980 : 320);
+      setEnemyHitFeedback(null);
+      const enemy = baseMonsterName(enemyName);
+      const goldRules = balanceConfig.economy.gold;
+      const goldTier = currentWaveBoss ? "boss" : currentWaveGuardian ? "guardian" : currentWaveElite ? "elite" : "normal";
+      const goldBase = goldRules.monsterDropBaseByMap[mapId - 1] ?? goldRules.monsterDropBaseByMap[0];
+      const goldGain = Math.round(
+        goldBase * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
+        goldRules.tierMultiplier[goldTier] *
+        (hasBlessing("stat-gold") ? 1.2 : 1) *
+        (1 + (characterStats.goldBonus / 100) * goldRules.goldAffixEffectiveness),
+      );
+      const enhanceGain =
+        Math.random() <
+        enhancementStoneDropChance(
+          currentWaveBoss || currentWaveGuardian ? 1 : currentWaveElite ? 0.3 : 0.06,
+          characterStats.resourceDrop + characterStats.enhanceDrop,
+          hasBlessing("stat-enhance") ? 0.1 : 0,
+        )
+          ? currentWaveBoss || currentWaveGuardian
+            ? 1 + Math.floor(Math.random() * 3)
+            : 1
+          : 0;
+      const reforgeGain =
+        Math.random() <
+        Math.min(
+          1,
+          (currentWaveBoss ? 0.35 : currentWaveGuardian ? 0.15 : currentWaveElite ? 0.04 : 0.008) +
+            (characterStats.resourceDrop + characterStats.reforgeDrop) / 100 +
+            (hasBlessing("stat-reforge") ? 0.05 : 0),
+        )
+          ? 1
+          : 0;
+      const yuanbaoGain =
+        Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
+      const gemDrop = rollGemDrop(mapId);
+      const drillingStoneDrop = rollDrillingStoneDrop();
+      setGold((value) => value + goldGain);
+      setEnhanceStones((value) => value + enhanceGain);
+      setReforgeStones((value) => value + reforgeGain);
+      setYuanbao((value) => value + yuanbaoGain);
+      if (gemDrop) {
+        setGemInventory((inventory) => addGemStack(inventory, gemDrop));
+        const gem = getGemDefinition(gemDrop.gemId, gemDrop.tier);
+        pushLog("掉落", `獲得${gem.tierLabel}${gem.name}`);
+      }
+      if (drillingStoneDrop) {
+        setDrillingStones((value) => value + 1);
+        pushLog("掉落", "獲得打孔石 ×1");
+      }
+      setRunKills((value) => value + 1);
+      setDailyKills((value) => value + 1);
+      const experienceGain = Math.round(
+        mapExperienceGain(currentMap, tier, level) *
+          (1 + characterStats.expBonus / 100),
+      );
+      grantExperience(experienceGain);
+      setRunGold((value) => value + goldGain);
+      setRunEnhance((value) => value + enhanceGain);
+      setRunReforge((value) => value + reforgeGain);
+      if (currentWaveElite) setRunElites((value) => value + 1);
+      if (currentWaveGuardian || currentWaveBoss)
+        setRunGuardians((value) => value + 1);
+      setResourceDrop({
+        key: Date.now(),
+        gold: goldGain,
+        enhance: enhanceGain,
+        reforge: reforgeGain,
+        yuanbao: yuanbaoGain,
+      });
+      setPlayerHp(100);
+      enemyAttackCount = 0;
+      setCombatStatuses([]);
+      defenseBreakRemaining = 0;
+      markedRemaining = 0;
+      markExplosionPending = false;
+      fissureRemaining = 0;
+      fissureDetonationPending = false;
+      burningUntil = 0;
+      setBloodShieldReady(true);
+      setRound(1);
+      revealBattleDrop(tier, wave);
+      pushLog(
+        "戰鬥",
+        `第 ${wave} 層擊敗${enemy}，金幣 +${goldGain}${enhanceGain ? `・強化石 +${enhanceGain}` : ""}${reforgeGain ? `・洗鍊石 +${reforgeGain}` : ""}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
+      );
+      pushLog("成長", `獲得 ${experienceGain.toLocaleString()} 經驗`);
+      if (wave >= MAP_FLOORS) {
+        setMapBestFloors((old) => ({ ...old, [mapId]: MAP_FLOORS }));
+        setTimeout(() => finishRun("complete", MAP_FLOORS), 250);
+        return 100;
+      }
+      const nextWave = wave + 1;
+      const nextEnemy = nextWave >= MAP_FLOORS
+        ? currentMap.monsters[4]
+        : nextWave % 10 === 0 || nextWave % 5 === 0
+          ? currentMap.monsters[4]
+          : currentMap.monsters[Math.floor(Math.random() * 4)];
+      setHighestFloor((value) => Math.max(value, nextWave));
+      setMapBestFloors((old) => ({
+        ...old,
+        [mapId]: Math.max(old[mapId] ?? 0, nextWave),
+      }));
+      const advanceToNextEnemy = () => {
+        setWave(nextWave);
+        setEnemyName(baseMonsterName(nextEnemy));
+        if (executionFinisher) setEnemyHp(100);
+        towerDeathPendingRef.current = false;
+        if (currentWaveGuardian) setTimeout(offerBlessings, 450);
+      };
+      if (executionFinisher) {
+        towerDeathPendingRef.current = true;
+        window.setTimeout(advanceToNextEnemy, 1_050);
+        return 0;
+      }
+      advanceToNextEnemy();
+      return 100;
+    };
     const timer = setInterval(
       () => {
         if (towerDeathPendingRef.current) return;
+        if (towerVictoryGuardRef.current.has(targetKey)) return;
         const battleKey = `${mapId}:${wave}`;
         if (bloodRoarStateRef.current.battleKey !== battleKey) {
           bloodRoarStateRef.current = { battleKey, remaining: 0, used: false };
@@ -4003,9 +4141,11 @@ function Game({
           const burnLevel = skills.find((skill) => skill.name === "霜火新星")?.level ?? 1;
           const burnTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
           const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName);
-          setEnemyHp((health) => settleCombatHealth(
-            health, maximumHealth, maximumHealth * (1.5 + burnLevel * 0.5) / 100,
-          ).remainingPercent);
+          setEnemyHp((health) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
+            const settled = settleCombatHealth(health, maximumHealth, maximumHealth * (1.5 + burnLevel * 0.5) / 100);
+            return settled.defeated ? resolveTowerKill(false, false, burnTier) : settled.remainingPercent;
+          });
         }
         const dynamicDamageReduction = characterStats.damageReduction +
           (hasPerk("special-ashguard") && playerHp < 40 ? 8 : 0);
@@ -4511,6 +4651,7 @@ function Game({
           setCausePrompt(attackDebugParts);
           const currentAction = ++actionSequence;
           setEnemyHp((h) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
             const execution =
               hasBlessing("execute") &&
               h <= (blessingUpgraded("execute") ? 35 : 30);
@@ -4663,140 +4804,7 @@ function Game({
               combatPerksRef.current.nextAttackCritDamage = 40;
               showCombatStatus({ name: "完美獵殺・下一擊暴傷 +40%", target: "player", remaining: 1, unit: "次", tone: "gold" });
             }
-            if (healthSettlement.defeated) {
-              const executionFinisher = triggered?.name === "處決";
-              if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
-              combatPerksRef.current.firstEnemyAttackReady = true;
-              combatPerksRef.current.revengeStacks = 0;
-              combatPerksRef.current.ironWallBonus = 0;
-              combatPerksRef.current.arcaneEchoReady = false;
-              combatPerksRef.current.arcaneStacks = 0;
-              if (markExplosionWasActive && hasPerk("skill-ranger-queen-contract")) {
-                nextEnemyMarkStacksRef.current = 2;
-              }
-              // A mark belongs to its current target. Clear an un detonated
-              // mark immediately when that target dies; an explosion already
-              // in progress is allowed to finish independently.
-              setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
-              setEnemyDefeated(true);
-              window.setTimeout(() => setEnemyDefeated(false), executionFinisher ? 980 : 320);
-              setEnemyHitFeedback(null);
-              const enemy = baseMonsterName(enemyName);
-              const goldRules = balanceConfig.economy.gold;
-              const goldTier = currentWaveBoss ? "boss" : currentWaveGuardian ? "guardian" : currentWaveElite ? "elite" : "normal";
-              const goldBase = goldRules.monsterDropBaseByMap[mapId - 1] ?? goldRules.monsterDropBaseByMap[0];
-              const goldGain = Math.round(
-                goldBase * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
-                goldRules.tierMultiplier[goldTier] *
-                (hasBlessing("stat-gold") ? 1.2 : 1) *
-                (1 + (characterStats.goldBonus / 100) * goldRules.goldAffixEffectiveness),
-              );
-              const enhanceGain =
-                Math.random() <
-                enhancementStoneDropChance(
-                  currentWaveBoss || currentWaveGuardian ? 1 : currentWaveElite ? 0.3 : 0.06,
-                  characterStats.resourceDrop + characterStats.enhanceDrop,
-                  hasBlessing("stat-enhance") ? 0.1 : 0,
-                )
-                  ? currentWaveBoss || currentWaveGuardian
-                    ? 1 + Math.floor(Math.random() * 3)
-                    : 1
-                  : 0;
-              const reforgeGain =
-                Math.random() <
-                Math.min(
-                  1,
-                  (currentWaveBoss ? 0.35 : currentWaveGuardian ? 0.15 : currentWaveElite ? 0.04 : 0.008) +
-                    (characterStats.resourceDrop + characterStats.reforgeDrop) / 100 +
-                    (hasBlessing("stat-reforge") ? 0.05 : 0),
-                )
-                  ? 1
-                  : 0;
-              const yuanbaoGain =
-                Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
-              const gemDrop = rollGemDrop(mapId);
-              const drillingStoneDrop = rollDrillingStoneDrop();
-              setGold((value) => value + goldGain);
-              setEnhanceStones((value) => value + enhanceGain);
-              setReforgeStones((value) => value + reforgeGain);
-              setYuanbao((value) => value + yuanbaoGain);
-              if (gemDrop) {
-                setGemInventory((inventory) => addGemStack(inventory, gemDrop));
-                const gem = getGemDefinition(gemDrop.gemId, gemDrop.tier);
-                pushLog("掉落", `獲得${gem.tierLabel}${gem.name}`);
-              }
-              if (drillingStoneDrop) {
-                setDrillingStones((value) => value + 1);
-                pushLog("掉落", "獲得打孔石 ×1");
-              }
-              setRunKills((value) => value + 1);
-              setDailyKills((value) => value + 1);
-              const experienceGain = Math.round(
-                mapExperienceGain(currentMap, tier, level) *
-                  (1 + characterStats.expBonus / 100),
-              );
-              grantExperience(experienceGain);
-              setRunGold((value) => value + goldGain);
-              setRunEnhance((value) => value + enhanceGain);
-              setRunReforge((value) => value + reforgeGain);
-              if (currentWaveElite) setRunElites((value) => value + 1);
-              if (currentWaveGuardian || currentWaveBoss)
-                setRunGuardians((value) => value + 1);
-              setResourceDrop({
-                key: Date.now(),
-                gold: goldGain,
-                enhance: enhanceGain,
-                reforge: reforgeGain,
-                yuanbao: yuanbaoGain,
-              });
-              setPlayerHp(100);
-              enemyAttackCount = 0;
-              setCombatStatuses([]);
-              defenseBreakRemaining = 0;
-              markedRemaining = 0;
-              markExplosionPending = false;
-              fissureRemaining = 0;
-              fissureDetonationPending = false;
-              burningUntil = 0;
-              setBloodShieldReady(true);
-              setRound(1);
-              revealBattleDrop(tier, wave);
-              pushLog(
-                "戰鬥",
-                `第 ${wave} 層擊敗${enemy}，金幣 +${goldGain}${enhanceGain ? `・強化石 +${enhanceGain}` : ""}${reforgeGain ? `・洗鍊石 +${reforgeGain}` : ""}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
-              );
-              pushLog("成長", `獲得 ${experienceGain.toLocaleString()} 經驗`);
-              if (wave >= MAP_FLOORS) {
-                setMapBestFloors((old) => ({ ...old, [mapId]: MAP_FLOORS }));
-                setTimeout(() => finishRun("complete", MAP_FLOORS), 250);
-                return 100;
-              }
-              const nextWave = wave + 1;
-              const nextEnemy = nextWave >= MAP_FLOORS
-                ? currentMap.monsters[4]
-                : nextWave % 10 === 0 || nextWave % 5 === 0
-                  ? currentMap.monsters[4]
-                  : currentMap.monsters[Math.floor(Math.random() * 4)];
-              setHighestFloor((value) => Math.max(value, nextWave));
-              setMapBestFloors((old) => ({
-                ...old,
-                [mapId]: Math.max(old[mapId] ?? 0, nextWave),
-              }));
-              const advanceToNextEnemy = () => {
-                setWave(nextWave);
-                setEnemyName(baseMonsterName(nextEnemy));
-                if (executionFinisher) setEnemyHp(100);
-                towerDeathPendingRef.current = false;
-                if (currentWaveGuardian) setTimeout(offerBlessings, 450);
-              };
-              if (executionFinisher) {
-                towerDeathPendingRef.current = true;
-                window.setTimeout(advanceToNextEnemy, 1_050);
-                return 0;
-              }
-              advanceToNextEnemy();
-              return 100;
-            }
+            if (healthSettlement.defeated) return resolveTowerKill(triggered?.name === "處決", markExplosionWasActive, tier);
             if (!monsterActs) return healthSettlement.remainingPercent;
             setPlayerHp((playerHealth) => {
               const shieldWasActive = magicShieldCooldown > 0;
@@ -5470,9 +5478,71 @@ function Game({
     let warriorBossAttackCount = 0;
     let bossPlayerAttackCount = 0;
     const hasPerk = (id: string) => hasCatalogItem(equippedGearRef.current, id);
+    const resolveBossVictory = (source: "attack" | "burn") => {
+      if (bossRoundEndedRef.current) return 0;
+      bossRoundEndedRef.current = true;
+      worldBossDeadlineRef.current = null;
+      abyssBossSequenceRef.current += 1;
+      bossCinematicLockRef.current = false;
+      setAbyssBossEffect(null);
+      setAbyssImpactPulse(false);
+      setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setBossOutcome("win");
+      setBossPlayerHp(100);
+      const report = [
+        `每秒攻擊 ${(baseCharacterStats.speed / 100).toFixed(2)} 次，你取得先手（遠征祝福未生效）。`,
+        source === "burn" ? "灼燒造成最後一擊。" : "技能與裝備造成最後一擊。",
+        `戰鬥勝利｜${activeBossBattle.name}倒下。`,
+      ];
+      setBattleReport(report);
+      if (activeBossBattle.mode === "personal") {
+        setBossTickets((value) => value - 1);
+        const bossParts = activeBossBattle.name.endsWith("・殘影");
+        const bossMapId = Math.max(
+          1,
+          Number(personalBosses.find((boss) => boss.name === activeBossBattle.name)?.id.split("-")[0] ?? 1),
+        );
+        const dropCount = Math.random() > 0.55 ? 2 : 1;
+        const bossDrops = Array.from({ length: dropCount }, (_, index) =>
+          rollCatalogDrop(
+            bossMapId,
+            bossParts ? "personal-shadow" : "personal-true",
+            playerClass,
+            index,
+          ) ?? createDrop(bossMapId, "首領", index, bossParts ? 3 : 4),
+        );
+        addLoot(
+          bossDrops,
+          `擊敗${activeBossBattle.name}`,
+        );
+        const reforgeGain =
+          (Number(bossMapId) * 2 - (bossParts ? 1 : 0)) * 4;
+        const yuanbaoGain =
+          Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
+        setReforgeStones((value) => value + reforgeGain);
+        setYuanbao((value) => value + yuanbaoGain);
+        setBattleReport((lines) => [
+          ...lines,
+          `獲得${bossDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : bossParts ? "史詩" : "傳奇"}裝備 ${dropCount} 件・洗鍊石 +${reforgeGain}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
+        ]);
+      } else {
+        const dropCount = 2;
+        const worldDrops = Array.from({ length: dropCount }, (_, index) =>
+          rollCatalogDrop(9, "world", playerClass, index) ?? createDrop(9, "首領", index, 4),
+        );
+        addLoot(worldDrops, `擊敗${activeBossBattle.name}`);
+        setBattleReport((lines) => [
+          ...lines,
+          `世界首領獎勵：${worldDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : "傳奇"}裝備 ${dropCount} 件`,
+        ]);
+      }
+      pushLog("首領", `擊敗 ${activeBossBattle.name}`);
+      bossEnemyHpRef.current = 0;
+      return 0;
+    };
     const timer = setInterval(
       () => {
-        if (bossCinematicLockRef.current) return;
+        if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
         playerClock += tickMs;
         bossClock += tickMs;
         const activeWorldBurn = worldBossBurnRef.current;
@@ -5482,16 +5552,26 @@ function Game({
           Date.now() >= activeWorldBurn.nextAt
         ) {
           activeWorldBurn.nextAt = Date.now() + 1_000;
-          const burnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
-          setBossEnemyHp((hp) => settleCombatHealth(hp, activeBossBattle.hp, burnDamage).remainingPercent);
-          setWorldDamage((value) => value + burnDamage);
-          setWorldRoundDamage((value) => value + burnDamage);
-          setLastBossDamage(burnDamage);
-          const burnKey = Date.now();
-          setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnDamage }]);
-          window.setTimeout(() => {
-            setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
-          }, 1_200);
+          const rawBurnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
+          const burnPreview = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, rawBurnDamage);
+          setBossEnemyHp((hp) => {
+            if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
+            const settled = settleCombatHealth(hp, activeBossBattle.hp, rawBurnDamage);
+            if (settled.defeated) return resolveBossVictory("burn");
+            bossEnemyHpRef.current = settled.remainingPercent;
+            return settled.remainingPercent;
+          });
+          if (burnPreview.actualDamage > 0) {
+            setWorldDamage((value) => value + burnPreview.actualDamage);
+            setWorldRoundDamage((value) => value + burnPreview.actualDamage);
+            setLastBossDamage(burnPreview.actualDamage);
+            const burnKey = Date.now();
+            setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnPreview.actualDamage }]);
+            window.setTimeout(() => {
+              setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
+            }, 1_200);
+          }
+          if (burnPreview.defeated) return;
         }
         const playerInterval = 100000 / Math.max(1, combatAttackSpeed);
         const bossInterval = 100000 / bossAttackSpeed;
@@ -5808,69 +5888,9 @@ function Game({
         if (bossActs && !abyssSpecialTriggered)
           setLastBossCounterDamage(bossEnemyHpRef.current <= bossHpLoss ? 0 : bossDamage);
         if (playerActs) setBossEnemyHp((hp) => {
+          if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
           const healthSettlement = settleCombatHealth(hp, activeBossBattle.hp, calculatedPlayerDamage);
-          if (healthSettlement.defeated) {
-            if (bossRoundEndedRef.current) return hp;
-            bossRoundEndedRef.current = true;
-            worldBossDeadlineRef.current = null;
-            abyssBossSequenceRef.current += 1;
-            bossCinematicLockRef.current = false;
-            setAbyssBossEffect(null);
-            setAbyssImpactPulse(false);
-            setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
-            setBossOutcome("win");
-            setBossPlayerHp(100);
-            const report = [
-              `每秒攻擊 ${(baseCharacterStats.speed / 100).toFixed(2)} 次，你取得先手（遠征祝福未生效）。`,
-              `技能與裝備造成最後一擊。`,
-              `戰鬥勝利｜${activeBossBattle.name}倒下。`,
-            ];
-            setBattleReport(report);
-            if (activeBossBattle.mode === "personal") {
-              setBossTickets((value) => value - 1);
-              const bossParts = activeBossBattle.name.endsWith("・殘影");
-              const bossMapId = Math.max(
-                1,
-                Number(personalBosses.find((boss) => boss.name === activeBossBattle.name)?.id.split("-")[0] ?? 1),
-              );
-              const dropCount = Math.random() > 0.55 ? 2 : 1;
-              const bossDrops = Array.from({ length: dropCount }, (_, index) =>
-                rollCatalogDrop(
-                  bossMapId,
-                  bossParts ? "personal-shadow" : "personal-true",
-                  playerClass,
-                  index,
-                ) ?? createDrop(bossMapId, "首領", index, bossParts ? 3 : 4),
-              );
-              addLoot(
-                bossDrops,
-                `擊敗${activeBossBattle.name}`,
-              );
-              const reforgeGain =
-                (Number(bossMapId) * 2 - (bossParts ? 1 : 0)) * 4;
-              const yuanbaoGain =
-                Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
-              setReforgeStones((value) => value + reforgeGain);
-              setYuanbao((value) => value + yuanbaoGain);
-              setBattleReport((lines) => [
-                ...lines,
-                `獲得${bossDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : bossParts ? "史詩" : "傳奇"}裝備 ${dropCount} 件・洗鍊石 +${reforgeGain}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
-              ]);
-            } else {
-              const dropCount = 2;
-              const worldDrops = Array.from({ length: dropCount }, (_, index) =>
-                rollCatalogDrop(9, "world", playerClass, index) ?? createDrop(9, "首領", index, 4),
-              );
-              addLoot(worldDrops, `擊敗${activeBossBattle.name}`);
-              setBattleReport((lines) => [
-                ...lines,
-                `世界首領獎勵：${worldDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : "傳奇"}裝備 ${dropCount} 件`,
-              ]);
-            }
-            pushLog("首領", `擊敗 ${activeBossBattle.name}`);
-            bossEnemyHpRef.current = 0;
-            return 0;
-          }
+          if (healthSettlement.defeated) return resolveBossVictory("attack");
           const nextHp = healthSettlement.remainingPercent;
           bossEnemyHpRef.current = nextHp;
           return nextHp;
