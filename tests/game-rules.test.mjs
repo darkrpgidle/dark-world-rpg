@@ -835,19 +835,11 @@ test("awards online yuanbao every ten minutes", () => {
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
-test("awards the 500-kill daily target exactly once per Taipei day", () => {
-  assert.match(page, /const \[dailyRewardClaimed, setDailyRewardClaimed\] = useState\(false\)/);
-  assert.match(page, /if \(dailyKills < 500\)/);
-  assert.match(page, /if \(dailyRewardClaimed\) return toast\.info\("今日獎勵已領取"\)/);
-  assert.match(page, /setGold\(\(value\) => value \+ 5000\)/);
-  assert.match(page, /setEnhanceStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setReforgeStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setYuanbao\(\(value\) => value \+ 20\)/);
+test("claims the 500-kill daily target through the save service", () => {
+  const reward = balanceConfig.economy.dailyHuntReward;
+  assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });
+  assert.match(page, /action: "claim_daily", dailyDate, dailyKills/);
   assert.match(page, /setDailyRewardClaimed\(true\)/);
-  assert.match(page, /timeZone: "Asia\/Taipei"/);
-  assert.match(page, /const savedForToday = save\.dailyDate === today/);
-  assert.match(page, /disabled=\{dailyKills < 500 \|\| dailyRewardClaimed\}/);
-  assert.match(page, /dailyRewardClaimed,/);
 });
 
 test("starts new accounts with zero yuanbao", () => {
