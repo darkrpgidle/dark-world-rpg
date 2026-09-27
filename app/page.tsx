@@ -128,10 +128,13 @@ import {
 } from "./gem-system";
 import { SkillEffectCanvas } from "./skill-effect-canvas";
 import { SkillReworkPanel } from "./skill-rework-panel";
-import { createSkillBuild, restoreSkillBuild, type SkillBuild } from "./skill-rework";
+import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoints, type SkillBuild } from "./skill-rework";
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
-import { finishLiveBasicAttack, prepareLiveBasicAttack, syncLiveBasicBattle, type LiveBasicBattle } from "./skill-live-basic";
+import { advanceLiveCombat, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
 import { settleCombatHealth } from "./skill-health-settlement";
+import { warriorPassiveDefenses } from "./skill-warrior-passives";
+import { rangerPassiveStats } from "./skill-ranger-passives";
+import { magePassiveStats } from "./skill-mage-passives";
 import { createCombatVictoryGuard } from "./skill-combat-victory";
 import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import type { SkillSaveAction } from "./skill-save-policy";
@@ -2239,18 +2242,15 @@ function Game({
     1: [],
     2: [],
   });
-  const [skillPoints, setSkillPoints] = useState(1);
+  const [skillPoints, setSkillPoints] = useState(0);
   const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
-  const liveBasicRef = useRef<LiveBasicBattle | null>(null);
+  const liveCombatRef = useRef<LiveCombatBattle | null>(null);
   const [skillAscensions, setSkillAscensions] = useState<SkillAscensionState>(createSkillAscensions);
   const [skillActionBusy, setSkillActionBusy] = useState(false);
   const skillActionInFlightRef = useRef(false);
   const skillActionRetryRef = useRef<{ key: string; id: string } | null>(null);
   const [skills, setSkills] = useState(() =>
-    skillsByClass[playerClass].map((skill, index) => ({
-      ...skill,
-      level: index === 0 ? 1 : 0,
-    })),
+    skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })),
   );
   const [bossTickets, setBossTickets] = useState(10);
   const [worldAttempts, setWorldAttempts] = useState(3);
@@ -2530,9 +2530,13 @@ function Game({
   const activeSetCount = equippedSetPieceCount(equippedGear);
   const activeSetAttackMultiplier = equippedSetAttackMultiplier(equippedGear);
   const activeSetAttackBonusPct = Math.round((activeSetAttackMultiplier - 1) * 100);
+  const skillHealthBonus = playerClass === "戰士"
+    ? warriorPassiveDefenses(skillReworkBuild, playerHp).maxHealthBonusPercent
+    : playerClass === "法師" ? magePassiveStats(skillReworkBuild).maxHealthBonusPercent : 0;
+  const rangerBaseStats = playerClass === "遊俠" ? rangerPassiveStats(skillReworkBuild) : null;
   const characterStats = {
     ...baseCharacterStats,
-    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1)),
+    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1) * (1 + skillHealthBonus / 100)),
     attack: Math.round(
       baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) *
       (hasBlessing("stat-attack") ? 1.15 : 1) *
@@ -2545,7 +2549,7 @@ function Game({
     ),
     speed: baseCharacterStats.speed + rebirthTalents.combatAttackSpeed * 5 + (hasBlessing("stat-speed") ? 15 : 0),
     hit: baseCharacterStats.hit + (hasBlessing("stat-hit") ? 10 : 0),
-    crit: baseCharacterStats.crit + rebirthTalents.combatCritRate * 4 + (hasBlessing("stat-crit") ? (blessingUpgraded("stat-crit") ? 18 : 12) : 0),
+    crit: baseCharacterStats.crit + rebirthTalents.combatCritRate * 4 + (hasBlessing("stat-crit") ? (blessingUpgraded("stat-crit") ? 18 : 12) : 0) + (rangerBaseStats?.criticalChancePoints ?? 0),
     critDamage: baseCharacterStats.critDamage + rebirthTalents.combatCritDamage * 10,
     lifesteal:
       baseCharacterStats.lifesteal +
@@ -2561,7 +2565,8 @@ function Game({
     skillDamage: baseCharacterStats.skillDamage + rebirthTalents.growthSkill * 5,
   };
   const combatAttackSpeed =
-    characterStats.speed +
+    characterStats.speed * (1 + ((rangerBaseStats?.attackSpeedBonusPercent ?? 0) +
+      (liveCombatRef.current ? liveCombatSpeedBonus(liveCombatRef.current) : 0)) / 100) +
     (hasBlessing("rapid") ? (blessingUpgraded("rapid") ? 35 : 20) : 0);
   const currentWaveBoss = wave === MAP_FLOORS;
   const currentWaveGuardian = wave % 10 === 0 && !currentWaveBoss;
@@ -3456,7 +3461,7 @@ function Game({
         }
         if (levelUps > 0) {
           setLevel(nextLevel);
-          setSkillPoints((points) => points + levelUps);
+          setSkillPoints(earnedSkillPoints(nextLevel));
           pushLog("成長", `經驗累積完成，角色提升至 Lv.${nextLevel}`);
         }
         return nextLevel >= 100 ? 0 : remaining;
@@ -3963,8 +3968,8 @@ function Game({
     setUnseenItemIds([]);
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
-    setSkills(skillsByClass[playerClass].map((skill, index) => ({ ...skill, level: index === 0 ? 1 : 0 })));
-    setSkillPoints(1);
+    setSkills(skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })));
+    setSkillPoints(0);
     setCompletedRuns(0);
     setStoredSeconds(0);
     setBlessings([]);
@@ -4047,7 +4052,8 @@ function Game({
       reworkReady: false,
     });
     let actionSequence = 0;
-    liveBasicRef.current = syncLiveBasicBattle(liveBasicRef.current, `tower:${runStartedAt}:${mapId}`, skillReworkBuild, playerClass);
+    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, `tower:${runStartedAt}:${mapId}`,
+      `${runStartedAt}:${mapId}:${wave}`, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const monsterAttackSpeed = monsterProfile(currentEnemyBaseName).speed * 100;
     let playerClock = 0;
@@ -4211,6 +4217,17 @@ function Game({
       () => {
         if (towerDeathPendingRef.current) return;
         if (towerVictoryGuardRef.current.has(targetKey)) return;
+        const tickDamage = liveCombatRef.current
+          ? advanceLiveCombat(liveCombatRef.current, Date.now()).reduce((sum, damage) => sum + damage, 0) : 0;
+        if (tickDamage > 0) {
+          const tickTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
+          const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName);
+          setEnemyHp((health) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+            const settled = settleCombatHealth(health, maximum, tickDamage);
+            return settled.defeated ? resolveTowerKill(false, false, tickTier) : settled.remainingPercent;
+          });
+        }
         const battleKey = `${mapId}:${wave}`;
         if (bloodRoarStateRef.current.battleKey !== battleKey) {
           bloodRoarStateRef.current = { battleKey, remaining: 0, used: false };
@@ -4313,7 +4330,7 @@ function Game({
                     (1 - Math.min(balanceConfig.progression.damageReductionCap, dynamicDamageReduction) / 100),
                 ),
               );
-              if (Math.random() * 100 < effectiveDodge) {
+              if (!liveCombatRef.current && Math.random() * 100 < effectiveDodge) {
                 if (hasPerk("special-shadowwalker")) {
                   combatPerksRef.current.dodgeSpeedAttacks = 3;
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
@@ -4354,6 +4371,27 @@ function Game({
                 monsterDamage = Math.max(1, Math.round(monsterDamage * (1 - reduction)));
                 setBloodShieldReady(false);
                 setCausePrompt(`血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`);
+              }
+              if (liveCombatRef.current) {
+                const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
+                  healthPercent: playerHealth, maxHealth: characterStats.hp,
+                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                });
+                monsterDamage = liveDefense.damage;
+                if (liveDefense.counterDamagePercent > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  setEnemyHp((health) => {
+                    if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+                    const settled = settleCombatHealth(health, maximum, counter);
+                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                  });
+                }
+                if (liveDefense.blocked || liveDefense.dodged) {
+                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
+                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  return playerHealth;
+                }
               }
               const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
               const actualDamage = healthSettlement.actualDamage;
@@ -4413,12 +4451,15 @@ function Game({
           const setTriggered =
             activeSetCount >= SET_RESONANCE_ATTACKS &&
             playerAttackCount % SET_RESONANCE_ATTACKS === 0;
-          const liveBasic = liveBasicRef.current;
-          const liveBasicCast = playerActs && liveBasic ? prepareLiveBasicAttack(liveBasic) : null;
-          let triggered: Skill | null = liveBasicCast
-            ? { name: liveBasicCast.name, desc: "", level: liveBasicCast.rank, max: 5, cost: 0 } : null;
-          let triggeredMultiplier = liveBasicCast?.multiplier ?? 1;
-          let triggeredDefenseIgnore = liveBasicCast?.defenseIgnore ?? (defenseBreakRemaining > 0 ? 35 : 0);
+          const liveCombat = liveCombatRef.current;
+          const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
+            now: Date.now(), healthPercent: playerHp, attack: characterStats.attack,
+            hitChance: effectiveHit, criticalChance: characterStats.crit,
+            criticalDamage: characterStats.critDamage,
+          }) : null;
+          let triggered: Skill | null = null;
+          let triggeredMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
+          let triggeredDefenseIgnore = liveAction?.defenseIgnore ?? (defenseBreakRemaining > 0 ? 35 : 0);
           let frostfireDetonationDamage = 0;
           let meteorSecondTriggered = false;
           const bloodRoarWasActive = bloodRoarStateRef.current.remaining > 0;
@@ -4451,13 +4492,13 @@ function Game({
             if (markedRemaining > 0) markedRemaining -= 1;
             else if (markExplosionPending) markExplosionPending = false;
             const learned = skills.filter((skill) => skill.level > 0);
-            const hasSkill = (name: string) => name === liveBasic?.name ? undefined : learned.find((skill) => skill.name === name);
+            const hasSkill = (name: string) => liveCombat ? undefined : learned.find((skill) => skill.name === name);
             const executionThreshold = hasPerk("skill-warrior-executioner") ? 8 : 10;
             const executionSkill = playerClass === "戰士" && warriorAttackCount % executionThreshold === 0
               ? hasSkill("處決")
               : undefined;
             const executionReady = Boolean(executionSkill);
-            if (!liveBasicCast && (skillCooldown <= 0 || executionReady)) {
+            if (!liveCombat && (skillCooldown <= 0 || executionReady)) {
               const candidates = playerClass === "戰士"
                 ? [
                     ...(executionSkill ? [{ skill: executionSkill, chance: 1 }] : []),
@@ -4485,7 +4526,7 @@ function Game({
               const cooldownRange = playerClass === "戰士" ? 3 : playerClass === "遊俠" ? 6 : 4;
               skillCooldown = cooldownRange + Math.floor(Math.random() * 3);
             }
-            if (!liveBasicCast && triggered?.name === "裂地斬") {
+            if (triggered?.name === "裂地斬") {
               defenseBreakRemaining = 2 + Math.ceil(triggered.level / 2);
               triggeredDefenseIgnore = hasPerk("skill-warrior-titan-axe") ? 35 : 20 + triggered.level * 5;
               triggeredMultiplier = skillMultiplier(triggered.name, triggered.level);
@@ -4493,13 +4534,13 @@ function Game({
               fissureDetonationPending = false;
               showCombatStatus({ name: `破防 ${triggeredDefenseIgnore}%`, target: "enemy", remaining: defenseBreakRemaining + 1, unit: "攻擊", tone: "red" });
             }
-            if (!liveBasicCast && (triggered?.name === "處決" || triggered?.name === "穿雲箭" || triggered?.name === "霜火新星" || triggered?.name === "奧術回響" || triggered?.name === "隕星術")) triggeredMultiplier = skillMultiplier(triggered.name, triggered.level);
+            if (triggered?.name === "處決" || triggered?.name === "穿雲箭" || triggered?.name === "霜火新星" || triggered?.name === "奧術回響" || triggered?.name === "隕星術") triggeredMultiplier = skillMultiplier(triggered.name, triggered.level);
             if (triggered?.name === "致命標記") {
               markedRemaining = 5;
               markExplosionPending = true;
               showCombatStatus({ name: `致命標記 +${deadlyMarkBonusPct(triggered.level)}%／爆炸 ${Math.round(deadlyMarkExplosionMultiplier(triggered.level) * 100)}%`, target: "enemy", remaining: 6, unit: "攻擊", tone: "gold" });
             }
-            if (triggered?.name === "霜火新星" && !liveBasicCast) {
+            if (triggered?.name === "霜火新星") {
               const burnLevel = triggered.level;
               const burnDamagePerSecond = 1.5 + burnLevel * 0.5;
               if (hasPerk("skill-mage-polar-staff") && burningUntil > Date.now()) {
@@ -4553,7 +4594,7 @@ function Game({
           if (Math.random() < thirdChance) attacks++;
           const windVolleyTriggered = triggered?.name === "疾風連射";
           const hunterLevel = skills.find((skill) => skill.name === "獵手本能")?.level ?? 0;
-          const critical = Math.random() * 100 < Math.min(100, characterStats.crit);
+          const critical = liveAction?.critical ?? Math.random() * 100 < Math.min(100, characterStats.crit);
           const hunterChance = hasPerk("skill-ranger-hunter-eye") ? 0.2 : skillProcChance("獵手本能", hunterLevel);
           const hunterBonus = playerClass === "遊俠" && critical && Math.random() < hunterChance;
           if (hunterBonus && !windVolleyTriggered) attacks += 1;
@@ -4589,12 +4630,12 @@ function Game({
               }
             }
           }
-          if (triggered?.name === "穿雲箭" && !liveBasicCast) {
+          if (triggered?.name === "穿雲箭") {
             triggeredDefenseIgnore = hasPerk("skill-ranger-sky-piercer")
               ? 60
               : 20 + triggered.level * 5;
           }
-          const windCriticalMultiplier = windVolleyTriggered
+          const windCriticalMultiplier = liveAction ? 1 : windVolleyTriggered
             ? windVolleyCriticals.reduce<number>(
                 (total, isCritical) => total + (isCritical ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100 : 1),
                 0,
@@ -4602,7 +4643,7 @@ function Game({
             : critical
               ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100
               : 1;
-          const skillDamageTriggered = Boolean(triggered);
+          const skillDamageTriggered = Boolean(triggered || liveAction?.name);
           const blessingEchoMultiplier =
             triggered && hasBlessing("echo")
               ? blessingUpgraded("echo")
@@ -4644,7 +4685,7 @@ function Game({
             lowHealthDamage: characterStats.lowHealthDamage,
             lowHealthReduction: characterStats.lowHealthReduction,
             lowHealth: playerHp <= 35,
-            roll: Math.random(),
+            roll: liveAction ? 0 : Math.random(),
             monsterName: currentEnemyBaseName,
             playerDefense: characterStats.defense,
             playerAttack: offensiveAttack,
@@ -4686,7 +4727,7 @@ function Game({
               combatValues.playerDamage * 0.7 * (1 + characterStats.critDamage / 100),
             );
           }
-          const effectName = bloodRoarFinalAttack
+          const effectName = liveAction?.name ?? (bloodRoarFinalAttack
             ? "鮮血怒吼・血爆"
             : magicShieldExplosionWasActive
               ? "魔力護盾・爆炸"
@@ -4700,7 +4741,7 @@ function Game({
               ? "致命標記・爆炸"
             : triggered
               ? `${triggered.name}${echoMultiplier > 1 ? "・回響" : ""}`
-              : null;
+              : null);
           setComboCount(attacks);
           if (effectName) queueSkillVisual({ name: effectName, key: next });
           else setSkillEffect(null);
@@ -4735,8 +4776,13 @@ function Game({
             }, 750);
           }
           const hitRoll = Math.random() * 100;
-          if (playerActs && liveBasic) finishLiveBasicAttack(liveBasic, liveBasicCast, hitRoll <= effectiveHit, critical);
-          if (hitRoll > effectiveHit) {
+          if (liveAction && liveAction.damagePercent <= 0) {
+            setLastDamage(0);
+            setBattleHits([]);
+            setCausePrompt(liveAction.name ? `${liveAction.name}已施放` : "攻擊落空");
+            return next;
+          }
+          if (!liveAction && hitRoll > effectiveHit) {
             setLastDamage(0);
             setBattleHits([]);
             setCausePrompt(
@@ -4744,11 +4790,8 @@ function Game({
             );
             return next;
           }
-          if (liveBasicCast?.name === "霜火新星" && Math.random() * 100 < liveBasicCast.burnChance) {
-            burningUntil = Date.now() + 5_000;
-            nextBurnAt = Date.now() + 1_000;
-            showCombatStatus({ name: `灼燒 ${1.5 + liveBasicCast.rank * 0.5}%`, target: "enemy", remaining: 5, unit: "秒", tone: "red" });
-          }
+          for (const status of liveAction?.statuses ?? [])
+            showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
           const attackDebugParts = [
             effectName ? `特效：${effectName}` : "特效：普通攻擊",
             `命中：${effectiveHit.toFixed(0)}%`,
@@ -4935,7 +4978,7 @@ function Game({
                     (1 - Math.min(balanceConfig.progression.damageReductionCap, dynamicDamageReduction) / 100),
                 ),
               );
-              if (Math.random() * 100 < effectiveDodge) {
+              if (!liveCombatRef.current && Math.random() * 100 < effectiveDodge) {
                 if (hasPerk("special-shadowwalker")) {
                   combatPerksRef.current.dodgeSpeedAttacks = 3;
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
@@ -4981,6 +5024,27 @@ function Game({
                 setCausePrompt(
                   `血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`,
                 );
+              }
+              if (liveCombatRef.current) {
+                const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
+                  healthPercent: playerHealth, maxHealth: characterStats.hp,
+                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                });
+                monsterDamage = liveDefense.damage;
+                if (liveDefense.counterDamagePercent > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  setEnemyHp((health) => {
+                    if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+                    const settled = settleCombatHealth(health, maximum, counter);
+                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                  });
+                }
+                if (liveDefense.blocked || liveDefense.dodged) {
+                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
+                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  return playerHealth;
+                }
               }
               const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
               const actualDamage = healthSettlement.actualDamage;
@@ -5039,6 +5103,7 @@ function Game({
     combatAttackSpeed,
     skills,
     skillReworkBuild,
+    skillAscensions,
     blessings,
     currentWaveElite,
     currentWaveGuardian,
@@ -5582,7 +5647,8 @@ function Game({
       reworkReady: false,
     });
     let actionSequence = 0;
-    liveBasicRef.current = syncLiveBasicBattle(liveBasicRef.current, activeBossBattle, skillReworkBuild, playerClass);
+    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, activeBossBattle,
+      activeBossBattle.name, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const bossMonsterName = baseMonsterName(activeBossBattle.name);
     // 個人首領採固定節奏，避免沿用各怪物原始攻速而造成首領間的壓力落差。
@@ -5661,6 +5727,23 @@ function Game({
     const timer = setInterval(
       () => {
         if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
+        const liveTickDamage = liveCombatRef.current
+          ? advanceLiveCombat(liveCombatRef.current, Date.now()).reduce((sum, damage) => sum + damage, 0) : 0;
+        if (liveTickDamage > 0) {
+          const preview = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, liveTickDamage);
+          setBossEnemyHp((hp) => {
+            if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
+            const settled = settleCombatHealth(hp, activeBossBattle.hp, liveTickDamage);
+            if (settled.defeated) return resolveBossVictory("burn");
+            bossEnemyHpRef.current = settled.remainingPercent;
+            return settled.remainingPercent;
+          });
+          if (activeBossBattle.mode === "world" && preview.actualDamage > 0) {
+            setWorldDamage((value) => value + preview.actualDamage);
+            setWorldRoundDamage((value) => value + preview.actualDamage);
+          }
+          setLastBossDamage(preview.actualDamage);
+        }
         playerClock += tickMs;
         bossClock += tickMs;
         const activeWorldBurn = worldBossBurnRef.current;
@@ -5706,13 +5789,19 @@ function Game({
         setBattlePulse((value) => value + 1);
         setEnemyHitFeedback(null);
         setPlayerHitFeedback(null);
-        const liveBasic = liveBasicRef.current;
-        const liveBasicCast = playerActs && liveBasic ? prepareLiveBasicAttack(liveBasic) : null;
-        let bossSkillMultiplier = liveBasicCast?.multiplier ?? 1;
-        let bossSkill: Skill | null = liveBasicCast
-          ? { name: liveBasicCast.name, desc: "", level: liveBasicCast.rank, max: 5, cost: 0 } : null;
-        let bossDefenseIgnore = (hasPerk("special-blackfang") ? 8 : 0) + (liveBasicCast?.defenseIgnore ?? 0);
-        if (liveBasicCast) queueSkillVisual({ name: liveBasicCast.name, key: next });
+        const liveCombat = liveCombatRef.current;
+        const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
+          now: next, healthPercent: bossPlayerHpRef.current, attack: characterStats.attack,
+          hitChance: hitChanceFromRatings(characterStats.hit,
+            20 + activeBossBattle.level * balanceConfig.combat.evasionModel.bossEvasionPerLevel),
+          criticalChance: characterStats.crit,
+          criticalDamage: characterStats.critDamage,
+        }) : null;
+        let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
+        let bossSkill: Skill | null = liveAction?.name
+          ? { name: liveAction.name, desc: "", level: skillReworkBuild.ranks[liveAction.name] ?? 1, max: 5, cost: 0 } : null;
+        let bossDefenseIgnore = (hasPerk("special-blackfang") ? 8 : 0) + (liveAction?.defenseIgnore ?? 0);
+        if (liveAction?.name) queueSkillVisual({ name: liveAction.name, key: next });
         let bossGuaranteedCritical = false;
         let bossCritDamageBonus = 0;
         let bossExecutionDamageMultiplier = 1;
@@ -5739,13 +5828,13 @@ function Game({
           }
           if (bossSkillCooldown > 0) bossSkillCooldown -= 1;
           const learned = skills.filter((skill) => skill.level > 0);
-          const hasSkill = (name: string) => name === liveBasic?.name ? undefined : learned.find((skill) => skill.name === name);
+          const hasSkill = (name: string) => liveCombat ? undefined : learned.find((skill) => skill.name === name);
           const executionThreshold = hasPerk("skill-warrior-executioner") ? 8 : 10;
           const executionSkill = playerClass === "戰士" && warriorBossAttackCount % executionThreshold === 0
             ? hasSkill("處決")
             : undefined;
           const executionReady = Boolean(executionSkill);
-          if (!liveBasicCast && (bossSkillCooldown <= 0 || executionReady)) {
+          if (!liveCombat && (bossSkillCooldown <= 0 || executionReady)) {
             const candidates = playerClass === "戰士"
               ? [
                   ...(executionSkill ? [{ skill: executionSkill, chance: 1 }] : []),
@@ -5898,8 +5987,8 @@ function Game({
           playerLevel: level,
           bossLevel: activeBossBattle.level,
           monsterName: bossMonsterName,
-          roll: Math.random(),
-          attackRoll: Math.random(),
+          roll: liveAction ? 1 : Math.random(),
+          attackRoll: liveAction ? 0 : Math.random(),
           counterRoll: Math.random(),
           playerDamageMultiplier:
             bossSkillMultiplier *
@@ -5920,15 +6009,9 @@ function Game({
           monsterDefense: bossBaseline.monsterDefense,
           monsterMultiplier: activeBossBattle.multiplier,
         });
-        if (playerActs && liveBasic) finishLiveBasicAttack(liveBasic, liveBasicCast, bossValues.playerDamage > 0);
-        if (playerActs && bossValues.playerDamage > 0 && liveBasicCast?.name === "霜火新星" &&
-            activeBossBattle.mode === "world" && Math.random() * 100 < liveBasicCast.burnChance) {
-          worldBossBurnRef.current = {
-            until: next + 5_000, nextAt: next + 1_000,
-            damagePerSecond: Math.max(1, Math.round(characterStats.attack * 0.3 * (1 + characterStats.skillDamage / 100) * (1 + characterStats.bossDamage / 100))),
-          };
-          showCombatStatus({ name: "灼燒・魔法傷害", target: "enemy", remaining: 5, unit: "秒", tone: "red" });
-        }
+        if (liveAction?.damagePercent === 0) bossValues.playerDamage = 0;
+        for (const status of liveAction?.statuses ?? [])
+          showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
         const bossElementalDamage = playerActs && activeSetCount >= 6
           ? bossValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100 : 0;
         const bossResonanceDamage = playerActs && setResonanceTriggered
@@ -5960,10 +6043,31 @@ function Game({
         const calculatedBossDamage = bossActs
           ? Math.round(bossValues.counterDamage * (abyssSpecialReady ? 1.6 : 1))
           : 0;
-        const bossDamage = Math.min(
+        let bossDamage = Math.min(
           healthFromPercent(bossPlayerHpRef.current, characterStats.hp),
           calculatedBossDamage,
         );
+        if (bossActs && liveCombatRef.current && !bossHealthSettlement.defeated) {
+          const defense = resolveLiveEnemyAttack(liveCombatRef.current, {
+            healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,
+          });
+          bossDamage = defense.damage;
+          if (defense.counterDamagePercent > 0) {
+            const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100);
+            setBossEnemyHp((hp) => {
+              if (bossRoundEndedRef.current) return bossEnemyHpRef.current;
+              const settled = settleCombatHealth(hp, activeBossBattle.hp, counter);
+              if (settled.defeated) return resolveBossVictory("attack");
+              bossEnemyHpRef.current = settled.remainingPercent;
+              return settled.remainingPercent;
+            });
+            if (activeBossBattle.mode === "world") {
+              const actual = settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, counter).actualDamage;
+              setWorldDamage((value) => value + actual);
+              setWorldRoundDamage((value) => value + actual);
+            }
+          }
+        }
         if (playerActs && bossMarkExplosionWasActive) {
           queueSkillVisual({ name: "致命標記・爆炸", key: next });
           setDeadlyMarkEffect((current) => current ? { ...current, detonationKey: next } : current);
@@ -6126,6 +6230,7 @@ function Game({
     playerClass,
     skills,
     skillReworkBuild,
+    skillAscensions,
   ]);
 
   const leaveBossBattle = () => {
@@ -8085,10 +8190,10 @@ function Game({
             <div className="page-section">
               <PageTitle
                 title={`${playerClass}技能`}
-                sub="升級技能會提高技能效果；只有直接增加角色面板數值的技能會反映在戰力。"
+                sub="升級並配置新版技能；已學被動自動生效。"
               >
                 <span className="skill-points">
-                  <Sparkles /> {skillPoints} 技能點
+                  <Sparkles /> {earnedSkillPoints(level) - spentSkillPoints(skillReworkBuild)} 技能點
                 </span>
               </PageTitle>
               <SkillReworkPanel
@@ -8102,101 +8207,6 @@ function Game({
                 onConfirmAscensions={() => { void runSkillAction({ kind: "confirm_ascensions" }); }}
                 busy={skillActionBusy}
               />
-              <h3>目前戰鬥使用的技能</h3>
-              <SkillGrowthTable skills={skills} />
-              <div className="skills-grid">
-                {skills.map((skill, i) => (
-                  (() => {
-                    const isUltimate = i === 3;
-                    const isUltimateLocked = isUltimate && level < 10;
-                    return (
-                  <Panel
-                    key={skill.name}
-                    className={`skill-card ${skill.level === 0 || isUltimateLocked ? "locked" : ""}`}
-                  >
-                    <div className="skill-icon">
-                      {i === 3 ? <Crown /> : <WandSparkles />}
-                    </div>
-                    <div>
-                      <small>
-                        {isUltimate ? "奧義" : i === 2 ? "被動" : "主動技能"}
-                      </small>
-                      <h3>{skill.name}</h3>
-                      <p>
-                        {skillValue(skill.name, skill.level).metric}：
-                        {skillValue(skill.name, skill.level).current}
-                      </p>
-                      {isUltimateLocked && <p>角色達到 Lv.10 後解鎖</p>}
-                      <div className="skill-level">
-                        <Meter value={(skill.level / skill.max) * 100} />
-                        <span>
-                          Lv.{skill.level} / {skill.max}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      className="btn btn-ghost"
-                      disabled={
-                        skillPoints < skill.cost ||
-                        skill.level >= skill.max ||
-                        isUltimateLocked
-                      }
-                      onClick={() => {
-                        setSkillPoints((v) => v - skill.cost);
-                        setSkills((old) =>
-                          old.map((s, idx) =>
-                            idx === i ? { ...s, level: s.level + 1 } : s,
-                          ),
-                        );
-                        pushLog(
-                          "技能",
-                          `${skill.name}提升至 Lv.${skill.level + 1}`,
-                        );
-                        toast.success(`${skill.name}升級`, {
-                          description: "技能效果已提升",
-                        });
-                      }}
-                    >
-                      {isUltimateLocked
-                        ? "Lv.10 解鎖"
-                        : skill.level === 0
-                          ? "解鎖"
-                          : "升級"} · {skill.cost} 點
-                    </button>
-                  </Panel>
-                    );
-                  })()
-                ))}
-              </div>
-              <Panel className="build-note">
-                <div>
-                  <BookOpen />
-                  <span>
-                    <b>
-                      推薦流派：
-                      {playerClass === "戰士"
-                        ? "鮮血處決"
-                        : playerClass === "遊俠"
-                          ? "疾風暴擊"
-                          : "霜火回響"}
-                    </b>
-                    <small>
-                      只有直接增加生命、攻擊、防禦等面板數值的技能會反映在戰力；傷害與觸發型技能不計入戰力。
-                    </small>
-                  </span>
-                </div>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() =>
-                    toast.info("推薦配點", {
-                      description:
-                        "先提升主動與被動技能；角色達到 Lv.10 後再解鎖奧義。",
-                    })
-                  }
-                >
-                  查看配點
-                </button>
-              </Panel>
             </div>
           )}
 

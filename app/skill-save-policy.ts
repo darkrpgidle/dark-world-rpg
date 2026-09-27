@@ -1,5 +1,5 @@
 import {
-  createSkillBuild, equipActiveSkill, restoreSkillBuild, upgradeSkill,
+  createSkillBuild, earnedSkillPoints, equipActiveSkill, restoreSkillBuild, upgradeSkill,
   type SkillBuild, type SkillClass,
 } from "./skill-rework";
 import {
@@ -9,7 +9,7 @@ import {
 import { preserveLegacyRebirthCount } from "./legacy-rebirth-storage";
 import { balanceConfig } from "./balance-config";
 
-export const SKILL_REWORK_SAVE_VERSION = 1;
+export const SKILL_REWORK_SAVE_VERSION = 2;
 const MAX_RECENT_SKILL_ACTION_IDS = 256;
 
 export function hasAppliedSkillAction(save: Record<string, unknown>, actionId: string): boolean {
@@ -42,7 +42,9 @@ export function restoreSkillSave(save: Record<string, unknown>): SkillSaveFields
   if (!Number.isInteger(level) || level < 1 || level > 100) return null;
   return {
     skillReworkVersion: SKILL_REWORK_SAVE_VERSION,
-    skillReworkBuild: restoreSkillBuild(save.skillReworkBuild, save.playerClass, level),
+    skillReworkBuild: Number(save.skillReworkVersion) < SKILL_REWORK_SAVE_VERSION ||
+      !Number.isInteger(save.skillReworkVersion) ? createSkillBuild()
+      : restoreSkillBuild(save.skillReworkBuild, save.playerClass, level),
     skillAscensions: restoreSkillAscensions(save.skillAscensions, save.playerClass),
   };
 }
@@ -54,11 +56,16 @@ export function preserveServerSkillSave(
   incoming: Record<string, unknown>, server: Record<string, unknown> | null,
 ): Record<string, unknown> | null {
   const canonical = restoreSkillSave(server ?? {
-    ...incoming, skillReworkBuild: createSkillBuild(), skillAscensions: createSkillAscensions(),
+    ...incoming, skillReworkVersion: SKILL_REWORK_SAVE_VERSION,
+    skillReworkBuild: createSkillBuild(), skillAscensions: createSkillAscensions(),
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
   return preserveLegacyRebirthCount({ ...incoming, ...canonical,
+    // Legacy point purchases must never reactivate after the new skill page goes live.
+    skills: Array.isArray(incoming.skills) ? incoming.skills.map((skill) =>
+      skill && typeof skill === "object" ? { ...skill, level: 0 } : skill) : [],
+    skillPoints: earnedSkillPoints(Number(incoming.level ?? server?.level)),
     _paidSkillResetActionIds: server && Array.isArray(server._paidSkillResetActionIds)
       ? server._paidSkillResetActionIds : [],
     _skillActionIds: server && Array.isArray(server._skillActionIds) ? server._skillActionIds : [],
@@ -124,7 +131,9 @@ export function applySkillSaveAction(
       return null;
   }
   return { ...save, skillReworkVersion: SKILL_REWORK_SAVE_VERSION, skillReworkBuild: build,
-    skillAscensions: ascensions,
+    skills: Array.isArray(save.skills) ? save.skills.map((skill) =>
+      skill && typeof skill === "object" ? { ...skill, level: 0 } : skill) : [],
+    skillPoints: earnedSkillPoints(level), skillAscensions: ascensions,
     ...(action.kind === "begin_rebirth" ? { _lastSkillRebirthLegacyCount: save.rebirthCount } : {}) };
 }
 

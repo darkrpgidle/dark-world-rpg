@@ -149,6 +149,34 @@ export async function GET(request: Request) {
     catch { /* never block loading a valid save */ }
   }
   const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
+  // Preserve the pre-reset save before committing the one-time skill refund.
+  // A concurrent save wins via updatedAt CAS and is reloaded rather than overwritten.
+  if (Number(savedPayload.skillReworkVersion) < 2 || !Number.isInteger(savedPayload.skillReworkVersion)) {
+    const migrated = preserveServerSkillSave(savedPayload, savedPayload);
+    if (!migrated) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 409);
+    try {
+      await db.insert(saveSnapshots).values({
+        playerId, accountId: account.id, payload: save.payload,
+        kind: "skill_reset_v2", capturedAt: new Date().toISOString(),
+      });
+      const updatedAt = nextUpdatedAt(save.updatedAt);
+      const changed = await db.update(gameSaves)
+        .set({ payload: JSON.stringify(migrated), updatedAt })
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, save.updatedAt)));
+      if ((changed.rowsAffected ?? 0) === 1) {
+        return jsonNoStore({ save: migrated, updatedAt });
+      }
+      const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
+        updatedAt: gameSaves.updatedAt }).from(gameSaves)
+        .where(eq(gameSaves.playerId, playerId)).limit(1);
+      if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
+      const latestPayload = JSON.parse(latest.payload) as Record<string, unknown>;
+      return jsonNoStore({ save: preserveServerSkillSave(latestPayload, latestPayload), updatedAt: latest.updatedAt });
+    } catch {
+      // Never return a refunded build unless it was durably committed.
+      return jsonNoStore({ error: "skill_reset_retry_required" }, 503);
+    }
+  }
   return jsonNoStore({
     save: preserveServerSkillSave(
       preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload), savedPayload), savedPayload), savedPayload,

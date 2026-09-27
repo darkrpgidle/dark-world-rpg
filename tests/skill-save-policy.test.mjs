@@ -23,6 +23,26 @@ test("legacy saves migrate without granting old rebirths, malformed or cross-cla
   assert.deepEqual(restoreSkillSave(malformed).skillAscensions, createSkillAscensions());
 });
 
+test("version 2 resets existing players once and refunds points by current level", () => {
+  for (const level of [1, 2, 37, 100]) {
+    const before = { ...base(), level, skillReworkVersion: 1, gold: 123,
+      skills: [{ name: "裂地斬", level: 5, max: 5, cost: 1 }],
+      skillPoints: 0, _paidSkillResetActionIds: ["old-receipt"],
+      skillReworkBuild: { ranks: { 裂地斬: 5 }, activeSlots: ["裂地斬", null, null] } };
+    const migrated = preserveServerSkillSave(before, before);
+    assert.equal(migrated.skillReworkVersion, 2);
+    assert.deepEqual(migrated.skillReworkBuild, createSkillBuild());
+    assert.equal(migrated.skillPoints, Math.floor(level / 2));
+    assert.equal(migrated.skills[0].level, 0);
+    assert.equal(migrated.gold, 123);
+    assert.deepEqual(migrated._paidSkillResetActionIds, ["old-receipt"]);
+    const upgraded = level >= 2 ? applySkillSaveAction(migrated, { kind: "upgrade", name: "裂地斬" }) : migrated;
+    const reconnect = preserveServerSkillSave({ ...before, skillReworkVersion: 1 }, upgraded);
+    assert.deepEqual(reconnect.skillReworkBuild, upgraded.skillReworkBuild);
+    assert.equal(reconnect.skills[0].level, 0);
+  }
+});
+
 test("generic autosaves preserve canonical skill fields, including after stale and forged writes", () => {
   const saved = applySkillSaveAction(base(), { kind: "upgrade", name: "裂地斬" });
   const incoming = { ...base(), skillReworkBuild: createSkillBuild(), skillAscensions: { rebirthCount: 5 } };
