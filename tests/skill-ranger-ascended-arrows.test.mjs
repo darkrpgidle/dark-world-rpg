@@ -17,7 +17,7 @@ function ranger(names, slots) {
 }
 function turn(combat, skill, now, critical = false, ascended = new Set()) {
   return resolveRangerTurn(combat, {
-    skill, now, hits: [{ hit: true, critical }], ascended,
+    skill, now, hits: [{ hit: true, critical }], ascended, roll: () => 1,
   });
 }
 
