@@ -1,5 +1,6 @@
 // Skill rework, stage 3: target-local, wall-clock debuff timing.
 // Damage multipliers for bleed and burn remain subject to balance testing.
+import { balanceConfig } from "./balance-config";
 export type EnemyDebuffKind = "bleed" | "burn" | "armorBreak" | "bloodBrand" | "hunterMark" | "elementSigil";
 
 // Shared classification for skills that depend on different enemy
@@ -32,6 +33,24 @@ export type DebuffTick = {
   // Multiply eventual base bleed damage by (1 + bonus / 100); no base damage is defined here.
   bleedDamageBonusPercent?: number;
 };
+
+// Raw damage before the battle engine's target mitigation and HP rounding.
+// The caller supplies the attack snapshot taken when the status was applied;
+// a later equipment swap must not change damage already scheduled.
+export function calculateDebuffTickRawDamage(tick: DebuffTick, attackAtApplication: number): number {
+  if (!Number.isFinite(attackAtApplication) || attackAtApplication < 0) {
+    throw new RangeError("Status attack snapshot must be finite and nonnegative");
+  }
+  if (!Number.isInteger(tick.stacks) || tick.stacks < 1 || tick.stacks > (tick.kind === "bleed" ? 3 : 1)) {
+    throw new RangeError("Invalid damage-over-time stack count");
+  }
+  const bonus = tick.kind === "bleed" ? tick.bleedDamageBonusPercent ?? 0 : 0;
+  if (!Number.isFinite(bonus) || bonus < 0) throw new RangeError("Invalid bleed damage bonus");
+  const percent = tick.kind === "bleed"
+    ? balanceConfig.skillRework.dot.bleedPerStackAttackPercent * tick.stacks * (1 + bonus / 100)
+    : balanceConfig.skillRework.dot.burnAttackPercent;
+  return attackAtApplication * percent / 100;
+}
 export type DebuffUpdate = { state: EnemyDebuffs; ticks: DebuffTick[] };
 
 const durationByLevel = {
