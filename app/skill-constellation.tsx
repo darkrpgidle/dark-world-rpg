@@ -125,11 +125,12 @@ export function SkillConstellation({ characterClass, catalog, ranks, activeSlots
       }
     }
 
+    const context = gl;
     function buffer(data: Float32Array) {
-      const value = gl.createBuffer();
+      const value = context.createBuffer();
       if (!value) return null;
-      gl.bindBuffer(gl.ARRAY_BUFFER, value);
-      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      context.bindBuffer(context.ARRAY_BUFFER, value);
+      context.bufferData(context.ARRAY_BUFFER, data, context.STATIC_DRAW);
       return value;
     }
     const positionBuffer = buffer(positions);
