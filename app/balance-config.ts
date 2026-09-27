@@ -8,6 +8,13 @@
 export const balanceConfig = {
   // 第 18 批：法師新版技能數值；僅供獨立重製規則使用，尚未接入正式戰鬥。
   skillRework: {
+    warrior: {
+      active: {
+        // Ascended 崩鎧重擊: twice this cast's armor-break value,
+        // capped at +60% of the skill's base damage multiplier.
+        碎甲猛擊: { repeatedArmorBreakFactor: 2, repeatedArmorBreakBonusCap: 60 },
+      },
+    },
     mage: {
       active: {
         霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [20, 25, 30, 35, 40], afterburstDamage: 70 },
