@@ -13,8 +13,9 @@
 ## Sites 來源與存取
 
 - GitHub 是最新原始碼來源：`darkrpgidle/dark-world-rpg`。Sites 設定在 GitHub `.openai/hosting.json`；原記錄專案 ID 為 `appgprj_6a90facf59b08191a3f2ca1ed79e96f2`，正式站 `https://darkrpgidle.fun`。
-- 本工作環境的 `sites_list_sites` 回傳空清單，指定專案的資料庫概覽先前回傳 `Sites project not found`（404）；故**沒有**實際線上帳號試算或備份。這只反映本工作環境的連線，接手者須在自己的 Sites 連線重新驗證專案及版本，勿把此狀態推斷成專案消失。
+- 2026-09-27 此工作環境已透過 Sites 唯讀確認原專案 `dark-world-rpg` 可存取，當時正式站為第 322 版，資料庫綁定 `DB` 存在 `accounts`、`game_saves`、`save_snapshots` 三張表。只讀一筆確認欄位時，存檔與快照 payload 回傳截斷；因此**尚未**完整核對線上帳號／轉生歷史，亦未建立正式備份或還原。先前環境的 404 不代表專案消失；後續仍須取得無截斷的授權匯出及可恢復備份。
 - 先唯讀核對 `accounts`、`game_saves`、`save_snapshots` 及線上版本與 GitHub 分支差異；不得回傳密碼雜湊、session 憑證或原始玩家存檔。若仍無存取權，明確回報具體限制。
+- 舊轉生匯出比對工具現在把「雜湊一致」與「可通過預檢」分開：歷史數值或帳號歸屬待人工核對時，`integrityMatches: true` 仍會輸出 `verified: false` 並以非零狀態結束；此工具不能證明正式資料庫已備份或還原。
 
 ## 下一步與邊界
 
