@@ -1,5 +1,5 @@
-// Enemy attack events for the isolated warrior rework. The caller decides
-// whether a blocked/dodged event counts as a received attack until specified.
+// Enemy attack events for the isolated warrior rework. Each enemy attack
+// counts once, including blocked, dodged and missed attacks.
 import type { SkillBuild } from "./skill-rework";
 import type { WarriorCombat } from "./skill-warrior-combat";
 import { consumeWarriorCounter, recordWarriorBlock, warriorPassiveDefenses } from "./skill-warrior-passives";
@@ -28,7 +28,8 @@ export function warriorDefenseActivation(build: SkillBuild, ascended: boolean) {
 export type WarriorEnemyAttack = {
   // Call once for one enemy attack event, even if it has multiple segments.
   segments: number;
-  countsAsReceivedHit: boolean;
+  // Kept for older callers; enemy attacks always count regardless of outcome.
+  countsAsReceivedHit?: boolean;
   healthPercent: number;
   ascended: boolean;
 };
@@ -38,7 +39,7 @@ export function recordWarriorEnemyAttack(combat: WarriorCombat, input: WarriorEn
     throw new RangeError("Enemy attack must contain at least one segment");
   }
   const rank = combat.build.ranks["不屈戰意"] ?? 0;
-  const total = rank && input.countsAsReceivedHit ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
+  const total = rank ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
   const activation = rank && total >= WARRIOR_ACTIVE_RULES.不屈戰意.enemyAttacksRequired
     ? warriorDefenseActivation(combat.build, input.ascended) : null;
   const defense: WarriorDefenseState = {
