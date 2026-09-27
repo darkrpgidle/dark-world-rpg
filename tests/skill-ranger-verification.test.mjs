@@ -240,3 +240,17 @@ test("phantom reactivates on five received attacks after expiry even if HP stays
   assert.equal(fifth.combat.defense.receivedAttacks, 0);
   assert.equal(transitionRangerNormalKill(fifth.combat).defense.phantomAttacksRemaining, 2);
 });
+
+test("an unequipped phantom step cannot activate or grant its dodge bonus", () => {
+  let combat = ranger({ 幻影步: 1, 影步反射: 1 });
+  for (let index = 0; index < 6; index++) {
+    const event = recordRangerEnemyAttack(combat, {
+      segments: 2, countsAsReceivedHit: true, healthPercent: 30,
+      canActivateFromHealth: true, ascended: true,
+    });
+    assert.equal(event.activation, null);
+    assert.equal(event.dodgeChancePoints, 2);
+    assert.equal(event.guaranteedDodgeForAttack, false);
+    combat = event.combat;
+  }
+});
