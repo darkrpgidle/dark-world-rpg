@@ -12,7 +12,8 @@ import {
   clearMageExhaustion, consumeMageOverload, createMageOverload,
   mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
-import { countMageAbnormalKinds, resolveMagePassiveAttack } from "./skill-mage-passives";
+import { countEnemyAbnormalKinds } from "./skill-debuff-timer";
+import { resolveMagePassiveAttack } from "./skill-mage-passives";
 import { equippedSkillMythic } from "./mythic-data";
 import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
 import {
@@ -150,7 +151,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const currentSigil = transitionMageSigilTarget(combat.sigil, markActiveAtStart);
   // Consume a previously granted buff before this cast may grant a new one.
   const sigilCast = consumeMageSigilActiveCast(currentSigil, isActive);
-  const distinctAbnormalKinds = countMageAbnormalKinds(session.enemy);
+  const distinctAbnormalKinds = countEnemyAbnormalKinds(session.enemy);
   const targetAbnormal = distinctAbnormalKinds > 0;
   const conditionalDamageBonusPercent = input.skill === "虛空崩解" && targetAbnormal
     ? mageSkillRankValue(MAGE_ACTIVE_RULES.虛空崩解.damageBonusVsStatus, rank) : 0;
