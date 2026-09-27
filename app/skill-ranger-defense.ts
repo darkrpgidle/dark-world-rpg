@@ -38,7 +38,8 @@ export function rangerDefenseActivation(build: SkillBuild, ascended: boolean) {
 
 export type RangerEnemyAttack = {
   segments: number;
-  countsAsReceivedHit: boolean;
+  // Kept for older callers; enemy attacks always count regardless of outcome.
+  countsAsReceivedHit?: boolean;
   healthPercent: number;
   // Whether this event can use the HP trigger (for instance, when a new
   // incoming attack begins); a single low-HP interval triggers only once.
@@ -52,7 +53,7 @@ export function recordRangerEnemyAttack(combat: RangerCombat, input: RangerEnemy
   }
   const rank = combat.build.activeSlots.includes("幻影步")
     ? combat.build.ranks["幻影步"] ?? 0 : 0;
-  const total = rank && input.countsAsReceivedHit
+  const total = rank
     ? combat.defense.receivedAttacks + 1 : combat.defense.receivedAttacks;
   const healthTriggerArmed = input.healthPercent >= RANGER_ACTIVE_RULES.幻影步.healthBelow
     ? true : combat.defense.healthTriggerArmed;
