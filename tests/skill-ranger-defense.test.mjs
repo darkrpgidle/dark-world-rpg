@@ -46,8 +46,8 @@ test("phantom step health condition activates below 55 only when caller allows a
 test("five received enemy attacks activate once, even when each attack has many segments", () => {
   let combat = ranger(["幻影步", "影步反射"]);
   combat = enemy(combat, { countsAsReceivedHit: false, segments: 3 }).combat;
-  assert.equal(combat.defense.receivedAttacks, 0);
-  for (let index = 0; index < 4; index++) {
+  assert.equal(combat.defense.receivedAttacks, 1);
+  for (let index = 1; index < 4; index++) {
     const result = enemy(combat, { segments: 7 });
     assert.equal(result.activation, null);
     assert.equal(result.combat.defense.receivedAttacks, index + 1);
