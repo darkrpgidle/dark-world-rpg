@@ -72,7 +72,7 @@ test("warrior ordinary kill preserves player buffs and ready order but drops ene
   assert.deepEqual(transitionWarriorCombat(combat, "normal-kill"), kill);
 });
 
-test("warrior death, map change, boss and PvP starts clear target and every player-side pending effect", () => {
+test("warrior death, map change, boss, PvP and reconnect clear target and every player-side pending effect", () => {
   let combat = createWarriorCombat(build("戰士",
     ["裂地斬", "泰坦斷界斬", "鮮血怒吼", "不屈戰意", "格擋精通"],
     ["裂地斬"]), 100);
@@ -83,7 +83,7 @@ test("warrior death, map change, boss and PvP starts clear target and every play
     session: { ...combat.session, charge: { ...combat.session.charge, ready: ["裂地斬"] } },
   };
   combat = recordWarriorSuccessfulBlock(combat, true).combat;
-  for (const boundary of ["death", "map-change", "boss-start", "pvp-start"]) {
+  for (const boundary of ["death", "map-change", "boss-start", "pvp-start", "reconnect"]) {
     const reset = transitionWarriorCombat(combat, boundary);
     assert.deepEqual(reset.buffs, createWarriorBuffState(), boundary);
     assert.deepEqual(reset.passives, createWarriorPassiveState(), boundary);
@@ -124,7 +124,7 @@ test("ranger ordinary kill carries self buffs and charge but clears marked enemy
   assert.deepEqual(transitionRangerCombat(combat, "normal-kill"), kill);
 });
 
-test("ranger death, map change, boss and PvP starts discard all waiting player and target effects", () => {
+test("ranger death, map change, boss, PvP and reconnect discard all waiting player and target effects", () => {
   let combat = createRangerCombat(build("遊俠",
     ["穿雲箭", "蒼穹箭雨", "幻影步"], ["穿雲箭", "幻影步"]), 100);
   combat = oneAttack(combat, "hunterMark");
@@ -133,7 +133,7 @@ test("ranger death, map change, boss and PvP starts discard all waiting player a
     session: { ...combat.session, charge: { ...combat.session.charge, ready: ["穿雲箭"] } } };
   combat = recordRangerSuccessfulDodge(combat,
     { phantomStepActive: true, ascended: true }).combat;
-  for (const boundary of ["death", "map-change", "boss-start", "pvp-start"]) {
+  for (const boundary of ["death", "map-change", "boss-start", "pvp-start", "reconnect"]) {
     const reset = transitionRangerCombat(combat, boundary);
     assert.deepEqual(reset.windDomain, createRangerWindDomain(), boundary);
     assert.deepEqual(reset.passives, createRangerPassiveState(), boundary);
@@ -169,7 +169,7 @@ test("mage ordinary kill retains self buffs but loses its enemy mark and target-
     { markedAscended: false, firstAnomalyUsed: false, enhancedCastsRemaining: 2 });
 });
 
-test("mage death, map change, boss and PvP starts discard self buffs and enemy effects", () => {
+test("mage death, map change, boss, PvP and reconnect discard self buffs and enemy effects", () => {
   let combat = createMageCombat(build("法師", ["霜火新星", "星界寂滅"], ["霜火新星"]), 100);
   combat = oneAttack(combat, "burn");
   combat = { ...combat,
@@ -178,7 +178,7 @@ test("mage death, map change, boss and PvP starts discard self buffs and enemy e
     sigil: { markedAscended: true, firstAnomalyUsed: true, enhancedCastsRemaining: 2 },
     session: { ...combat.session, charge: { ...combat.session.charge, ready: ["霜火新星"] } },
   };
-  for (const boundary of ["death", "map-change", "boss-start", "pvp-start"]) {
+  for (const boundary of ["death", "map-change", "boss-start", "pvp-start", "reconnect"]) {
     const reset = transitionMageCombat(combat, boundary);
     assert.deepEqual(reset.overload, createMageOverload(), boundary);
     assert.deepEqual(reset.shield, createMageShieldState(), boundary);
