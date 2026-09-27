@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import test from "node:test";
-import { advanceEnemyDebuffs, applyEnemyDebuff, clearEnemyDebuffs } from "../app/skill-debuff-timer.ts";
+
+registerHooks({ resolve(specifier, context, nextResolve) {
+  if (specifier.startsWith("./") && !specifier.endsWith(".ts")) return nextResolve(`${specifier}.ts`, context);
+  return nextResolve(specifier, context);
+} });
+const { advanceEnemyDebuffs, applyEnemyDebuff, calculateDebuffTickRawDamage, clearEnemyDebuffs } =
+  await import("../app/skill-debuff-timer.ts");
 
 test("three-second damage over time ticks at 1, 2 and 3 seconds, including after a delayed frame", () => {
   const applied = applyEnemyDebuff({}, { kind: "bleed" }, 0);
@@ -67,4 +74,17 @@ test("ascended bleed bonus stays on one-second ticks, including settled ticks be
   })));
   assert.deepEqual(state.state, {});
   assert.throws(() => applyEnemyDebuff({}, { kind: "burn", bleedDamageBonusPercent: 20 }, 0), RangeError);
+});
+
+test("one tick uses the selected attack snapshot: bleed per stack 20%, burn 30%, ascended bleed +20%", () => {
+  const attackAtApplication = 680;
+  const bleed = { kind: "bleed", at: 1000, stacks: 1 };
+  assert.equal(calculateDebuffTickRawDamage(bleed, attackAtApplication), 136);
+  assert.equal(calculateDebuffTickRawDamage({ ...bleed, stacks: 2 }, attackAtApplication), 272);
+  assert.equal(calculateDebuffTickRawDamage({
+    ...bleed, stacks: 3, bleedDamageBonusPercent: 20,
+  }, attackAtApplication), 489.6);
+  assert.equal(calculateDebuffTickRawDamage({ kind: "burn", at: 1000, stacks: 1 }, attackAtApplication), 204);
+  assert.throws(() => calculateDebuffTickRawDamage({ ...bleed, stacks: 4 }, attackAtApplication), RangeError);
+  assert.throws(() => calculateDebuffTickRawDamage(bleed, Number.NaN), RangeError);
 });
