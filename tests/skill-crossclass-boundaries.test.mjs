@@ -26,6 +26,11 @@ const { createMageSigilState } = await import("../app/skill-mage-sigil.ts");
 const { createMageOverload } = await import("../app/skill-mage-rules.ts");
 const { resolveSkillAction, advanceCombatSession, trySkillProc } =
   await import("../app/skill-combat-session.ts");
+const { applyEnemyDebuff, advanceEnemyDebuffs, countEnemyAbnormalKinds, isAppliedAffliction } =
+  await import("../app/skill-debuff-timer.ts");
+const { recordMageSigilStatuses } =
+  await import("../app/skill-mage-sigil.ts");
+const { countMageAbnormalKinds } = await import("../app/skill-mage-passives.ts");
 
 function build(characterClass, names, slots) {
   let result = createSkillBuild();
@@ -235,4 +240,38 @@ test("enemy DoT ticks use wall time and never create a second primary attack or 
     ...createWarriorCombat(build("戰士", ["血刃斬", "泰坦斷界斬"], ["血刃斬"]), 100),
     session,
   }, "normal-kill").session.enemy, {});
+});
+
+test("all classes share the same four target abnormal categories, independent of stacks and marks", () => {
+  let enemy = {};
+  for (const kind of ["bleed", "bleed", "burn", "armorBreak", "elementSigil", "bloodBrand", "hunterMark"]) {
+    enemy = applyEnemyDebuff(enemy, { kind }, 0).state;
+  }
+  assert.equal(enemy.bleed.stacks, 2);
+  assert.equal(countEnemyAbnormalKinds(enemy), 4);
+  assert.equal(countMageAbnormalKinds(enemy), 4);
+  assert.equal(countEnemyAbnormalKinds(advanceEnemyDebuffs(enemy, 4001).state), 1);
+  assert.equal(countEnemyAbnormalKinds(advanceEnemyDebuffs(enemy, 13000).state), 0);
+  const ranger = createRangerCombat(build("遊俠", ["穿雲箭"], ["穿雲箭"]), 100);
+  assert.equal(countEnemyAbnormalKinds(transitionRangerCombat({
+    ...ranger, session: { ...ranger.session, enemy },
+  }, "normal-kill").session.enemy), 0);
+});
+
+test("placing a sigil counts for target damage but only a later affliction activates chaos seal", () => {
+  assert.equal(isAppliedAffliction("elementSigil"), false);
+  for (const kind of ["bloodBrand", "hunterMark", "elementSigil"]) {
+    assert.equal(isAppliedAffliction(kind), false);
+  }
+  for (const kind of ["bleed", "burn", "armorBreak"]) {
+    assert.equal(isAppliedAffliction(kind), true);
+    const marked = recordMageSigilStatuses(createMageSigilState(), {
+      hadCurrentSigil: false, appliedKinds: ["elementSigil"], newlyAppliedSigilAscended: true,
+    });
+    assert.equal(marked.enhancedCastsRemaining, 0);
+    const triggered = recordMageSigilStatuses(marked, {
+      hadCurrentSigil: true, appliedKinds: [kind], newlyAppliedSigilAscended: false,
+    });
+    assert.equal(triggered.enhancedCastsRemaining, 3);
+  }
 });
