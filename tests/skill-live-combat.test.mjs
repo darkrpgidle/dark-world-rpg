@@ -87,7 +87,8 @@ test("equipped defensive skills absorb or avoid an actual enemy attack", () => {
 test("equipped mage mythics affect only their live skill events", () => {
   const cast = (name, equippedItems, withShield = false) => {
     const battle = syncLiveCombat(null, `${name}-${equippedItems.length}`, "boss", {
-      ranks: { [name]: 5 }, activeSlots: [name, null, null],
+      ranks: { [name]: 5, ...(withShield ? { 魔力護盾: 5 } : {}) },
+      activeSlots: [name, withShield ? "魔力護盾" : null, null],
     }, "法師", 100, createSkillAscensions());
     if (withShield) resolveLiveEnemyAttack(battle,
       { healthPercent: 30, maxHealth: 100, damage: 1, roll: () => 0.99 });
