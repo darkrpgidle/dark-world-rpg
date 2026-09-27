@@ -10,6 +10,7 @@ import { recordWarriorEnemyAttack, recordWarriorSuccessfulBlock, recordWarriorCo
 import { recordRangerEnemyAttack, recordRangerSuccessfulDodge } from "./skill-ranger-defense";
 import { recordMageIncomingAttack, tryActivateMageShield } from "./skill-mage-shield";
 import { rangerPassiveStats } from "./skill-ranger-passives";
+import { RANGER_ACTIVE_RULES, RANGER_PASSIVE_RULES, rangerSkillRankValue } from "./skill-ranger-rules";
 import { warriorPassiveDefenses } from "./skill-warrior-passives";
 import { magePassiveStats } from "./skill-mage-passives";
 import { restoreSkillBuild, SKILL_REWORK_CATALOG, type SkillBuild, type SkillClass } from "./skill-rework";
@@ -69,9 +70,15 @@ export function nextLiveSkill(battle: LiveCombatBattle): string | null {
 }
 
 export function liveCombatSpeedBonus(battle: LiveCombatBattle): number {
-  if (battle.characterClass === "遊俠")
-    return (battle.combat as RangerCombat).windDomain.remainingActions > 0
-        ? ([12, 16, 20, 24, 30][(battle.combat as RangerCombat).windDomain.rank - 1] ?? 0) : 0;
+  if (battle.characterClass === "遊俠") {
+    const ranger = battle.combat as RangerCombat;
+    const windRank = battle.build.ranks["風之積蓄"] ?? 0;
+    const windPassive = ranger.passives.windMomentumRemaining > 0 && windRank > 0
+      ? ranger.passives.windMomentumStacks * rangerSkillRankValue(RANGER_PASSIVE_RULES.風之積蓄.speedPerStack, windRank) : 0;
+    return windPassive + (ranger.windDomain.remainingActions > 0
+      ? rangerSkillRankValue(RANGER_ACTIVE_RULES.風行領域.attackSpeedBonus, ranger.windDomain.rank)
+        + (ranger.windDomain.ascended ? ranger.windDomain.galeStacks * 3 : 0) : 0);
+  }
   if (battle.characterClass === "戰士") {
     const stance = (battle.combat as WarriorCombat).buffs;
     return stance.stanceRemaining > 0 ? ([10, 14, 18, 22, 26][stance.stanceRank - 1] ?? 0) : 0;
@@ -103,14 +110,23 @@ function segmentCount(name: string | null): number {
 export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: AttackOptions): LiveCombatAction {
   const name = nextLiveSkill(battle);
   const random = options.roll ?? Math.random;
-  const critChance = Math.min(100, options.criticalChance);
+  const ranger = battle.characterClass === "遊俠" ? battle.combat as RangerCombat : null;
+  const nextCritRank = battle.build.ranks["影步反射"] ?? 0;
+  const pendingCrit = ranger?.passives.nextPrimaryCriticalPending && nextCritRank
+    ? rangerSkillRankValue(RANGER_PASSIVE_RULES.影步反射.nextPrimaryCriticalChancePoints, nextCritRank) : 0;
+  const critChance = Math.min(100, options.criticalChance + (ranger?.session.enemy.hunterMark?.strength ?? 0)
+    + (ranger?.defense.nextHitCriticalChancePoints ?? 0) + pendingCrit);
+  const snipeRank = name === "破星狙擊" ? battle.build.ranks[name] ?? 0 : 0;
+  const criticalDamage = options.criticalDamage + (snipeRank
+    ? rangerSkillRankValue(RANGER_ACTIVE_RULES.破星狙擊.criticalDamageBonus, snipeRank) : 0)
+    + (name && ranger?.defense.nextSkillCriticalDamagePending ? RANGER_ACTIVE_RULES.幻影步.nextSkillCritDamage : 0);
   const hits = Array.from({ length: segmentCount(name) }, () => {
     const hit = random() * 100 < options.hitChance;
     return { hit, critical: hit && random() * 100 < critChance };
   });
   const critical = hits.some((part) => part.hit && part.critical);
   const percent = (value: number, index = 0) => hits[index]?.hit
-    ? value * (hits[index]?.critical ? 1 + options.criticalDamage / 100 : 1) : 0;
+    ? value * (hits[index]?.critical ? 1 + criticalDamage / 100 : 1) : 0;
   const statuses: string[] = [];
   let damagePercent = 0;
   let defenseIgnore = battle.combat.session.enemy.armorBreak?.strength ?? 0;

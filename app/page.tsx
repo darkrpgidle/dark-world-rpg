@@ -4934,7 +4934,7 @@ function Game({
             const temporaryLifesteal = bloodRoarWasActive
               ? bloodRoarLifesteal(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0)
               : 0;
-            const totalLifesteal = Math.min(100, dynamicLifesteal + temporaryLifesteal);
+            const totalLifesteal = Math.min(100, dynamicLifesteal + temporaryLifesteal + (liveAction?.lifestealPercent ?? 0));
             if (bloodRoarFinalAttack) {
               setPlayerHp((health) => Math.max(1, health * 0.9));
             }
@@ -6106,12 +6106,12 @@ function Game({
           if (bossDamageDisplayDelay > 0) window.setTimeout(publishBossDamage, bossDamageDisplayDelay);
           else publishBossDamage();
         }
-        if (playerActs && playerDamage > 0 && characterStats.lifesteal > 0)
+        if (playerActs && playerDamage > 0 && characterStats.lifesteal + (liveAction?.lifestealPercent ?? 0) > 0)
           setBossPlayerHp((health) => {
             const nextHealth = Math.min(
               100,
               health + healthPercentFromDamage(
-                (playerDamage * Math.min(100, characterStats.lifesteal)) / 100,
+                (playerDamage * Math.min(100, characterStats.lifesteal + (liveAction?.lifestealPercent ?? 0))) / 100,
                 characterStats.hp,
               ),
             );

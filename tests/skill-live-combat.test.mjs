@@ -10,6 +10,8 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 const { syncLiveCombat, resolveLiveCombatAttack, advanceLiveCombat, resolveLiveEnemyAttack } =
   await import("../app/skill-live-combat.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
+const { settleCombatHealth } = await import("../app/skill-health-settlement.ts");
+const { beginSkillBattleCutover, settleCutoverAction } = await import("../app/skill-combat-cutover.ts");
 
 const sets = {
   戰士: ["裂地斬", "血刃斬", "血戰烙印", "狂戰姿態", "碎甲猛擊", "泰坦斷界斬"],
@@ -62,5 +64,25 @@ test("equipped defensive skills absorb or avoid an actual enemy attack", () => {
     const outcomes = Array.from({ length: 5 }, () => resolveLiveEnemyAttack(battle,
       { healthPercent: 30, maxHealth: 100, damage: 20, roll: () => 0 }));
     assert.ok(outcomes.some((outcome) => outcome.damage < 20 || outcome.blocked || outcome.dodged), name);
+  }
+});
+
+test("direct skill damage reaches the shared HP and victory calculation once in every encounter", () => {
+  for (const [characterClass, name] of [["戰士", "裂地斬"], ["遊俠", "穿雲箭"], ["法師", "霜火新星"]]) {
+    for (const encounter of ["tower", "personal-boss", "world-boss"]) {
+      const id = `${encounter}-${name}`;
+      const battle = syncLiveCombat(null, id, id, { ranks: { [name]: 5 },
+        activeSlots: [name, null, null] }, characterClass, 100, createSkillAscensions());
+      let cast;
+      for (let i = 0; i < 5; i++) cast = resolveLiveCombatAttack(battle, { ...opts, now: i * 100 + 1000 });
+      assert.equal(cast.name, name);
+      const route = beginSkillBattleCutover({ battleId: id, encounter, enableRework: false, reworkReady: false });
+      const directDamage = Math.round(100 * cast.damagePercent / 100);
+      const settled = settleCutoverAction(route, { battleId: id, sequence: 1, legacyDamage: directDamage });
+      assert.equal(settled.damage, directDamage);
+      const health = settleCombatHealth(100, 100, settled.damage);
+      assert.equal(health.remainingPercent, 0);
+      assert.equal(health.defeated, true);
+    }
   }
 });

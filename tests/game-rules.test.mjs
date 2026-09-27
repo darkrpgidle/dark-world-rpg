@@ -820,29 +820,33 @@ test("centralizes adjustable game balance in one configuration file", () => {
   assert.match(balanceSource, /balanceConfig\.combat/);
 });
 
-test("awards online yuanbao every ten minutes", () => {
-  const idleRewardBody = page.slice(
-    page.indexOf("const next = idleSeconds + 60"),
-    page.indexOf("const buyShopItem"),
-  );
-  assert.match(idleRewardBody, /next >= 600/);
-  assert.match(idleRewardBody, /Math\.floor\(next \/ 600\) \* 10/);
+test("awards online yuanbao every ten minutes through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.onlineYuanbao, {
+    intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90,
+  });
+  assert.match(page, /action: "heartbeat_online"/);
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
-test("awards the 500-kill daily target exactly once per Taipei day", () => {
-  assert.match(page, /const \[dailyRewardClaimed, setDailyRewardClaimed\] = useState\(false\)/);
-  assert.match(page, /if \(dailyKills < 500\)/);
-  assert.match(page, /if \(dailyRewardClaimed\) return toast\.info\("今日獎勵已領取"\)/);
-  assert.match(page, /setGold\(\(value\) => value \+ 5000\)/);
-  assert.match(page, /setEnhanceStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setReforgeStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setYuanbao\(\(value\) => value \+ 20\)/);
+test("buys the yuanbao reforge bundle through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoReforgeBundle, { price: 10, stones: 12 });
+  assert.ok(page.includes('item === "reforge" ? "shop_reforge" : "shop_cosmetic"'));
+});
+
+test("buys cosmetic unlocks through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoCosmetics, {
+    "title-ash": 80, "title-abyss": 180,
+    "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
+  });
+  assert.match(page, /shop_cosmetic/);
+  assert.ok(!page.includes("setOwnedTitles((current) => current.includes(title)"));
+});
+
+test("claims the 500-kill daily target through the save service", () => {
+  const reward = balanceConfig.economy.dailyHuntReward;
+  assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });
+  assert.match(page, /action: "claim_daily", dailyDate, dailyKills/);
   assert.match(page, /setDailyRewardClaimed\(true\)/);
-  assert.match(page, /timeZone: "Asia\/Taipei"/);
-  assert.match(page, /const savedForToday = save\.dailyDate === today/);
-  assert.match(page, /disabled=\{dailyKills < 500 \|\| dailyRewardClaimed\}/);
-  assert.match(page, /dailyRewardClaimed,/);
 });
 
 test("starts new accounts with zero yuanbao", () => {
