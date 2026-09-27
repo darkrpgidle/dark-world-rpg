@@ -3305,19 +3305,45 @@ function Game({
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const next = idleSeconds + 60;
-      if (next >= 600) {
-        const rewards = Math.floor(next / 600) * 10;
-        setYuanbao((value) => value + rewards);
-        pushLog("收益", `泡點模式達成，獲得元寶 +${rewards}`);
-        toast.success("泡點收益已發放", { description: `元寶 +${rewards}` });
-        requestPrioritySave();
+    if (!saveReady || !playerId || sessionSuperseded) return;
+    let cancelled = false;
+    let inFlight = false;
+    const heartbeat = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch("/api/save", {
+          method: "POST",
+          headers: loginHeaders(loginId, true),
+          body: JSON.stringify({ playerId, action: "heartbeat_online" }),
+        });
+        const result = await response.json();
+        if (cancelled) return;
+        if (response.status === 401 || result?.error === "maintenance") {
+          pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+            : result?.error === "session_replaced" ? "replaced" : "expired");
+          return;
+        }
+        if (!response.ok || result?.ok !== true || result.accepted !== true) return;
+        if (Number.isSafeInteger(result.idleSeconds)) setIdleSeconds(result.idleSeconds);
+        const reward = Number(result.reward);
+        if (Number.isSafeInteger(reward) && reward > 0) {
+          setYuanbao((value) => value + reward);
+          if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+          pushLog("收益", `泡點模式達成，獲得元寶 +${reward}`);
+          toast.success("泡點收益已發放", { description: `元寶 +${reward}` });
+        }
+        setSaveUpdatedAt(result.updatedAt ?? null);
+      } catch {
+        // The next heartbeat resumes accrual without paying for the full gap.
+      } finally {
+        inFlight = false;
       }
-      setIdleSeconds(next % 600);
-    }, 60_000);
-    return () => window.clearTimeout(timer);
-  }, [idleSeconds, pushLog, requestPrioritySave]);
+    };
+    void heartbeat();
+    const timer = window.setInterval(() => { void heartbeat(); }, 60_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [saveReady, playerId, loginId, sessionSuperseded, pauseSupersededSession, pushLog]);
 
   const buyShopItem = (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
     const yuanbaoPrices: Partial<Record<typeof item, number>> = {

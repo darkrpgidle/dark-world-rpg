@@ -825,13 +825,11 @@ test("centralizes adjustable game balance in one configuration file", () => {
   assert.match(balanceSource, /balanceConfig\.combat/);
 });
 
-test("awards online yuanbao every ten minutes", () => {
-  const idleRewardBody = page.slice(
-    page.indexOf("const next = idleSeconds + 60"),
-    page.indexOf("const buyShopItem"),
-  );
-  assert.match(idleRewardBody, /next >= 600/);
-  assert.match(idleRewardBody, /Math\.floor\(next \/ 600\) \* 10/);
+test("awards online yuanbao every ten minutes through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.onlineYuanbao, {
+    intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90,
+  });
+  assert.match(page, /action: "heartbeat_online"/);
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
