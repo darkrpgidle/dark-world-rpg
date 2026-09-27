@@ -844,7 +844,7 @@ test("buys cosmetic unlocks through the save service", () => {
     "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
   });
   assert.match(page, /shop_cosmetic/);
-  assert.doesNotMatch(page, /setOwnedTitles\\(\\(current\\) => current\\.includes\\(title\\)/);
+  assert.ok(!page.includes("setOwnedTitles((current) => current.includes(title)"));
 });
 
 test("claims the 500-kill daily target through the save service", () => {

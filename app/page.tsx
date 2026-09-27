@@ -3354,7 +3354,7 @@ function Game({
     if (item === "reforge" || cosmeticPrice !== undefined) {
       if (shopPurchaseInFlightRef.current) return;
       if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
-      const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : cosmeticPrice;
+      const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : (cosmeticPrice ?? 0);
       if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
       if (shopPurchaseRetryRef.current && shopPurchaseRetryRef.current.item !== item)
         return toast.error("請先重試尚未確認的上一筆購買");
