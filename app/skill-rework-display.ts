@@ -51,6 +51,7 @@ const labels: Record<string, string> = {
   procChance: "追加傷害觸發率",
   maxStacks: "最多層數", missesToClear: "未命中清除次數",
   followingPrimaryActions: "後續主要攻擊次數", maxDistinctStatuses: "最多異常種類",
+  repeatedArmorBreakFactor: "重複破防換傷倍率", repeatedArmorBreakBonusCap: "換傷技能倍率上限",
   maxProcsPerCast: "每次施放最多觸發", maxProcsPerUltimate: "每次終極最多觸發",
 };
 
@@ -61,6 +62,7 @@ const units: Record<string, string> = {
   missiles: "發", ultimateEnergyPerSuccessfulCast: "點",
   maxStacks: "層", missesToClear: "次", followingPrimaryActions: "次",
   maxDistinctStatuses: "種", maxProcsPerCast: "次", maxProcsPerUltimate: "次",
+  repeatedArmorBreakFactor: "倍",
 };
 
 const ascensionEffects: Record<SkillClass, Record<string, string>> = {
@@ -71,7 +73,7 @@ const ascensionEffects: Record<SkillClass, Record<string, string>> = {
     血戰烙印: "烙印期間首次成功流血，引發 100% 攻擊傷害血爆。",
     鮮血怒吼: "啟動清除一個負面；第五擊追加 180% 攻擊傷害。",
     狂戰姿態: "姿態內造成流血或破防時延長一次攻擊，最多延長三次。",
-    碎甲猛擊: "已破防目標再次破防時轉為額外傷害，最高 +60% 技能倍率；換算待定。",
+    碎甲猛擊: "命中已破防目標時，依本次破防率 ×2 增加技能基礎倍率，最高 +60%；破防維持較強值並刷新持續時間。",
     泰坦斷界斬: "後續三次主要攻擊各追加 70% 攻擊傷害。",
   },
   遊俠: {
