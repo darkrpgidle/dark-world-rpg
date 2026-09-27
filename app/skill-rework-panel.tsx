@@ -43,7 +43,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
   return (
     <section className="panel" aria-label="新版技能配置" style={{ padding: 18, marginBottom: 20 }}>
       <h3>新版技能配置</h3>
-      <p>新版配點與昇華可在這裡配置；目前戰鬥仍使用下方的既有技能。</p>
+      <p>已裝備的裂地斬、穿雲箭或霜火新星會在推圖與首領戰蓄力施放，使用新版 Lv1～5 傷害；其餘新版技能尚未接入戰鬥，下方既有技能繼續生效。</p>
       <p>可用技能點：<strong>{available}</strong>／已取得：{earnedSkillPoints(characterLevel)}（每 2 等 1 點）</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
         {build.activeSlots.map((name, index) => (
