@@ -5,7 +5,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 } });
 const { balanceConfig } = await import("../app/balance-config.ts");
-const { towerCombatValues, hitChanceFromRatings, enhancementBonusPercent } = await import("../app/balance.ts");
+const { towerCombatValues, hitChanceFromRatings, enhancementBonusPercent, monsterProfile } = await import("../app/balance.ts");
 const { maps, personalBosses, worldBosses } = await import("../app/game-data.ts");
 const { rangerPassiveStats } = await import("../app/skill-ranger-passives.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
@@ -16,6 +16,11 @@ const { settleCombatHealth } = await import("../app/skill-health-settlement.ts")
 const { createBossDamageLedger, settleBossDamageEvent } = await import("../app/skill-boss-damage.ts");
 
 const slots = ["武器", "頭盔", "胸甲", "手套", "鞋子", "項鍊", "戒指", "腰帶", "護腕", "披風"];
+const combatAffixes = {
+  戰士: ["攻擊%", "生命%", "防禦%", "暴擊", "暴擊傷害"],
+  遊俠: ["攻擊%", "暴擊", "暴擊傷害", "攻速", "命中"],
+  法師: ["攻擊%", "暴擊", "暴擊傷害", "技能傷害", "生命%"],
+};
 const layouts = {
   戰士: ["血刃斬", "裂地斬", "血戰烙印", "泰坦斷界斬", "重刃專精",
     "鐵骨", "裂傷本能", "破鎧追擊", "血氣汲取", "泰坦餘震"],
@@ -33,9 +38,9 @@ function rng(seed) {
   let state = seed >>> 0;
   return () => ((state = (1664525 * state + 1013904223) >>> 0) / 4294967296);
 }
-function snapshot(scenario) {
+function snapshot(scenario, mapOverride) {
   const { characterClass, level, equipment } = scenario;
-  const mapId = level === 50 ? 5 : 9;
+  const mapId = mapOverride ?? (level === 50 ? 5 : 9);
   const base = balanceConfig.character.baseStats[characterClass];
   const growth = balanceConfig.character.levelGrowth;
   const stats = { hp: base.hp + (level - 1) * growth.hp,
@@ -46,12 +51,35 @@ function snapshot(scenario) {
     const quality = equipment === "傳奇" ? 4 : 5;
     const enhance = level === 50 ? 5 : 10;
     const scale = balanceConfig.equipment.baseScaleByMap[mapId];
+    const qualityRank = equipment === "傳奇" ? 4 : 5;
+    const maxAffixes = balanceConfig.equipment.maxAffixesByQuality[qualityRank];
+    const affixBands = balanceConfig.equipment.affixes.percentQualityBands;
+    const mapGrowth = { "攻擊%": 0.45, "生命%": 0.45, "防禦%": 0.45, 暴擊: 0.45,
+      暴擊傷害: 0.45, 技能傷害: 0.5, 命中: 0.5, 攻速: 0 };
+    const attackPercent = { "攻擊%": "attackPct", "生命%": "hpPct", "防禦%": "defensePct" };
     for (const slot of slots) for (const [stat, baseValue, growthValue] of balanceConfig.equipment.baseStats[slot]) {
       const value = Math.round(Math.round((baseValue + mapId * growthValue) * scale *
         balanceConfig.equipment.baseQualityMultipliers[quality]) * (1 + enhancementBonusPercent(enhance) / 100));
       stats[stat === "生命" ? "hp" : stat === "攻擊" ? "attack" : "defense"] += value;
     }
-    // Fixed, conservative snapshots: no random affixes, gems, rebirth or blessing.
+    // Reproducible complete combat loadout: all quality affixes at the midpoint
+    // of their legal range plus two advanced offensive gems per item.
+    for (const name of combatAffixes[characterClass].slice(0, maxAffixes)) {
+      const [minimum, maximum] = name === "攻速"
+        ? balanceConfig.equipment.affixes.speedQualityBands[qualityRank]
+        : affixBands[name][qualityRank];
+      const value = Math.round((minimum + maximum) / 2) + Math.floor((mapId - 1) * (mapGrowth[name] ?? 0));
+      const key = attackPercent[name] ?? ({ 暴擊: "crit", 暴擊傷害: "critDamage", 攻速: "speed",
+        命中: "hit", 技能傷害: "skillDamage" })[name];
+      stats[key] = (stats[key] ?? 0) + value;
+    }
+    const gems = balanceConfig.gems.values;
+    const gemTier = mapId >= 7 ? "advanced" : mapId >= 4 ? "intermediate" : "beginner";
+    stats.attackPct = (stats.attackPct ?? 0) + gems.redIron[gemTier] * 10;
+    stats.hpPct = (stats.hpPct ?? 0) + gems.emeraldLife[gemTier] * 10;
+    stats.hp = Math.round(stats.hp * (1 + (stats.hpPct ?? 0) / 100));
+    stats.attack = Math.round(stats.attack * (1 + (stats.attackPct ?? 0) / 100));
+    stats.defense = Math.round(stats.defense * (1 + (stats.defensePct ?? 0) / 100));
   }
   const chosen = layouts[characterClass].slice(0, level === 50 ? 5 : 10);
   const build = { ranks: Object.fromEntries(chosen.map(name => [name, 5])), activeSlots: chosen.slice(0, 3) };
@@ -59,19 +87,31 @@ function snapshot(scenario) {
   const equippedItems = equipment === "神話" ? mythic[characterClass] : [];
   return { stats, build, mapId, equippedItems };
 }
-function sample(scenario, index, trial = 0) {
+function recommendedPowerAtFloor(map, floor) {
+  if (floor >= 30) return map.bossPower;
+  const boundedFloor = Math.max(1, Math.min(29, floor));
+  const interpolate = (start, end, step, steps) => Math.round(start + (end - start) * step / steps);
+  if (boundedFloor <= 10) return interpolate(map.power[0], map.phasePower[0], boundedFloor - 1, 9);
+  if (boundedFloor <= 20) return interpolate(
+    Math.round(map.phasePower[0] * balanceConfig.mapFloors.phaseTwoStartMultiplier),
+    map.phasePower[1], boundedFloor - 11, 9);
+  return interpolate(Math.round(map.phasePower[1] * balanceConfig.mapFloors.phaseThreeStartMultiplier),
+    map.power[1], boundedFloor - 21, 8);
+}
+function sample(scenario, index, trial = 0, mapOverride) {
   const { characterClass, level, encounter } = scenario;
-  const { stats, build, mapId, equippedItems } = snapshot(scenario);
+  const { stats, build, mapId, equippedItems } = snapshot(scenario, mapOverride);
   const map = maps[mapId - 1];
   const boss = encounter === "個人首領" ? personalBosses.find(b => b.id === `${mapId}-2`)
     : encounter === "世界首領60秒" ? worldBosses[0] : null;
-  const recommendedPower = boss?.recommendedPower ?? Math.round((map.phasePower[0] + map.phasePower[1]) / 2);
-  const floor = boss?.baseFloor ?? 14;
+  const floor = boss ? boss.baseFloor : 14;
+  const recommendedPower = boss?.recommendedPower ?? recommendedPowerAtFloor(map, floor);
   const tier = boss ? "boss" : "normal";
   const monsterName = boss ? (boss.name.endsWith("・真身") ? boss.name.slice(0, -3) : boss.name) : map.monsters[0];
-  const maxEnemyHp = boss?.hp ?? Math.max(100, Math.round(recommendedPower *
-    balanceConfig.mapFloors.monsterHealth.normal * balanceConfig.mapFloors.monsterHealth.combatMultiplier.normal *
-    (balanceConfig.lateGameMonsterScaling.health[mapId] ?? 1)));
+  const maxEnemyHp = boss?.hp ?? Math.max(balanceConfig.mapFloors.monsterHealth.minimum, Math.round(
+    recommendedPower * balanceConfig.mapFloors.monsterHealth.normal *
+    balanceConfig.mapFloors.monsterHealth.combatMultiplier.normal *
+    (balanceConfig.lateGameMonsterScaling.health[mapId] ?? 1) * monsterProfile(monsterName).health));
   const maxHp = Math.round(stats.hp * (1 + liveCombatMaxHealthBonus(
     syncLiveCombat(null, `sample:${index}`, "initial", build, characterClass, level, createSkillAscensions())) / 100));
   const random = rng(1777 + index * 101 + trial * 1000003);
@@ -120,6 +160,8 @@ function sample(scenario, index, trial = 0) {
         damage = Math.round(stats.attack * (1 - Math.min(0.65, defense / (defense + 100))) *
           action.damagePercent / 100);
       } else {
+        // resolveLiveCombatAttack already rolls per segment for hit/crit. Keep
+        // this downstream formula deterministic to avoid rolling accuracy twice.
         damage = towerCombatValues({ combatPower: recommendedPower, recommendedPower, mapId,
           localFloor: floor, tier, attacks: 1, skillTriggered: !!action.name, setTier: 0,
           monsterName, playerAttack: stats.attack, playerDefense: stats.defense,
@@ -156,7 +198,7 @@ function sample(scenario, index, trial = 0) {
   if (encounter === "世界首領60秒" && enemyPercent > 0 && elapsedMs >= 60000) playerHp = 0;
   return { ...scenario, elapsedSeconds: elapsedMs / 1000, damageDealt: dealt,
     maximumHealth: maxHp, remainingHealth: Math.max(0, playerHp), skillCasts,
-    mapId, enemy: boss?.name ?? `${map.name}第14層`, enemyMaximumHealth: maxEnemyHp,
+    mapId, recommendedPower, enemy: boss?.name ?? `${map.name}第14層`, enemyMaximumHealth: maxEnemyHp,
     defeatedEnemy: enemyPercent === 0, kills };
 }
 const samples = skillBalanceScenarios().map(sample);
@@ -170,12 +212,24 @@ const repeated = skillBalanceScenarios().map((scenario, index) => {
     meanSkillCasts: Number((runs.reduce((total, s) => total +
       Object.values(s.skillCasts).reduce((a, b) => a + b, 0), 0) / runs.length).toFixed(1)) };
 });
+// A same-map control isolates level/loadout progression from the original
+// map-5-at-50 / map-9-at-100 difficulty jump. World boss is global, so only
+// tower and personal-boss encounters belong in this comparison.
+const matchedScenarios = skillBalanceScenarios().filter(s => s.encounter !== "世界首領60秒");
+const matchedMapComparisons = matchedScenarios.map((scenario, index) => {
+  const runs = Array.from({ length: 30 }, (_, trial) => sample(scenario, index + 1000, trial, 5));
+  return { ...scenario, mapId: 5, trials: runs.length, wins: runs.filter(s => s.defeatedEnemy).length,
+    meanDamage: Math.round(runs.reduce((total, s) => total + s.damageDealt, 0) / runs.length),
+    meanSkillCasts: Number((runs.reduce((total, s) => total +
+      Object.values(s.skillCasts).reduce((a, b) => a + b, 0), 0) / runs.length).toFixed(1)) };
+});
 if (process.argv.includes("--json")) console.log(JSON.stringify({ assumptions: {
   seed: "1777+情境序號×101+重複序號×1000003", trialsPerScenario: 30,
-  equipment: "10件同地圖、傳奇/神話+5(50級)/+10(100級)、無隨機詞綴與寶石",
+  equipment: "10件同地圖、傳奇/神話+5(50級)/+10(100級)；戰鬥詞綴固定中位數、依地圖可取得等級配攻擊與生命寶石各10顆",
   maps: "Lv50=地圖5、Lv100=地圖9，普通怪第14層；個人首領真身；世界首領深淵王60秒",
-  excluded: "轉生、祝福、套裝、伺服器獎勵與瀏覽器渲染；模擬不計為正式帳號實戰驗收",
-}, samples, repeated, metrics: summary.rows.map(row => row.metrics) }, null, 2));
+  matchedMap: "另以地圖5對照50/100級推圖與個人首領；固定地圖對照不包含全球世界首領",
+  excluded: "轉生、祝福、套裝、專屬神話觸發詞綴與瀏覽器渲染；模擬不計為正式帳號實戰驗收",
+}, samples, repeated, matchedMapComparisons, metrics: summary.rows.map(row => row.metrics) }, null, 2));
 else console.log(JSON.stringify({ scenarios: summary.measured, results: samples.map(s => ({
   class: s.characterClass, level: s.level, equipment: s.equipment, encounter: s.encounter,
   map: s.mapId, dps: Math.round(s.damageDealt / s.elapsedSeconds), survived: s.remainingHealth > 0,
