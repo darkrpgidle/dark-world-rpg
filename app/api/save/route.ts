@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { gameSaves, saveSnapshots } from "../../../db/schema";
 import { currentLogin } from "../auth-utils";
-import { applySkillSaveAction, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
+import { applySkillSaveAction, hasAppliedSkillAction, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{20,80}$/.test(value);
 const normalize = (value: string) => value.trim().toLocaleLowerCase("zh-TW");
@@ -53,6 +53,7 @@ function prepareAuthoritativePayload(
 ) {
   const next: Record<string, unknown> = { ...incoming, _saveSessionId: sessionId };
   delete next._lastSkillActionId;
+  delete next._paidSkillResetActionIds;
   delete next._lastSkillRebirthLegacyCount;
   let serverSave: Record<string, unknown> | null = null;
   try {
@@ -75,6 +76,8 @@ function prepareAuthoritativePayload(
       next.adminRevision = serverRevision;
     }
     if (serverSave._lastSkillActionId) next._lastSkillActionId = serverSave._lastSkillActionId;
+    if (Array.isArray(serverSave._paidSkillResetActionIds))
+      next._paidSkillResetActionIds = serverSave._paidSkillResetActionIds;
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
@@ -325,12 +328,16 @@ export async function POST(request: Request) {
       let previous: Record<string, unknown>;
       try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
       catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
-      if (previous._lastSkillActionId === actionId)
+      if (hasAppliedSkillAction(previous, actionId))
         return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
-          skillReworkBuild: previous.skillReworkBuild, skillAscensions: previous.skillAscensions });
+          skillReworkBuild: previous.skillReworkBuild, skillAscensions: previous.skillAscensions,
+          yuanbao: previous.yuanbao, adminRevision: previous.adminRevision });
       const next = applySkillSaveAction(previous, body.skillAction);
       if (!next) return jsonNoStore({ error: "skill_action_rejected" }, 409);
       next._lastSkillActionId = actionId;
+      if (body.skillAction.kind === "paid_reset")
+        next._paidSkillResetActionIds = [...(Array.isArray(previous._paidSkillResetActionIds)
+          ? previous._paidSkillResetActionIds : []), actionId];
       next._saveSessionId = sessionId;
       const nextPayload = JSON.stringify(next);
       if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
@@ -340,7 +347,8 @@ export async function POST(request: Request) {
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt)));
       if ((result.rowsAffected ?? 0) === 1) {
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
-          skillReworkBuild: next.skillReworkBuild, skillAscensions: next.skillAscensions });
+          skillReworkBuild: next.skillReworkBuild, skillAscensions: next.skillAscensions,
+          yuanbao: next.yuanbao, adminRevision: next.adminRevision });
       }
       const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
         .from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
@@ -362,6 +370,7 @@ export async function POST(request: Request) {
   const initialSave = preserveServerSkillSave(normalizedIncoming, null);
   if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
   delete initialSave._lastSkillActionId;
+  initialSave._paidSkillResetActionIds = [];
   delete initialSave._lastSkillRebirthLegacyCount;
   let finalPayload = JSON.stringify({ ...initialSave, _saveSessionId: sessionId });
   let updatedAt = new Date().toISOString();

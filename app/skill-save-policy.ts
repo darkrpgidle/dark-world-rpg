@@ -7,8 +7,14 @@ import {
   restoreSkillAscensions, selectSkillAscension, type SkillAscensionState,
 } from "./skill-ascensions";
 import { preserveLegacyRebirthCount } from "./legacy-rebirth-storage";
+import { balanceConfig } from "./balance-config";
 
 export const SKILL_REWORK_SAVE_VERSION = 1;
+
+export function hasAppliedSkillAction(save: Record<string, unknown>, actionId: string): boolean {
+  return save._lastSkillActionId === actionId ||
+    (Array.isArray(save._paidSkillResetActionIds) && save._paidSkillResetActionIds.includes(actionId));
+}
 
 export type SkillSaveFields = {
   skillReworkVersion: number;
@@ -21,7 +27,8 @@ export type SkillSaveAction =
   | { kind: "equip"; slot: number; name: string | null }
   | { kind: "select_ascension"; tier: number; name: string }
   | { kind: "confirm_ascensions" }
-  | { kind: "begin_rebirth" };
+  | { kind: "begin_rebirth" }
+  | { kind: "paid_reset" };
 
 function isSkillClass(value: unknown): value is SkillClass {
   return value === "戰士" || value === "遊俠" || value === "法師";
@@ -49,7 +56,10 @@ export function preserveServerSkillSave(
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
-  return preserveLegacyRebirthCount({ ...incoming, ...canonical }, server);
+  return preserveLegacyRebirthCount({ ...incoming, ...canonical,
+    _paidSkillResetActionIds: server && Array.isArray(server._paidSkillResetActionIds)
+      ? server._paidSkillResetActionIds : [],
+  }, server);
 }
 
 export function applySkillSaveAction(
@@ -82,6 +92,16 @@ export function applySkillSaveAction(
       ascensions = confirmSkillAscensions(ascensions, characterClass)!;
       if (!ascensions) return null;
       break;
+    case "paid_reset": {
+      const price = balanceConfig.economy.costs.skillReworkResetYuanbao;
+      const balance = save.yuanbao;
+      if (!Number.isSafeInteger(balance) || (balance as number) < price ||
+          !Object.values(build.ranks).some((rank) => rank > 0)) return null;
+      build = createSkillBuild();
+      save = { ...save, yuanbao: (balance as number) - price,
+        adminRevision: Math.max(0, Number(save.adminRevision) || 0) + 1 };
+      break;
+    }
     case "begin_rebirth": {
       const floors = save.mapBestFloors as Record<string, unknown> | undefined;
       if (Number(floors?.[9]) < 30 || typeof save.rebirthCount !== "number" || !Number.isInteger(save.rebirthCount) ||

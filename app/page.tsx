@@ -3819,6 +3819,10 @@ function Game({
         toast.error("新版技能操作未完成，請重新載入後再試");
         return false;
       }
+      if (action.kind === "paid_reset") {
+        if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+        if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+      }
       setSkillReworkBuild(restoreSkillBuild(result.skillReworkBuild, playerClass, level));
       setSkillAscensions(restoreSkillAscensions(result.skillAscensions, playerClass));
       setSaveUpdatedAt(result.updatedAt ?? null);
@@ -8245,6 +8249,14 @@ function Game({
               onSelectTitle={setSelectedTitle}
               onSelectAppearance={setSelectedAppearance}
               onBuy={buyShopItem}
+              onPaidSkillReset={async () => {
+                if (await runSkillAction({ kind: "paid_reset" })) {
+                  pushLog("收益", "商城技能重置，消耗 300 元寶");
+                  toast.success("新版技能點已重置", { description: "消耗 300 元寶；昇華選擇保留" });
+                }
+              }}
+              skillResetBusy={skillActionBusy || !saveReady || sessionSuperseded}
+              skillResetAvailable={Object.values(skillReworkBuild.ranks).some((rank) => rank > 0)}
             />
           )}
           {tab === "日誌" && <Logs logs={logs} />}
@@ -8602,6 +8614,9 @@ function Shop({
   onSelectTitle,
   onSelectAppearance,
   onBuy,
+  onPaidSkillReset,
+  skillResetBusy,
+  skillResetAvailable,
 }: {
   yuanbao: number;
   gold: number;
@@ -8613,9 +8628,14 @@ function Shop({
   onSelectTitle: (id: TitleId) => void;
   onSelectAppearance: (id: AppearanceId) => void;
   onBuy: (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => void;
+  onPaidSkillReset: () => Promise<void>;
+  skillResetBusy: boolean;
+  skillResetAvailable: boolean;
 }) {
   const [currency, setCurrency] = useState<"yuanbao" | "gold">("yuanbao");
   const [yuanbaoPage, setYuanbaoPage] = useState<1 | 2>(1);
+  const [confirmSkillReset, setConfirmSkillReset] = useState(false);
+  const resetPrice = balanceConfig.economy.costs.skillReworkResetYuanbao;
   return (
     <div className="page-section">
       <PageTitle title="暗黑商城" sub="使用金幣或元寶兌換冒險資源。" />
@@ -8645,6 +8665,17 @@ function Shop({
         <div className="shop-grid">
           <Panel className="shop-card"><h3>洗鍊石 ×12</h3><p>資源補給｜補充裝備洗鍊所需的稀有資源。</p><button className="btn btn-primary" onClick={() => onBuy("reforge")}>10 元寶購買</button></Panel>
           <Panel className="shop-card"><h3>賭狗禮包</h3><p>資源補給｜已攻略最高地圖的隨機部位裝備。</p><small>史詩 40%・洗鍊石 ×10 30%・傳奇 20%・神話 10%</small><button className="btn btn-primary" onClick={() => onBuy("gamble")}>10 元寶開啟</button></Panel>
+          <Panel className="shop-card">
+            <h3>新版技能重置</h3><p>重置已分配的新版技能點與出戰槽；昇華選擇保留。</p>
+            {confirmSkillReset ? <div className="cosmetic-actions">
+              <button className="btn btn-primary" disabled={skillResetBusy || yuanbao < resetPrice || !skillResetAvailable}
+                onClick={async () => { setConfirmSkillReset(false); await onPaidSkillReset(); }}>確認消耗 {resetPrice} 元寶</button>
+              <button className="btn btn-ghost" disabled={skillResetBusy} onClick={() => setConfirmSkillReset(false)}>取消</button>
+            </div> : <button className="btn btn-primary" disabled={skillResetBusy || yuanbao < resetPrice || !skillResetAvailable}
+              onClick={() => setConfirmSkillReset(true)}>{resetPrice} 元寶重置</button>}
+            {yuanbao < resetPrice && <small>元寶不足</small>}
+            {!skillResetAvailable && <small>尚未分配新版技能點</small>}
+          </Panel>
         </div>
       )}
       <Panel className="shop-card cosmetic-loadout"><h3>目前裝備</h3><p>稱號：{TITLE_OPTIONS[selectedTitle].name}　外觀：{APPEARANCE_OPTIONS[selectedAppearance].name}</p><div className="cosmetic-actions"><select value={selectedTitle} onChange={(event) => onSelectTitle(event.target.value as TitleId)}>{ownedTitles.map((id) => <option key={id} value={id}>{TITLE_OPTIONS[id].name}</option>)}</select><select value={selectedAppearance} onChange={(event) => onSelectAppearance(event.target.value as AppearanceId)}>{ownedAppearances.map((id) => <option key={id} value={id}>{APPEARANCE_OPTIONS[id].name}</option>)}</select></div><small>金幣 {gold.toLocaleString()} · 元寶 {yuanbao.toLocaleString()}</small></Panel>

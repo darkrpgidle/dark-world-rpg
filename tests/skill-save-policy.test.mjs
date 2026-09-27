@@ -6,7 +6,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   if (specifier.startsWith("./") && !specifier.endsWith(".ts")) return nextResolve(`${specifier}.ts`, context);
   return nextResolve(specifier, context);
 } });
-const { applySkillSaveAction, preserveServerSkillSave, restoreSkillSave } = await import("../app/skill-save-policy.ts");
+const { applySkillSaveAction, hasAppliedSkillAction, preserveServerSkillSave, restoreSkillSave } = await import("../app/skill-save-policy.ts");
 const { createSkillBuild } = await import("../app/skill-rework.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
 const { preserveLegacyRebirthCount } = await import("../app/legacy-rebirth-storage.ts");
@@ -101,4 +101,48 @@ test("skill actions preserve daily, idle and resource balances", () => {
   for (const key of ["yuanbao", "gold", "storedSeconds", "lastSeenAt", "dailyDate", "dailyRewardClaimed"])
     assert.equal(next[key], previous[key], key);
   assert.deepEqual(previous.skillReworkBuild, undefined);
+});
+
+
+test("paid skill reset charges exactly 300 yuanbao and preserves unrelated progress", () => {
+  let before = applySkillSaveAction({ ...base(), yuanbao: 300, gold: 999,
+    dailyRewardClaimed: true, storedSeconds: 80 }, { kind: "upgrade", name: "裂地斬" });
+  before = applySkillSaveAction(before, { kind: "equip", slot: 0, name: "裂地斬" });
+  const after = applySkillSaveAction(before, { kind: "paid_reset" });
+  assert.equal(after.yuanbao, 0);
+  assert.equal(after.adminRevision, 1);
+  assert.deepEqual(after.skillReworkBuild, createSkillBuild());
+  assert.deepEqual(after.skillAscensions, before.skillAscensions);
+  for (const key of ["gold", "dailyRewardClaimed", "storedSeconds", "rebirthCount"])
+    assert.equal(after[key], before[key]);
+  assert.deepEqual(before.skillReworkBuild.activeSlots, ["裂地斬", null, null]);
+  assert.equal(applySkillSaveAction(after, { kind: "paid_reset" }), null);
+});
+
+test("paid reset rejects insufficient, malformed and unspent balances without mutation", () => {
+  const spent = applySkillSaveAction({ ...base(), yuanbao: 299 }, { kind: "upgrade", name: "裂地斬" });
+  for (const yuanbao of [0, 299, -1, 300.5, "300", null, Number.NaN])
+    assert.equal(applySkillSaveAction({ ...spent, yuanbao }, { kind: "paid_reset" }), null);
+  assert.equal(applySkillSaveAction({ ...base(), yuanbao: 300 }, { kind: "paid_reset" }), null);
+  assert.equal(spent.yuanbao, 299);
+});
+
+test("generic autosave cannot remove or fabricate server paid reset receipts", () => {
+  const id = "123e4567-e89b-12d3-a456-426614174000";
+  const server = { ...base(), yuanbao: 0, _paidSkillResetActionIds: [id] };
+  assert.deepEqual(preserveServerSkillSave({ ...base(), _paidSkillResetActionIds: ["forged"] }, server)
+    ._paidSkillResetActionIds, [id]);
+  assert.deepEqual(preserveServerSkillSave({ ...base(), _paidSkillResetActionIds: [id] }, null)
+    ._paidSkillResetActionIds, []);
+});
+
+
+test("paid reset receipt prevents replay after an intervening skill action", () => {
+  const resetId = "123e4567-e89b-12d3-a456-426614174000";
+  const laterId = "123e4567-e89b-12d3-a456-426614174001";
+  const save = { ...base(), yuanbao: 300, _lastSkillActionId: laterId,
+    _paidSkillResetActionIds: [resetId] };
+  assert.equal(hasAppliedSkillAction(save, resetId), true);
+  assert.equal(hasAppliedSkillAction(save, laterId), true);
+  assert.equal(hasAppliedSkillAction(save, "123e4567-e89b-12d3-a456-426614174002"), false);
 });

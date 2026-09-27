@@ -338,6 +338,7 @@ export const balanceConfig = {
       affixLockFirst: 50_000,
       affixLockSecond: 150_000,
       skillReset: 50_000,
+      skillReworkResetYuanbao: 300,
     },
   },
 

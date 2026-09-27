@@ -128,7 +128,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
             )}
           </div>
         )}
-        <p>付費技能重置待元寶價格、重置卷道具及伺服器扣款規則定案後開放。</p>
+        <p>新版技能點可在商城以 300 元寶重置；轉生可免費重配。重置卷尚待道具來源定案。</p>
       </section>
       {(["active", "passive"] as const).map((kind) => (
         <div key={kind}>
