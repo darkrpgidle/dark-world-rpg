@@ -92,7 +92,7 @@ test("equipped mage mythics affect only their live skill events", () => {
     }, "法師", 100, createSkillAscensions());
     if (withShield) resolveLiveEnemyAttack(battle,
       { healthPercent: 30, maxHealth: 100, damage: 1, roll: () => 0.99 });
-    for (let action = 0; action < 8; action++) {
+    for (let action = 0; action < 50; action++) {
       const result = resolveLiveCombatAttack(battle, {
         ...opts, now: 1000 + action * 100, roll: () => 0.25, equippedItems,
       });
