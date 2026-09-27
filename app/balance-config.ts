@@ -315,6 +315,13 @@ export const balanceConfig = {
   economy: {
     onlineYuanbao: { intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90 },
     yuanbaoReforgeBundle: { price: 10, stones: 12 },
+    yuanbaoCosmetics: {
+      "title-ash": 80,
+      "title-abyss": 180,
+      "appearance-ember": 120,
+      "appearance-arcane": 180,
+      "appearance-abyss": 300,
+    },
     dailyHuntReward: { kills: 500, gold: 5_000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 },
     gold: {
       monsterDropBaseByMap: [80, 150, 260, 420, 680, 1000, 1500, 2200, 3200],

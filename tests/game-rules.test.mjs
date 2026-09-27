@@ -838,6 +838,15 @@ test("buys the yuanbao reforge bundle through the save service", () => {
   assert.match(page, /action: "shop_reforge", purchaseId/);
 });
 
+test("buys cosmetic unlocks through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoCosmetics, {
+    "title-ash": 80, "title-abyss": 180,
+    "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
+  });
+  assert.match(page, /shop_cosmetic/);
+  assert.doesNotMatch(page, /setOwnedTitles\\(\\(current\\) => current\\.includes\\(title\\)/);
+});
+
 test("claims the 500-kill daily target through the save service", () => {
   const reward = balanceConfig.economy.dailyHuntReward;
   assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });

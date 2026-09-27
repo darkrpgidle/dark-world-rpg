@@ -4,7 +4,7 @@ import { gameSaves, saveSnapshots, sessions } from "../../../db/schema";
 import { activeSaveSession } from "../../save-session-guard";
 import { applyDailyHuntClaim, preserveServerDailyHuntClaim, taipeiDailyDate } from "../../daily-hunt-claim";
 import { advanceOnlineYuanbao, preserveServerOnlineYuanbao } from "../../online-yuanbao";
-import { buyYuanbaoReforgeBundle, preserveServerShopPurchases } from "../../shop-purchase";
+import { buyYuanbaoCosmetic, buyYuanbaoReforgeBundle, cosmeticSku, preserveServerShopPurchases } from "../../shop-purchase";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
@@ -169,12 +169,13 @@ export async function POST(request: Request) {
     save?: unknown;
     payload?: unknown;
     expectedUpdatedAt?: string | null;
-    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "skill";
+    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "shop_cosmetic" | "skill";
     dailyDate?: string;
     dailyKills?: number;
     skillAction?: SkillSaveAction;
     skillActionId?: string;
     purchaseId?: string;
+    shopItem?: string;
   };
   const playerId = body.playerId ?? "";
   if (!validId(playerId))
@@ -341,21 +342,27 @@ export async function POST(request: Request) {
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
   }
-  if (body.action === "shop_reforge") {
+  if (body.action === "shop_reforge" || body.action === "shop_cosmetic") {
     if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
     const purchaseId = body.purchaseId;
     if (!purchaseId || !/^[a-f0-9-]{36}$/.test(purchaseId))
       return jsonNoStore({ error: "invalid_purchase_id" }, 400);
+    if (body.action === "shop_cosmetic" && !cosmeticSku(body.shopItem))
+      return jsonNoStore({ error: "invalid_shop_item" }, 400);
     let current = existing[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
       let previous: Record<string, unknown>;
       try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
       catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
-      const purchase = buyYuanbaoReforgeBundle(previous, purchaseId);
+      const purchase = body.action === "shop_cosmetic" && cosmeticSku(body.shopItem)
+        ? buyYuanbaoCosmetic(previous, body.shopItem, purchaseId)
+        : buyYuanbaoReforgeBundle(previous, purchaseId);
       if (!purchase) return jsonNoStore({ error: "purchase_rejected" }, 409);
       if (!purchase.accepted)
         return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
           yuanbao: previous.yuanbao, reforgeStones: previous.reforgeStones,
+          ownedTitles: previous.ownedTitles, ownedAppearances: previous.ownedAppearances,
+          selectedTitle: previous.selectedTitle, selectedAppearance: previous.selectedAppearance,
           adminRevision: previous.adminRevision });
       const next: Record<string, unknown> = { ...purchase.save, _saveSessionId: sessionId };
       const nextPayload = JSON.stringify(next);
@@ -366,7 +373,10 @@ export async function POST(request: Request) {
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
       if ((result.rowsAffected ?? 0) === 1)
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
-          yuanbao: next.yuanbao, reforgeStones: next.reforgeStones, adminRevision: next.adminRevision });
+          yuanbao: next.yuanbao, reforgeStones: next.reforgeStones,
+          ownedTitles: next.ownedTitles, ownedAppearances: next.ownedAppearances,
+          selectedTitle: next.selectedTitle, selectedAppearance: next.selectedAppearance,
+          adminRevision: next.adminRevision });
       if (await writerRevoked()) return replacedResponse();
       const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
         updatedAt: gameSaves.updatedAt }).from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);

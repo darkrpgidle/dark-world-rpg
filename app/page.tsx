@@ -2314,7 +2314,7 @@ function Game({
   const dailyClaimInFlightRef = useRef(false);
   const [shopPurchaseBusy, setShopPurchaseBusy] = useState(false);
   const shopPurchaseInFlightRef = useRef(false);
-  const shopPurchaseRetryRef = useRef<string | null>(null);
+  const shopPurchaseRetryRef = useRef<{ id: string; item: string } | null>(null);
   const [worldDamage, setWorldDamage] = useState(0);
   const [worldRoundDamage, setWorldRoundDamage] = useState(0);
   const [worldBossSecondsLeft, setWorldBossSecondsLeft] = useState(WORLD_BOSS_ROUND_MS / 1_000);
@@ -3349,20 +3349,27 @@ function Game({
   }, [saveReady, playerId, loginId, sessionSuperseded, pauseSupersededSession, pushLog]);
 
   const buyShopItem = async (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
-    if (item === "reforge") {
+    const cosmeticPrices: Partial<Record<typeof item, number>> = balanceConfig.economy.yuanbaoCosmetics;
+    const cosmeticPrice = cosmeticPrices[item];
+    if (item === "reforge" || cosmeticPrice !== undefined) {
       if (shopPurchaseInFlightRef.current) return;
       if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
-      const { price, stones } = balanceConfig.economy.yuanbaoReforgeBundle;
+      const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : cosmeticPrice;
       if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
+      if (shopPurchaseRetryRef.current && shopPurchaseRetryRef.current.item !== item)
+        return toast.error("請先重試尚未確認的上一筆購買");
       shopPurchaseInFlightRef.current = true;
       setShopPurchaseBusy(true);
-      const purchaseId = shopPurchaseRetryRef.current ?? crypto.randomUUID();
-      shopPurchaseRetryRef.current = purchaseId;
+      const purchaseId = shopPurchaseRetryRef.current?.id ?? crypto.randomUUID();
+      shopPurchaseRetryRef.current = { id: purchaseId, item };
       try {
         const response = await fetch("/api/save", {
           method: "POST",
           headers: loginHeaders(loginId, true),
-          body: JSON.stringify({ playerId, action: "shop_reforge", purchaseId }),
+          body: JSON.stringify({
+            playerId, action: item === "reforge" ? "shop_reforge" : "shop_cosmetic",
+            purchaseId, ...(item === "reforge" ? {} : { shopItem: item }),
+          }),
         });
         const result = await response.json();
         if (response.status === 401) {
@@ -3370,19 +3377,31 @@ function Game({
           return;
         }
         if (!response.ok || result?.ok !== true || typeof result.accepted !== "boolean") {
-          toast.error(result?.error === "purchase_rejected" ? "元寶不足或存檔異常" : "購買失敗，請重試");
+          toast.error(result?.error === "purchase_rejected" ? "元寶不足、已擁有或存檔異常" : "購買失敗，請重試");
           return;
         }
         if (result.accepted) {
           setYuanbao((value) => value - price);
-          setReforgeStones((value) => value + stones);
-          pushLog("收益", `商城購買洗鍊石 ×${stones}，消耗元寶 ${price}`);
-          toast.success("購買成功", { description: `洗鍊石 +${stones}` });
+          if (item === "reforge") {
+            const stones = balanceConfig.economy.yuanbaoReforgeBundle.stones;
+            setReforgeStones((value) => value + stones);
+            pushLog("收益", `商城購買洗鍊石 ×${stones}，消耗元寶 ${price}`);
+            toast.success("購買成功", { description: `洗鍊石 +${stones}` });
+          } else {
+            toast.success("外觀或稱號已解鎖並裝備");
+          }
         } else {
           if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
-          if (Number.isSafeInteger(result.reforgeStones)) setReforgeStones(result.reforgeStones);
+          if (item === "reforge" && Number.isSafeInteger(result.reforgeStones))
+            setReforgeStones(result.reforgeStones);
           toast.info("該筆購買已完成");
         }
+        if (Array.isArray(result.ownedTitles)) setOwnedTitles(result.ownedTitles);
+        if (Array.isArray(result.ownedAppearances)) setOwnedAppearances(result.ownedAppearances);
+        if (typeof result.selectedTitle === "string" && result.ownedTitles?.includes(result.selectedTitle))
+          setSelectedTitle(result.selectedTitle as TitleId);
+        if (typeof result.selectedAppearance === "string" && result.ownedAppearances?.includes(result.selectedAppearance))
+          setSelectedAppearance(result.selectedAppearance as AppearanceId);
         if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
         setSaveUpdatedAt(result.updatedAt ?? null);
         shopPurchaseRetryRef.current = null;
@@ -3394,32 +3413,8 @@ function Game({
       }
       return;
     }
-    const yuanbaoPrices: Partial<Record<typeof item, number>> = {
-      "title-ash": 80, "title-abyss": 180, "appearance-ember": 120,
-      "appearance-arcane": 180, "appearance-abyss": 300, gamble: 10,
-    };
     const goldPrices: Partial<Record<typeof item, number>> = { "gold-reforge": 200000, "gold-enhance": 100000 };
-    const yuanbaoPrice = yuanbaoPrices[item];
     const goldPrice = goldPrices[item];
-    if (yuanbaoPrice) {
-      if (yuanbao < yuanbaoPrice) return toast.error("元寶不足", { description: `需要 ${yuanbaoPrice} 元寶` });
-      setYuanbao((value) => value - yuanbaoPrice);
-      if (item.startsWith("title-")) {
-        const title = item === "title-ash" ? "ash-conqueror" : "abyss-survivor";
-        setOwnedTitles((current) => current.includes(title) ? current : [...current, title]);
-        setSelectedTitle(title);
-        toast.success("稱號已解鎖並裝備", { description: TITLE_OPTIONS[title].name });
-        return;
-      }
-      if (item.startsWith("appearance-")) {
-        const appearance = item.replace("appearance-", "") as "ember" | "arcane" | "abyss";
-        const id = `${appearance}-aura` as AppearanceId;
-        setOwnedAppearances((current) => current.includes(id) ? current : [...current, id]);
-        setSelectedAppearance(id);
-        toast.success("外觀特效已解鎖並裝備", { description: APPEARANCE_OPTIONS[id].name });
-        return;
-      }
-    }
     if (goldPrice) {
       if (gold < goldPrice) return toast.error("金幣不足", { description: `需要 ${goldPrice.toLocaleString()} 金幣` });
       setGold((value) => value - goldPrice);
@@ -8765,11 +8760,11 @@ function Shop({
         </div>
       ) : yuanbaoPage === 2 ? (
         <div className="shop-grid">
-          <Panel className="shop-card"><h3>灰燼征服者</h3><p>外型｜稱號：征服灰燼墓園。</p><button className="btn btn-primary" disabled={ownedTitles.includes("ash-conqueror")} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : "80 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵倖存者</h3><p>外型｜稱號：從時墟深淵生還。</p><button className="btn btn-primary" disabled={ownedTitles.includes("abyss-survivor")} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外型｜六格去背熔岩骨翼，展翼時彈射火星。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "120 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>奧術星翼</h3><p>外型｜六格去背紫色符文能量羽翼。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外型｜六格去背黑紅破碎深淵蝠翼。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "300 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼征服者</h3><p>外型｜稱號：征服灰燼墓園。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("ash-conqueror")} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : "80 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵倖存者</h3><p>外型｜稱號：從時墟深淵生還。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("abyss-survivor")} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外型｜六格去背熔岩骨翼，展翼時彈射火星。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "120 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>奧術星翼</h3><p>外型｜六格去背紫色符文能量羽翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外型｜六格去背黑紅破碎深淵蝠翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "300 元寶解鎖"}</button></Panel>
         </div>
       ) : (
         <div className="shop-grid">
