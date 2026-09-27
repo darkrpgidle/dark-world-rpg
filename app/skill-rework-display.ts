@@ -17,11 +17,12 @@ const labels: Record<string, string> = {
   attackSpeedBonus: "攻速加成", defensePenalty: "防禦降低", attacks: "持續攻擊次數",
   enemyAttacksRequired: "受擊觸發次數", healthBelow: "生命門檻（低於 %）",
   ignoreDefense: "忽略防禦", chargeReductionChance: "暴擊縮短充能機率",
+  recoveredOwnCharge: "觸發時自身回復充能", affectedEnemyAttacks: "生效的敵方攻擊次數",
   dodgeBonus: "閃避加成", nextCritChance: "閃避後下一擊暴擊加成",
   criticalChanceBonus: "暴擊加成", arrows: "箭數", damagePerArrow: "每箭傷害倍率",
   successfulPrimaryHitsRequired: "所需主要命中次數", actions: "持續攻擊次數",
   normalDamagePenalty: "普攻傷害降低", criticalDamageBonus: "技能暴傷加成",
-  rainArrows: "箭雨箭數", mainArrows: "主箭數", totalDamage: "總傷害倍率",
+  rainArrows: "箭雨箭數", mainArrows: "主箭數", rainArrowDamage: "每支雨箭傷害倍率", totalDamage: "總傷害倍率",
   burnChance: "灼燒率", missiles: "飛彈數", damagePerMissile: "每發傷害倍率",
   maxHealthShieldPercent: "最大生命護盾比例", statusChancePoints: "異常率加成",
   successfulActiveCastsRequired: "所需成功主動施放", followingSuccessfulActiveCasts: "後續成功施放次數",
@@ -63,6 +64,7 @@ const units: Record<string, string> = {
   maxStacks: "層", missesToClear: "次", followingPrimaryActions: "次",
   maxDistinctStatuses: "種", maxProcsPerCast: "次", maxProcsPerUltimate: "次",
   repeatedArmorBreakFactor: "倍",
+  recoveredOwnCharge: "格", affectedEnemyAttacks: "次",
 };
 
 const ascensionEffects: Record<SkillClass, Record<string, string>> = {
