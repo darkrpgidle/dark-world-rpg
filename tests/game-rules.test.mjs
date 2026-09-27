@@ -9,6 +9,8 @@ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8
 const balanceSource = await readFile(new URL("../app/balance.ts", import.meta.url), "utf8");
 const balanceConfigSource = await readFile(new URL("../app/balance-config.ts", import.meta.url), "utf8");
 const skillCanvasSource = await readFile(new URL("../app/skill-effect-canvas.tsx", import.meta.url), "utf8");
+const skillPanelSource = await readFile(new URL("../app/skill-rework-panel.tsx", import.meta.url), "utf8");
+const skillConstellationSource = await readFile(new URL("../app/skill-constellation.tsx", import.meta.url), "utf8");
 const adminPanelsSource = await readFile(new URL("../app/admin-panels.tsx", import.meta.url), "utf8");
 const authSource = await readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8");
 const authUtilsSource = await readFile(new URL("../app/api/auth-utils.ts", import.meta.url), "utf8");
@@ -517,7 +519,11 @@ test("displays player and monster damage as matching raw numbers", () => {
 
 test("keeps skill cards and battle information unambiguous", () => {
   assert.match(page, /<SkillReworkPanel/);
-  assert.match(page, /earnedSkillPoints\(level\) - spentSkillPoints\(skillReworkBuild\)/);
+  assert.match(skillPanelSource, /可用/);
+  assert.match(skillPanelSource, /aria-label="已投入技能點"/);
+  assert.match(skillPanelSource, /效果與成長/);
+  assert.match(skillPanelSource, /SkillConstellation/);
+  assert.match(skillConstellationSource, /getContext\("webgl"/);
   assert.doesNotMatch(page, /目前戰鬥使用的技能/);
   assert.match(page, /遠征祝福不會在首領戰生效/);
   assert.match(page, /首領 -\{group\.damage\}/);
