@@ -19,6 +19,7 @@ import {
   recordWarriorSkillHit,
   triggerWarriorBloodRoar,
   triggerWarriorStance,
+  warriorRepeatedArmorBreakBonus,
   warriorSkillRankValue,
   type WarriorActiveName,
   type WarriorBuffState,
@@ -78,6 +79,8 @@ export type WarriorTurnInput = {
 export type WarriorTurnResult = {
   combat: WarriorCombat;
   baseDamagePercent: number;
+  // Base skill multiplier after 崩鎧重擊, before ordinary passive/buff bonuses.
+  effectiveBaseDamagePercent: number;
   bonusDamagePercent: number;
   extraDamagePercents: number[];
   ascensionDamageEvents: { id: "血祭印記" | "地脈崩裂" | "天地斷絕" | "血怒終焉"; percent: number }[];
@@ -91,7 +94,7 @@ export type WarriorTurnResult = {
   clearsOneNegativeStatus: boolean;
   clearedNegativeStatus: string | null;
   remainingNegativeStatuses: string[];
-  // Exact conversion of repeated armor break to damage is not specified yet.
+  repeatedArmorBreakBonusPercent: number;
   repeatedArmorBreakBonusCapPercent: number;
 };
 
@@ -124,6 +127,10 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   let buffs = newlyTriggeredRoar ?? combat.buffs;
   const rule = activeSkill ? WARRIOR_ACTIVE_RULES[activeSkill] : null;
   const baseDamagePercent = rule && "damage" in rule ? warriorSkillRankValue(rule.damage, rank) : active ? 0 : 100;
+  const repeatedArmorBreakBonusPercent = input.skill === "碎甲猛擊" && previousArmorBreak
+    && successfulHit && input.ascended.has("碎甲猛擊")
+    ? warriorRepeatedArmorBreakBonus(rank) : 0;
+  const effectiveBaseDamagePercent = baseDamagePercent * (1 + repeatedArmorBreakBonusPercent / 100);
   const statusApplications: StatusApplication[] = [];
   let bleedChancePercent = 0;
   if (successfulHit && rule && "armorBreak" in rule) {
@@ -197,6 +204,7 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
       bloodBrandBurstUsed: bloodBrandBurstUsed || bloodBrandBurst,
     },
     baseDamagePercent,
+    effectiveBaseDamagePercent,
     bonusDamagePercent: modifiers.damageBonusPercent + passive.damageBonusPercent,
     extraDamagePercents: [
       ...ascensionDamageEvents.map((event) => event.percent),
@@ -213,6 +221,8 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     clearsOneNegativeStatus,
     clearedNegativeStatus,
     remainingNegativeStatuses: clearedNegativeStatus === null ? [...negativeStatuses] : negativeStatuses.slice(1),
-    repeatedArmorBreakBonusCapPercent: input.skill === "碎甲猛擊" && previousArmorBreak && input.ascended.has("碎甲猛擊") ? 60 : 0,
+    repeatedArmorBreakBonusPercent,
+    repeatedArmorBreakBonusCapPercent: repeatedArmorBreakBonusPercent
+      ? WARRIOR_ACTIVE_RULES.碎甲猛擊.repeatedArmorBreakBonusCap : 0,
   };
 }
