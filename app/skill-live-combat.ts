@@ -28,7 +28,8 @@ export type LiveCombatAction = {
   statuses: string[]; ticks: number[]; critical: boolean;
 };
 type AttackOptions = { now: number; healthPercent: number; attack: number;
-  hitChance: number; criticalChance: number; criticalDamage: number; roll?: () => number };
+  hitChance: number; criticalChance: number; criticalDamage: number; roll?: () => number;
+  equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[] };
 
 function createCombat(characterClass: SkillClass, build: SkillBuild, level: number) {
   const unequipped = new Set(SKILL_REWORK_CATALOG[characterClass]
@@ -172,7 +173,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       skill: (name ?? "normal") as Parameters<typeof resolveMageTurn>[1]["skill"],
       hits, now: options.now,
       ascended: battle.ascended as ReadonlySet<Exclude<Parameters<typeof resolveMageTurn>[1]["skill"], "normal">>,
-      roll: random,
+      roll: random, equippedItems: options.equippedItems,
     });
     if (!result) throw new Error("Mage action and charge queue disagree");
     battle.combat = result.combat;
