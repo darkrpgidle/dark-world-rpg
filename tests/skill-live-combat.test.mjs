@@ -84,6 +84,29 @@ test("equipped defensive skills absorb or avoid an actual enemy attack", () => {
   }
 });
 
+test("equipped mage mythics affect only their live skill events", () => {
+  const cast = (name, equippedItems, withShield = false) => {
+    const battle = syncLiveCombat(null, `${name}-${equippedItems.length}`, "boss", {
+      ranks: { [name]: 5 }, activeSlots: [name, null, null],
+    }, "法師", 100, createSkillAscensions());
+    if (withShield) resolveLiveEnemyAttack(battle,
+      { healthPercent: 30, maxHealth: 100, damage: 1, roll: () => 0.99 });
+    for (let action = 0; action < 8; action++) {
+      const result = resolveLiveCombatAttack(battle, {
+        ...opts, now: 1000 + action * 100, roll: () => 0.25, equippedItems,
+      });
+      if (result.name === name) return result.damagePercent;
+    }
+    throw new Error(`${name} never cast`);
+  };
+  const meteor = cast("隕星術", []);
+  const extraMeteor = cast("隕星術", [{ mythicId: "skill-mage-cataclysm-crown" }]);
+  assert.ok(extraMeteor > meteor, "the second meteor must add real damage");
+  const frostfire = cast("霜火新星", [], true);
+  const shieldCore = cast("霜火新星", [{ mythicId: "skill-mage-eternal-core" }], true);
+  assert.ok(shieldCore > frostfire, "an active shield must increase direct skill damage");
+});
+
 test("direct skill damage reaches the shared HP and victory calculation once in every encounter", () => {
   for (const [characterClass, name] of [["戰士", "裂地斬"], ["遊俠", "穿雲箭"], ["法師", "霜火新星"]]) {
     for (const encounter of ["tower", "personal-boss", "world-boss"]) {
