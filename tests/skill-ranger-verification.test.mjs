@@ -48,11 +48,13 @@ test("tailwind critical rolls the five ranked charge-reduction probabilities onc
     assert.equal(draws, 1);
     assert.equal(triggered.tailwindChargeReductionChancePercent, chance);
     assert.equal(triggered.tailwindChargeReductionTriggered, true);
-    assert.equal(triggered.combat.session.charge.charges.追風箭, 1);
+    assert.equal(triggered.tailwindChargeRecovered, 1);
+    assert.equal(triggered.combat.session.charge.charges.追風箭, 2);
     assert.equal(triggered.combat.session.charge.ultimateEnergy, 27);
     const boundary = turn(combat, "追風箭", 300, [{ hit: true, critical: true }],
       { roll: () => chance / 100 });
     assert.equal(boundary.tailwindChargeReductionTriggered, false);
+    assert.equal(boundary.tailwindChargeRecovered, 0);
     assert.equal(boundary.combat.session.charge.charges.追風箭, 1);
   }
 });
@@ -64,6 +66,7 @@ test("tailwind miss, normal hit and ordinary critical cannot roll or fabricate c
       { roll: () => { throw Error("not eligible for a roll"); } });
     assert.equal(result.tailwindChargeReductionChancePercent, 0);
     assert.equal(result.tailwindChargeReductionTriggered, false);
+    assert.equal(result.tailwindChargeRecovered, 0);
   }
   const normal = turn(ranger({ 追風箭: 1 }), "normal", 0, [{ hit: true, critical: true }],
     { roll: () => { throw Error("normal attack does not roll tailwind"); } });
@@ -79,7 +82,7 @@ test("ascended tailwind arrow remains a separate segment and does not roll reduc
   assert.equal(draws, 1);
   assert.deepEqual(cast.additionalArrowEvents, [{ id: "風痕追獵", percent: 60 }]);
   assert.equal(cast.tailwindChargeReductionTriggered, true);
-  assert.equal(cast.combat.session.charge.charges.追風箭, 1);
+  assert.equal(cast.combat.session.charge.charges.追風箭, 2);
   assert.equal(cast.combat.session.charge.ultimateEnergy, 27);
 });
 
@@ -92,7 +95,7 @@ test("eight critical rain arrows grant eight marks, but a missed main arrow rece
   assert.equal(result.mainArrowDamageBonusPercent, 0);
   assert.deepEqual(result.passiveDamageProcs, []);
   assert.equal(result.combat.session.charge.ultimateEnergy, 3);
-  assert.deepEqual(result.damageSegmentPercents, []); // nine per-segment base multipliers remain undefined
+  assert.deepEqual(result.damageSegmentPercents, [...Array(8).fill(30), 160]);
 });
 
 test("main arrow critical alone grants no marks; mixed rain hits boost only the landed main arrow", () => {
@@ -109,6 +112,7 @@ test("main arrow critical alone grants no marks; mixed rain hits boost only the 
       ...Array.from({ length: 5 }, () => ({ hit: false })), { hit: true }],
     { ascended: new Set(["蒼穹箭雨"]) });
   assert.equal(mixed.totalDamagePercent, 630);
+  assert.deepEqual(mixed.damageSegmentPercents, [...Array(8).fill(46), 262]);
   assert.equal(mixed.skyMarks, 3);
   assert.equal(mixed.mainArrowDamageBonusPercent, 18);
   assert.equal(mixed.combat.session.charge.ultimateEnergy, 3);
@@ -153,4 +157,86 @@ test("phantom dodge bonus waits through normals, then the next skill spends it e
   const missed = turn(ready(combat, "穿雲箭"), "穿雲箭", 100, [{ hit: false }]);
   assert.equal(missed.phantomNextSkillCriticalDamagePercent, 35);
   assert.equal(missed.combat.defense.nextSkillCriticalDamagePending, false);
+});
+
+test("tailwind recovers only its own charge after the cast without changing queued order", () => {
+  let combat = ranger({ 追風箭: 1, 穿雲箭: 1, 蒼穹箭雨: 1 }, ["追風箭", "穿雲箭"]);
+  combat = ready(combat, "追風箭");
+  combat.session.charge.ready.push("穿雲箭");
+  combat.session.charge.charges.穿雲箭 = 4;
+  const cast = turn(combat, "追風箭", 0, [{ hit: true, critical: true }], { roll: () => 0 });
+  assert.equal(cast.combat.session.charge.charges.追風箭, 2);
+  assert.equal(cast.combat.session.charge.charges.穿雲箭, 4);
+  assert.deepEqual(cast.combat.session.charge.ready, ["穿雲箭"]);
+  assert.equal(cast.combat.session.charge.ultimateEnergy, 3);
+  const next = turn(cast.combat, "穿雲箭", 1);
+  assert.equal(next.combat.session.charge.charges.追風箭, 3);
+  assert.deepEqual(next.combat.session.charge.ready, ["追風箭"]);
+});
+
+test("all sky-rain ranks divide their listed total into eight independent rains and one main", () => {
+  for (const [index, [total, rain]] of [[400, 30], [450, 34], [505, 38], [565, 42], [630, 46]].entries()) {
+    const combat = ready(ranger({ 蒼穹箭雨: index + 1 }), "蒼穹箭雨");
+    combat.session.charge.ultimateEnergy = 100;
+    const cast = turn(combat, "蒼穹箭雨", 0, Array.from({ length: 9 }, () => ({ hit: true })));
+    assert.equal(cast.damageSegmentPercents.length, 9);
+    assert.deepEqual(cast.damageSegmentPercents, [...Array(8).fill(rain), total - 8 * rain]);
+    assert.equal(cast.damageSegmentPercents.reduce((sum, value) => sum + value, 0), total);
+    assert.equal(cast.combat.session.charge.ultimateEnergy, 0);
+  }
+});
+
+test("phantom lasts three enemy attacks and low HP cannot retrigger until it resets", () => {
+  let combat = ranger({ 幻影步: 5, 影步反射: 1 }, ["幻影步"]);
+  const incoming = (healthPercent, extra = {}) => recordRangerEnemyAttack(combat, {
+    segments: 8, countsAsReceivedHit: true, healthPercent,
+    canActivateFromHealth: true, ascended: true, ...extra,
+  });
+  let event = incoming(54);
+  assert.equal(event.activation.dodgeChancePoints, 22);
+  assert.equal(event.dodgeChancePoints, 24);
+  assert.equal(event.guaranteedDodgeForAttack, true);
+  combat = recordRangerSuccessfulDodge(event.combat,
+    { phantomStepActive: true, ascended: true }).combat;
+  assert.equal(combat.defense.guaranteedDodgePending, false);
+  for (const remaining of [1, 0]) {
+    event = incoming(54);
+    assert.equal(event.activation, null);
+    assert.equal(event.phantomActiveForAttack, true);
+    assert.equal(event.dodgeChancePoints, 24);
+    assert.equal(event.guaranteedDodgeForAttack, false);
+    assert.equal(event.combat.defense.phantomAttacksRemaining, remaining);
+    combat = event.combat;
+  }
+  event = incoming(54);
+  assert.equal(event.activation, null);
+  assert.equal(event.phantomActiveForAttack, false);
+  assert.equal(event.dodgeChancePoints, 2);
+  combat = event.combat;
+  event = incoming(56);
+  assert.equal(event.activation, null);
+  combat = event.combat;
+  event = incoming(54);
+  assert.equal(event.activation.dodgeChancePoints, 22);
+  assert.equal(event.guaranteedDodgeForAttack, true);
+});
+
+test("phantom reactivates on five received attacks after expiry even if HP stays low", () => {
+  let combat = ranger({ 幻影步: 1 }, ["幻影步"]);
+  const incoming = () => recordRangerEnemyAttack(combat, {
+    segments: 5, countsAsReceivedHit: true, healthPercent: 40,
+    canActivateFromHealth: true, ascended: false,
+  });
+  combat = incoming().combat;
+  for (let count = 1; count <= 4; count++) {
+    const event = incoming();
+    assert.equal(event.activation, null);
+    assert.equal(event.combat.defense.receivedAttacks, count);
+    combat = event.combat;
+  }
+  const fifth = incoming();
+  assert.equal(fifth.activation.dodgeChancePoints, 10);
+  assert.equal(fifth.guaranteedDodgeForAttack, false);
+  assert.equal(fifth.combat.defense.receivedAttacks, 0);
+  assert.equal(transitionRangerNormalKill(fifth.combat).defense.phantomAttacksRemaining, 2);
 });
