@@ -9,7 +9,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 const { createSkillBuild, upgradeSkill, equipActiveSkill } = await import("../app/skill-rework.ts");
 const { createWarriorCombat, resolveWarriorTurn, transitionWarriorNormalKill } =
   await import("../app/skill-warrior-combat.ts");
-const { recordWarriorSuccessfulBlock, recordWarriorCounter } =
+const { recordWarriorEnemyAttack, recordWarriorSuccessfulBlock, recordWarriorCounter } =
   await import("../app/skill-warrior-defense.ts");
 const { recordWarriorSkillHit } = await import("../app/skill-warrior-rules.ts");
 
@@ -60,7 +60,11 @@ test("roar has no status to clear if none exists, and an ordinary roar does not 
 test("three confirmed ascended blocks stack the next counter at +60%, alongside block mastery", () => {
   let combat = warrior({ 不屈戰意: 1, 格擋精通: 5 });
   const chargeBefore = combat.session.charge;
+  for (let index = 0; index < 3; index++) combat = recordWarriorEnemyAttack(combat, {
+    segments: 1, healthPercent: 100, ascended: true,
+  }).combat;
   for (let index = 0; index < 4; index++) {
+    combat = recordWarriorEnemyAttack(combat, { segments: 1, healthPercent: 100, ascended: true }).combat;
     combat = recordWarriorSuccessfulBlock(combat, true).combat;
     assert.equal(combat.defense.ascendedCounterStacks, Math.min(3, index + 1));
   }
@@ -76,7 +80,11 @@ test("three confirmed ascended blocks stack the next counter at +60%, alongside 
 });
 
 test("a failed counter roll does not spend the pending bonus; an actual missed counter does", () => {
-  let combat = recordWarriorSuccessfulBlock(warrior({ 不屈戰意: 1, 格擋精通: 1 }), true).combat;
+  let combat = warrior({ 不屈戰意: 1, 格擋精通: 1 });
+  for (let index = 0; index < 4; index++) combat = recordWarriorEnemyAttack(combat, {
+    segments: 1, healthPercent: 100, ascended: true,
+  }).combat;
+  combat = recordWarriorSuccessfulBlock(combat, true).combat;
   combat = turn(combat, "normal", 0).combat; // the next player action is not a counter
   assert.equal(combat.defense.ascendedCounterStacks, 1);
   assert.equal(combat.passives.counterBonusPending, true);
