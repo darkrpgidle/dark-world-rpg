@@ -2,6 +2,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { gameSaves, saveSnapshots, sessions } from "../../../db/schema";
 import { activeSaveSession } from "../../save-session-guard";
+import { applyDailyHuntClaim, preserveServerDailyHuntClaim, taipeiDailyDate } from "../../daily-hunt-claim";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
 
@@ -38,7 +39,9 @@ function authoritativeResponse(save: { payload: string; updatedAt: string }) {
       ok: true,
       accepted: false,
       updatedAt: save.updatedAt,
-      save: preserveServerSkillSave(resetPersonalBossTicketsIfNeeded(payload), payload) ?? resetPersonalBossTicketsIfNeeded(payload),
+      save: preserveServerSkillSave(
+        preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload), payload,
+      ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload),
     });
   } catch {
     return jsonNoStore({ ok: true, accepted: false, updatedAt: save.updatedAt });
@@ -84,7 +87,7 @@ function prepareAuthoritativePayload(
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
-  const protectedSave = preserveServerSkillSave(next, serverSave);
+  const protectedSave = preserveServerSkillSave(preserveServerDailyHuntClaim(next, serverSave), serverSave);
   return protectedSave ? JSON.stringify(protectedSave) : null;
 }
 
@@ -148,8 +151,9 @@ export async function GET(request: Request) {
   }
   const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
   return jsonNoStore({
-    save: preserveServerSkillSave(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload)
-      ?? resetPersonalBossTicketsIfNeeded(savedPayload),
+    save: preserveServerSkillSave(
+      preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload), savedPayload,
+    ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload),
     updatedAt: save.updatedAt,
   });
 }
@@ -163,7 +167,9 @@ export async function POST(request: Request) {
     save?: unknown;
     payload?: unknown;
     expectedUpdatedAt?: string | null;
-    action?: "settle_idle" | "claim_idle" | "skill";
+    action?: "settle_idle" | "claim_idle" | "claim_daily" | "skill";
+    dailyDate?: string;
+    dailyKills?: number;
     skillAction?: SkillSaveAction;
     skillActionId?: string;
   };
@@ -332,6 +338,41 @@ export async function POST(request: Request) {
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
   }
+  if (body.action === "claim_daily") {
+    if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
+    const today = taipeiDailyDate();
+    let current = existing[0];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      let previous: Record<string, unknown>;
+      try { previous = JSON.parse(current.payload) as Record<string, unknown>; }
+      catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
+      const outcome = applyDailyHuntClaim(previous, { dailyDate: body.dailyDate, dailyKills: body.dailyKills }, today);
+      if (!outcome) return jsonNoStore({ error: "daily_claim_rejected" }, 409);
+      if (!outcome.accepted)
+        return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
+          gold: previous.gold, enhanceStones: previous.enhanceStones,
+          reforgeStones: previous.reforgeStones, yuanbao: previous.yuanbao,
+          adminRevision: previous.adminRevision, dailyRewardClaimed: true });
+      const next = { ...outcome.save, _saveSessionId: sessionId };
+      const nextPayload = JSON.stringify(next);
+      if (nextPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
+      const updatedAt = nextUpdatedAt(current.updatedAt);
+      const result = await db.update(gameSaves)
+        .set({ accountId: account.id, payload: nextPayload, updatedAt })
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
+      if ((result.rowsAffected ?? 0) === 1)
+        return jsonNoStore({ ok: true, accepted: true, updatedAt,
+          gold: next.gold, enhanceStones: next.enhanceStones,
+          reforgeStones: next.reforgeStones, yuanbao: next.yuanbao,
+          adminRevision: next.adminRevision, dailyRewardClaimed: true });
+      if (await writerRevoked()) return replacedResponse();
+      const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
+        updatedAt: gameSaves.updatedAt }).from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
+      if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
+      current = latest;
+    }
+    return authoritativeResponse(current);
+  }
   if (body.action === "skill") {
     if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
     const actionId = body.skillActionId;
@@ -379,7 +420,7 @@ export async function POST(request: Request) {
         return jsonNoStore({ ok: true, updatedAt: existing[0].updatedAt });
     } catch { /* continue with the normal save path */ }
   }
-  const initialSave = preserveServerSkillSave(normalizedIncoming, null);
+  const initialSave = preserveServerSkillSave(preserveServerDailyHuntClaim(normalizedIncoming, null), null);
   if (!initialSave) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 400);
   delete initialSave._lastSkillActionId;
   initialSave._paidSkillResetActionIds = [];

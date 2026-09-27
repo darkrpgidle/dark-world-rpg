@@ -2310,6 +2310,8 @@ function Game({
   const [dailyKills, setDailyKills] = useState(0);
   const [dailyDate, setDailyDate] = useState("");
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState(false);
+  const [dailyClaimBusy, setDailyClaimBusy] = useState(false);
+  const dailyClaimInFlightRef = useRef(false);
   const [worldDamage, setWorldDamage] = useState(0);
   const [worldRoundDamage, setWorldRoundDamage] = useState(0);
   const [worldBossSecondsLeft, setWorldBossSecondsLeft] = useState(WORLD_BOSS_ROUND_MS / 1_000);
@@ -3250,21 +3252,56 @@ function Game({
     });
   }, [dailyDate, now]);
 
-  const claimDailyHuntReward = () => {
-    if (dailyKills < 500)
+  const claimDailyHuntReward = async () => {
+    const reward = balanceConfig.economy.dailyHuntReward;
+    if (dailyKills < reward.kills)
       return toast.info("今日獵殺尚未完成", {
-        description: `還需擊敗 ${500 - dailyKills} 隻怪物`,
+        description: `還需擊敗 ${reward.kills - dailyKills} 隻怪物`,
       });
     if (dailyRewardClaimed) return toast.info("今日獎勵已領取");
-    setGold((value) => value + 5000);
-    setEnhanceStones((value) => value + 10);
-    setReforgeStones((value) => value + 10);
-    setYuanbao((value) => value + 20);
-    setDailyRewardClaimed(true);
-    pushLog("收益", "完成今日獵殺 500 隻：金幣 +5,000・強化石 +10・洗鍊石 +10・元寶 +20");
-    toast.success("今日獵殺獎勵已領取", {
-      description: "金幣 +5,000・強化石 +10・洗鍊石 +10・元寶 +20",
-    });
+    if (!saveReady || sessionSuperseded || dailyClaimInFlightRef.current) return;
+    dailyClaimInFlightRef.current = true;
+    setDailyClaimBusy(true);
+    try {
+      const response = await fetch("/api/save", {
+        method: "POST",
+        headers: loginHeaders(loginId, true),
+        body: JSON.stringify({ playerId, action: "claim_daily", dailyDate, dailyKills }),
+      });
+      const result = await response.json();
+      if (response.status === 401 || result?.error === "maintenance") {
+        pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+          : result?.error === "session_replaced" ? "replaced" : "expired");
+        return;
+      }
+      if (!response.ok || result?.ok !== true || result?.dailyRewardClaimed !== true) {
+        toast.error("今日獵殺獎勵未領取，請重新載入確認進度");
+        return;
+      }
+      if (result.accepted === false) {
+        if (Number.isSafeInteger(result.gold)) setGold(result.gold);
+        if (Number.isSafeInteger(result.enhanceStones)) setEnhanceStones(result.enhanceStones);
+        if (Number.isSafeInteger(result.reforgeStones)) setReforgeStones(result.reforgeStones);
+        if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+        toast.info("今日獎勵已領取");
+      } else {
+        setGold((value) => value + reward.gold);
+        setEnhanceStones((value) => value + reward.enhanceStones);
+        setReforgeStones((value) => value + reward.reforgeStones);
+        setYuanbao((value) => value + reward.yuanbao);
+        const summary = `金幣 +${reward.gold.toLocaleString()}・強化石 +${reward.enhanceStones}・洗鍊石 +${reward.reforgeStones}・元寶 +${reward.yuanbao}`;
+        pushLog("收益", `完成今日獵殺 ${reward.kills} 隻：${summary}`);
+        toast.success("今日獵殺獎勵已領取", { description: summary });
+      }
+      setDailyRewardClaimed(true);
+      if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+      setSaveUpdatedAt(result.updatedAt ?? null);
+    } catch {
+      toast.error("連線中斷，請重試今日獵殺獎勵");
+    } finally {
+      dailyClaimInFlightRef.current = false;
+      setDailyClaimBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -7331,18 +7368,20 @@ function Game({
                   <div>
                     <p className="eyebrow">DAILY TARGET</p>
                     <h3>今日獵殺</h3>
-                    <span>擊敗怪物 {Math.min(500, dailyKills)} / 500</span>
+                    <span>擊敗怪物 {Math.min(balanceConfig.economy.dailyHuntReward.kills, dailyKills)} / {balanceConfig.economy.dailyHuntReward.kills}</span>
                     <small className="daily-reward-copy">
-                      獎勵：金幣 5,000・強化石 10・洗鍊石 10・元寶 20
+                      獎勵：金幣 {balanceConfig.economy.dailyHuntReward.gold.toLocaleString()}・強化石 {balanceConfig.economy.dailyHuntReward.enhanceStones}・洗鍊石 {balanceConfig.economy.dailyHuntReward.reforgeStones}・元寶 {balanceConfig.economy.dailyHuntReward.yuanbao}
                     </small>
                     <button
                       className="btn btn-primary daily-claim"
-                      disabled={dailyKills < 500 || dailyRewardClaimed}
+                      disabled={dailyKills < balanceConfig.economy.dailyHuntReward.kills || dailyRewardClaimed || dailyClaimBusy}
                       onClick={claimDailyHuntReward}
                     >
                       {dailyRewardClaimed
                         ? "今日已領取"
-                        : dailyKills >= 500
+                        : dailyClaimBusy
+                          ? "領取中…"
+                        : dailyKills >= balanceConfig.economy.dailyHuntReward.kills
                           ? "領取獎勵"
                           : "尚未完成"}
                     </button>
