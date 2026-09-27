@@ -3396,7 +3396,7 @@ function Game({
     }
     const yuanbaoPrices: Partial<Record<typeof item, number>> = {
       "title-ash": 80, "title-abyss": 180, "appearance-ember": 120,
-      "appearance-arcane": 180, "appearance-abyss": 300, reforge: 10, gamble: 10,
+      "appearance-arcane": 180, "appearance-abyss": 300, gamble: 10,
     };
     const goldPrices: Partial<Record<typeof item, number>> = { "gold-reforge": 200000, "gold-enhance": 100000 };
     const yuanbaoPrice = yuanbaoPrices[item];
