@@ -53,7 +53,7 @@ test("Fallen City saves block defense for exactly the next primary attack", () =
 });
 
 test("Executioner improves earned ultimate energy without an extra primary attack", () => {
-  const build = { ranks: {}, activeSlots: [null, null, null] };
+  const build = { ranks: { 泰坦斷界斬: 1 }, activeSlots: [null, null, null] };
   const equipped = battle("戰士", build, "executioner");
   const plain = battle("戰士", build, "plain-executioner");
   for (let i = 0; i < 4; i++) {
@@ -78,7 +78,8 @@ test("Hunter Eye follow-up counts once and cannot trigger another follow-up", ()
 
 test("Queen contract carries two critical hits only to the next marked target", () => {
   const build = { ranks: { 獵殺標記: 5, 追風箭: 5 }, activeSlots: ["獵殺標記", "追風箭", null] };
-  const equipped = battle("遊俠", build, "queen");
+  const ascensions = { rebirthCount: 2, choices: ["追風箭", "獵殺標記", null, null, null], selectionOpen: false };
+  const equipped = syncLiveCombat(null, "queen", "enemy-1", build, "遊俠", 100, ascensions);
   let exploded = false;
   for (let i = 0; i < 50; i++) {
     resolveLiveCombatAttack(equipped, {
@@ -88,7 +89,7 @@ test("Queen contract carries two critical hits only to the next marked target", 
     if (equipped.queenCarryForNextTarget) { exploded = true; break; }
   }
   assert.ok(exploded);
-  syncLiveCombat(equipped, "queen", "enemy-2", equipped.build, "遊俠", 100, createSkillAscensions());
+  syncLiveCombat(equipped, "queen", "enemy-2", equipped.build, "遊俠", 100, ascensions);
   assert.equal(equipped.queenCarry, 2);
   for (let i = 0; i < 50; i++) {
     const cast = resolveLiveCombatAttack(equipped, {
