@@ -70,6 +70,10 @@ export function spentSkillPoints(build: SkillBuild): number {
   return Object.values(build.ranks).reduce((sum, rank) => sum + rank, 0);
 }
 
+export function availableSkillPoints(build: SkillBuild, characterLevel: number): number {
+  return Math.max(0, earnedSkillPoints(characterLevel) - spentSkillPoints(build));
+}
+
 export function isValidSkillBuild(build: SkillBuild, characterClass: SkillClass, characterLevel: number): boolean {
   if (!build || !build.ranks || !Array.isArray(build.activeSlots) || build.activeSlots.length !== 3) return false;
   if (!Number.isInteger(characterLevel) || characterLevel < 1 || characterLevel > 100) return false;
