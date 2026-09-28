@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SKILL_REWORK_CATALOG,
+  availableSkillPoints,
   createSkillBuild,
   earnedSkillPoints,
   enabledUltimate,
@@ -20,6 +21,17 @@ test("each class has the prescribed 8 active and 12 passive skills with unlocks"
     assert.equal(new Set(catalog.map((skill) => skill.name)).size, 20);
   }
   assert.deepEqual([1, 2, 49, 50, 100].map(earnedSkillPoints), [0, 1, 24, 25, 50]);
+});
+
+test("GM full-skill configuration shows no negative available points", () => {
+  const build = {
+    ranks: Object.fromEntries(SKILL_REWORK_CATALOG["法師"].map(({ name }) => [name, 5])),
+    activeSlots: ["霜火新星", "奧術飛彈", "魔力護盾"],
+  };
+  assert.equal(spentSkillPoints(build), 100);
+  assert.equal(earnedSkillPoints(100), 50);
+  assert.equal(availableSkillPoints(build, 100), 0);
+  assert.equal(availableSkillPoints(createSkillBuild(), 100), 50);
 });
 
 test("optional rework save restores valid builds and isolates malformed or legacy saves", () => {
