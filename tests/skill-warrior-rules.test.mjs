@@ -15,10 +15,13 @@ const {
 test("all warrior skill levels and ascensions match the rework table", () => {
   assert.equal(Object.keys(WARRIOR_ACTIVE_RULES).length, 8);
   assert.equal(Object.keys(WARRIOR_PASSIVE_RULES).length, 12);
-  assert.deepEqual(WARRIOR_ACTIVE_RULES.裂地斬.damage, [150, 160, 170, 185, 200]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.裂地斬.damage, [165, 176, 187, 204, 220]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.血刃斬.damage, [143, 154, 165, 176, 193]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.狂戰姿態.attackSpeedBonus, [10, 14, 18, 22, 26]);
   assert.deepEqual(WARRIOR_ACTIVE_RULES.泰坦斷界斬.damage, [400, 450, 500, 560, 630]);
   assert.deepEqual(WARRIOR_ACTIVE_RULES.血戰烙印.durationSeconds, [6, 7, 8, 9, 10]);
   assert.deepEqual(WARRIOR_PASSIVE_RULES.格擋精通.blockChancePoints, [3, 5, 7, 9, 11]);
+  assert.deepEqual(WARRIOR_PASSIVE_RULES.重刃專精.basicAndBurstDamage, [5, 7, 9, 12, 16]);
   for (const skill of Object.values(WARRIOR_ACTIVE_RULES)) {
     assert.equal(typeof skill.ascension, "string");
     for (const value of Object.values(skill)) if (Array.isArray(value)) assert.equal(value.length, 5);
@@ -73,3 +76,4 @@ test("ground shock and titan slashes attach only to later primary attacks", () =
   assert.deepEqual(third.extraDamagePercents, [70]);
   assert.deepEqual(consumeWarriorPrimaryAttack(third.state, false).extraDamagePercents, []);
 });
+

@@ -22,8 +22,8 @@ const combatAffixes = {
   法師: ["攻擊%", "暴擊", "暴擊傷害", "技能傷害", "生命%"],
 };
 const layouts = {
-  戰士: ["血刃斬", "裂地斬", "血戰烙印", "泰坦斷界斬", "重刃專精",
-    "鐵骨", "裂傷本能", "破鎧追擊", "血氣汲取", "泰坦餘震"],
+  戰士: ["血刃斬", "裂地斬", "狂戰姿態", "重刃專精", "碎甲猛擊",
+    "泰坦斷界斬", "鐵骨", "破鎧追擊", "血痕累積", "絕境怒火"],
   遊俠: ["追風箭", "獵殺標記", "疾風連射", "蒼穹箭雨", "鷹眼",
     "迅捷手感", "精準連射", "狩獵節奏", "乘風閃擊", "要害穿透"],
   法師: ["奧術飛彈", "霜火新星", "隕星術", "星界寂滅", "奧術循環",
@@ -235,3 +235,4 @@ else console.log(JSON.stringify({ scenarios: summary.measured, results: samples.
   map: s.mapId, dps: Math.round(s.damageDealt / s.elapsedSeconds), survived: s.remainingHealth > 0,
   won: s.defeatedEnemy, casts: Object.values(s.skillCasts).reduce((a,b) => a+b,0),
 })) }, null, 2));
+
