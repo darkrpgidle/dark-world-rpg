@@ -323,7 +323,7 @@ function renderSkillDetails(
       {display && (
         <div className="skill-detail-effects">
           <div className="skill-detail-effect-head">
-            <span>效果預覽</span>
+            <span>效果與成長</span>
             <small>{rank ? `Lv${rank} → Lv${Math.min(rank + 1, 5)}` : "學習後 Lv1"}</small>
           </div>
           {display.fixed.map((value) => <span className="skill-effect-chip" key={value}>{value}</span>)}
