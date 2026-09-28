@@ -100,6 +100,7 @@ import {
   towerCombatValues,
 } from "./balance";
 import { balanceConfig } from "./balance-config";
+import { combatStatusLabel } from "./skill-status-label";
 import {
   addGemStack,
   createEquipmentSockets,
@@ -7064,7 +7065,7 @@ function Game({
                         <div className="combat-statuses" aria-label="玩家戰鬥狀態">
                           {combatStatuses.filter((status) => status.target === "player").map((status) => (
                             <span key={`${status.name}-${status.target}`} className={`combat-status ${status.tone}`}>
-                              {status.name} · {status.remaining}{status.unit}
+                              {combatStatusLabel(status.name)} · {status.remaining}{status.unit}
                             </span>
                           ))}
                         </div>
@@ -7105,7 +7106,7 @@ function Game({
                         <div className="combat-statuses" aria-label="敵方戰鬥狀態">
                           {combatStatuses.filter((status) => status.target === "enemy").map((status) => (
                             <span key={`${status.name}-${status.target}`} className={`combat-status ${status.tone}`}>
-                              {status.name} · {status.remaining}{status.unit}
+                              {combatStatusLabel(status.name)} · {status.remaining}{status.unit}
                             </span>
                           ))}
                         </div>
