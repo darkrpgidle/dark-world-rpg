@@ -4,8 +4,8 @@ import { monsterProfile } from "./balance";
 
 export const classes = [
   { name: "戰士" as const, icon: "⚔", role: "近戰・首領剋星", desc: "以重甲與怒氣正面突破，生命與首領傷害最高。", stats: ["生命 620", "攻擊 54", "防禦 36"], skill: "裂地斬" },
-  { name: "遊俠" as const, icon: "➶", role: "高速・打寶專家", desc: "善用速度與暴擊連續狙殺，掛機收益穩定。", stats: ["攻速 22", "暴擊 12%", "閃避 10%"], skill: "穿雲箭" },
-  { name: "法師" as const, icon: "✦", role: "單體・術式爆發", desc: "以高倍率元素術式擊穿單一敵人的防禦，擅長爆發與命中。", stats: ["魔攻 68", "經驗 +14%", "命中 12%"], skill: "霜火新星" },
+  { name: "遊俠" as const, icon: "➶", role: "高速・打寶專家", desc: "善用速度與暴擊連續狙殺，掛機收益穩定。", stats: ["攻速 22", "暴擊 12%", "閃避值 10"], skill: "穿雲箭" },
+  { name: "法師" as const, icon: "✦", role: "單體・術式爆發", desc: "以高倍率元素術式擊穿單一敵人的防禦，擅長爆發與命中。", stats: ["魔攻 68", "經驗 +14%", "命中值 112"], skill: "霜火新星" },
 ];
 
 const mapPresentation = [
@@ -176,10 +176,10 @@ export const worldBosses = [
 
 export const items = [
   { id: 1, name: "守夜者鐵劍", slot: "武器", quality: "優秀", power: 164, enhance: 5, set: "守夜旅者", affixes: ["攻擊 +28", "暴擊 +4%", "首領傷害 +3%"] },
-  { id: 2, name: "守夜者胸甲", slot: "胸甲", quality: "史詩", power: 218, enhance: 7, set: "守夜旅者", affixes: ["防禦 +42", "生命 +180", "閃避 +3%", "傷害減免 +2%"] },
-  { id: 3, name: "灰燼指環", slot: "戒指", quality: "傳奇", power: 286, enhance: 3, set: "", affixes: ["攻擊 +36", "暴擊 +6%", "命中 +5%", "吸血 +3%", "金幣 +8%"] },
-  { id: 4, name: "旅者皮靴", slot: "鞋子", quality: "良好", power: 102, enhance: 0, set: "守夜旅者", affixes: ["攻速 +5", "閃避 +3%"] },
-  { id: 5, name: "幽魂護符", slot: "項鍊", quality: "傳奇", power: 362, enhance: 10, set: "", affixes: ["生命 +260", "攻擊 +45", "命中 +7%", "暴擊 +7%", "吸血 +5%", "經驗 +9%"] },
+  { id: 2, name: "守夜者胸甲", slot: "胸甲", quality: "史詩", power: 218, enhance: 7, set: "守夜旅者", affixes: ["防禦 +42", "生命 +180", "閃避 +3", "傷害減免 +2%"] },
+  { id: 3, name: "灰燼指環", slot: "戒指", quality: "傳奇", power: 286, enhance: 3, set: "", affixes: ["攻擊 +36", "暴擊 +6%", "命中 +5", "吸血 +3%", "金幣 +8%"] },
+  { id: 4, name: "旅者皮靴", slot: "鞋子", quality: "良好", power: 102, enhance: 0, set: "守夜旅者", affixes: ["攻速 +5", "閃避 +3"] },
+  { id: 5, name: "幽魂護符", slot: "項鍊", quality: "傳奇", power: 362, enhance: 10, set: "", affixes: ["生命 +260", "攻擊 +45", "命中 +7", "暴擊 +7%", "吸血 +5%", "經驗 +9%"] },
 ];
 
 export const qualityColors: Record<string, string> = {
@@ -199,7 +199,7 @@ export const skillsByClass: Record<GameClass, {name:string; desc:string; level:n
   遊俠: [
     { name: "穿雲箭", desc: "6% 觸發，造成 180% 傷害並忽略敵人 35% 防禦。", level: 3, max: 10, cost: 2 },
     { name: "疾風連射", desc: "8% 觸發，連續射出 5 支箭；每支箭在命中時獨立結算傷害。技能等級提高每箭傷害，裝備千羽風暴時改為 7 支箭。", level: 2, max: 8, cost: 2 },
-    { name: "獵手本能", desc: "被動：暴擊率與閃避率各提高（2%＋技能等級）；每次暴擊有（6%＋技能等級）機率追加 1 次攻擊。裝備白銀獵神之瞳時追加機率提高至 20%，追加攻擊再次暴擊會強化下一擊暴傷。", level: 4, max: 10, cost: 1 },
+    { name: "獵手本能", desc: "被動：暴擊率提高（2%＋技能等級），閃避值提高（2＋技能等級）；每次暴擊有（6%＋技能等級）機率追加 1 次攻擊。裝備白銀獵神之瞳時追加機率提高至 20%，追加攻擊再次暴擊會強化下一擊暴傷。", level: 4, max: 10, cost: 1 },
     { name: "致命標記", desc: "觸發後，前 5 次攻擊逐次追加傷害；第 6 下引爆。Lv.1～5：每次 +10%／+14%／+18%／+22%／+24%，爆炸 140%／160%／180%／200%／220%；魅惑女王的契約使爆炸 +50%。", level: 0, max: 5, cost: 3 },
   ],
   法師: [
