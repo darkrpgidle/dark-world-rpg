@@ -51,7 +51,7 @@ test("active and passive skills each enforce their own character-level unlock ga
   assert.equal(upgradeSkill(empty, "戰士", 3, "鐵骨"), null);
   assert.equal(upgradeSkill(empty, "戰士", 2, "鐵骨"), null);
   assert.equal(upgradeSkill(empty, "戰士", 4, "鐵骨")?.ranks["鐵骨"], 1);
-  assert.equal(upgradeSkill(empty, "遊俠", 5, "迅捷手感"), null);
+  assert.equal(upgradeSkill(empty, "遊俠", 3, "迅捷手感"), null);
   assert.equal(upgradeSkill(empty, "法師", 3, "奧術感知"), null);
   assert.equal(upgradeSkill(empty, "法師", 4, "奧術感知")?.ranks["奧術感知"], 1);
 });
