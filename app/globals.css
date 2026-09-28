@@ -1402,6 +1402,12 @@ body {
   color: #8fe3ff;
   text-shadow: 0 2px 5px #000, 0 0 8px #3b9fc7;
 }
+.missed-float {
+  color: #a9e7ff;
+  font: 950 20px monospace;
+  text-shadow: 0 2px 5px #000, 0 0 8px #3b9fc7;
+  animation: enemy-damage 1.2s ease-out both;
+}
 @keyframes enemy-damage {
   0% { opacity: 0; transform: translateY(10px) scale(.72); }
   18% { opacity: 1; transform: translateY(0) scale(1.08); }
