@@ -114,8 +114,8 @@ export const balanceConfig = {
   combat: {
     // 流亡黯道式命中判定：命中值與閃避值先換算成評等，再計算命中率。
     evasionModel: {
-      accuracyMultiplier: 1.25,
-      evasionMultiplier: 0.3,
+      accuracyMultiplier: 1,
+      evasionMultiplier: 0.12,
       minimumHitChance: 5,
       maximumHitChance: 95,
       statToRating: 10,
