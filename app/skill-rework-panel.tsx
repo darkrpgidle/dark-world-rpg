@@ -354,7 +354,7 @@ function renderSkillDetails(
           <div>
             {build.activeSlots.map((name, index) => (
               <button type="button" className="btn btn-ghost" key={index}
-                disabled={busy || name === skill.name}
+                disabled={busy || name === skill.name || equipped}
                 onClick={() => onEquip(index, skill.name)}>
                 {name === skill.name ? `槽${index + 1} 已配置` : name ? `替換槽${index + 1}` : `配置到槽${index + 1}`}
               </button>
