@@ -7,6 +7,7 @@ import {
 } from "./skill-ascensions";
 import {
   SKILL_REWORK_CATALOG,
+  availableSkillPoints,
   earnedSkillPoints,
   enabledUltimate,
   equipActiveSkill,
@@ -45,9 +46,11 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
   }, [characterClass, ascensions.rebirthCount, ascensions.selectionOpen]);
 
   const catalog = SKILL_REWORK_CATALOG[characterClass];
-  const available = earnedSkillPoints(characterLevel) - spentSkillPoints(build);
+  const available = availableSkillPoints(build, characterLevel);
   const earned = earnedSkillPoints(characterLevel);
   const spent = spentSkillPoints(build);
+  const budgetExceeded = spent > earned;
+  const progressSpent = Math.min(spent, earned);
   const learnedActive = catalog.filter((skill) => skill.kind === "active"
     && skill.category !== "ultimate" && (build.ranks[skill.name] ?? 0) > 0);
   const ultimateSkill = catalog.find((skill) => skill.category === "ultimate");
@@ -72,10 +75,10 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                 <span>{earned} 點</span>
               </div>
               <div className="skill-point-meter" role="progressbar" aria-label="已投入技能點"
-                aria-valuemin={0} aria-valuemax={Math.max(earned, 1)} aria-valuenow={spent}>
-                <span style={{ width: `${earned ? (spent / earned) * 100 : 0}%` }} />
+                aria-valuemin={0} aria-valuemax={Math.max(earned, 1)} aria-valuenow={progressSpent}>
+                <span style={{ width: `${earned ? (progressSpent / earned) * 100 : 0}%` }} />
               </div>
-              <p className="skill-overview-note">已投入 {spent} 點 <i /> 角色 Lv{characterLevel}</p>
+              <p className="skill-overview-note">{budgetExceeded ? `已投入 ${spent} 點・超出一般上限 ${spent - earned} 點` : `已投入 ${spent} 點`} <i /> 角色 Lv{characterLevel}</p>
             </div>
             <div className="skill-state-summary">
               <span><b>{learnedActive.length}</b><small>已學戰技</small></span>
