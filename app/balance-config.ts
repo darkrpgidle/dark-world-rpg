@@ -6,6 +6,45 @@
  */
 
 export const balanceConfig = {
+  // 第 18 批：法師新版技能數值；僅供獨立重製規則使用，尚未接入正式戰鬥。
+  skillRework: {
+    // 第 27 批試行：每秒基礎持續傷害以施加時的面板攻擊為基準。
+    dot: { bleedPerStackAttackPercent: 20, burnAttackPercent: 30 },
+    warrior: {
+      active: {
+        // Ascended 崩鎧重擊: twice this cast's armor-break value,
+        // capped at +60% of the skill's base damage multiplier.
+        碎甲猛擊: { repeatedArmorBreakFactor: 2, repeatedArmorBreakBonusCap: 60 },
+      },
+    },
+    mage: {
+      active: {
+        霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [20, 25, 30, 35, 40], afterburstDamage: 70 },
+        奧術飛彈: { missiles: 3, damagePerMissile: [50, 55, 60, 66, 72], resonanceMissileDamage: 80 },
+        魔力護盾: { healthBelow: 60, maxHealthShieldPercent: [12, 15, 18, 21, 25], followingActiveCasts: 3, activeDamageBonus: 10, energyOnBreak: 15 },
+        元素蝕印: { durationSeconds: [7, 8, 9, 10, 12], statusChancePoints: [5, 7, 9, 11, 14], followingActiveCasts: 3, nextStatusChancePoints: 15 },
+        隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [25, 30, 35, 40, 50], emberExplosionDamage: 120 },
+        奧術超載: { successfulActiveCastsRequired: 6, followingSuccessfulActiveCasts: 6, skillEfficiencyBonus: [10, 14, 18, 22, 26], exhaustionPenalty: 15, stableExhaustionPenalty: 5, stabilityStacksRequired: 6 },
+        虛空崩解: { damage: [250, 275, 300, 330, 365], damageBonusVsStatus: [20, 25, 30, 35, 40], damagePerDistinctStatus: 18, maxDistinctStatuses: 3 },
+        星界寂滅: { totalDamage: [420, 475, 530, 590, 660], maxCollapseStacks: 6, finalExplosionDamagePerStack: 8 },
+      },
+      passive: {
+        奧術感知: { activeDirectDamageBonus: [3, 5, 7, 9, 12] },
+        焰脈: { normalBurnChance: [4, 6, 8, 10, 12] },
+        星界護體: { maxHealthBonus: [3, 5, 7, 9, 12] },
+        燃燼導引: { activeDirectDamageVsBurn: [6, 9, 12, 15, 18] },
+        護盾轉流: { activeDirectDamageWithShield: [4, 6, 8, 10, 12] },
+        精密咒式: { activeStatusChancePoints: [3, 4, 5, 6, 8] },
+        餘燼回響: { extraDamage: [25, 35, 45, 55, 65], procChance: 15, maxProcsPerCast: 1 },
+        奧術循環: { ultimateEnergyPerSuccessfulCast: [2, 3, 4, 5, 6] },
+        元素共振: { activeDirectDamagePerStatus: [3, 4, 5, 6, 8], maxDistinctStatuses: 3 },
+        屏障續航: { initialShieldBonus: [4, 6, 8, 10, 12] },
+        枯竭控制: { exhaustionReductionPoints: [2, 4, 6, 8, 10] },
+        星界回爆: { ultimateFinalExplosionExtraDamage: [45, 55, 65, 75, 90], maxProcsPerUltimate: 1 },
+      },
+    },
+  },
+
   progression: {
     mapFloors: 30,
     experienceMultiplier: 3,
@@ -274,6 +313,16 @@ export const balanceConfig = {
   },
 
   economy: {
+    onlineYuanbao: { intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90 },
+    yuanbaoReforgeBundle: { price: 10, stones: 12 },
+    yuanbaoCosmetics: {
+      "title-ash": 80,
+      "title-abyss": 180,
+      "appearance-ember": 120,
+      "appearance-arcane": 180,
+      "appearance-abyss": 300,
+    },
+    dailyHuntReward: { kills: 500, gold: 5_000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 },
     gold: {
       monsterDropBaseByMap: [80, 150, 260, 420, 680, 1000, 1500, 2200, 3200],
       floorGrowth: 0.03,
@@ -299,6 +348,7 @@ export const balanceConfig = {
       affixLockFirst: 50_000,
       affixLockSecond: 150_000,
       skillReset: 50_000,
+      skillReworkResetYuanbao: 300,
     },
   },
 

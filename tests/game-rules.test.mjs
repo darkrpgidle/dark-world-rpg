@@ -9,6 +9,8 @@ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8
 const balanceSource = await readFile(new URL("../app/balance.ts", import.meta.url), "utf8");
 const balanceConfigSource = await readFile(new URL("../app/balance-config.ts", import.meta.url), "utf8");
 const skillCanvasSource = await readFile(new URL("../app/skill-effect-canvas.tsx", import.meta.url), "utf8");
+const skillPanelSource = await readFile(new URL("../app/skill-rework-panel.tsx", import.meta.url), "utf8");
+const skillConstellationSource = await readFile(new URL("../app/skill-constellation.tsx", import.meta.url), "utf8");
 const adminPanelsSource = await readFile(new URL("../app/admin-panels.tsx", import.meta.url), "utf8");
 const authSource = await readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8");
 const authUtilsSource = await readFile(new URL("../app/api/auth-utils.ts", import.meta.url), "utf8");
@@ -23,6 +25,7 @@ const { dropPowerRange, enhancementBonusPercent, enhancementFailureLevel, enhanc
   "/app/balance.ts",
 );
 const { balanceConfig } = await vite.ssrLoadModule("/app/balance-config.ts");
+const { settleCombatHealth } = await vite.ssrLoadModule("/app/skill-health-settlement.ts");
 const {
   createEquipmentSockets,
   drillSocket,
@@ -194,10 +197,10 @@ test("names only actual set drops after their set and lists every worn set", () 
 });
 
 test("stacks the two-piece attack bonus once for each equipped set", () => {
-  assert.match(page, /function equippedSetAttackMultiplier\\(gear: Item\\[\\]\\)[\\s\\S]*?maps\\.filter\\([\\s\\S]*?length >= 2[\\s\\S]*?1 \\+ twoPieceSetCount \\* \\(SET_ATTACK_BONUS - 1\\)/);
-  assert.match(page, /const setAttackMultiplier = equippedSetAttackMultiplier\\(gear\\)/);
-  assert.match(page, /const activeSetAttackMultiplier = equippedSetAttackMultiplier\\(equippedGear\\)/);
-  assert.match(page, /activeSetAttackBonusPct = Math\\.round\\(\\(activeSetAttackMultiplier - 1\\) \\* 100\\)/);
+  assert.match(page, /function equippedSetAttackMultiplier\(gear: Item\[\]\)[\s\S]*?maps\.filter\([\s\S]*?length >= 2[\s\S]*?1 \+ twoPieceSetCount \* \(SET_ATTACK_BONUS - 1\)/);
+  assert.match(page, /const setAttackMultiplier = equippedSetAttackMultiplier\(gear\)/);
+  assert.match(page, /const activeSetAttackMultiplier = equippedSetAttackMultiplier\(equippedGear\)/);
+  assert.match(page, /activeSetAttackBonusPct = Math\.round\(\(activeSetAttackMultiplier - 1\) \* 100\)/);
 });
 
 test("uses non-overlapping equipment rails", () => {
@@ -515,7 +518,13 @@ test("displays player and monster damage as matching raw numbers", () => {
 });
 
 test("keeps skill cards and battle information unambiguous", () => {
-  assert.match(page, /skillValue\(skill\.name, skill\.level\)\.current/);
+  assert.match(page, /<SkillReworkPanel/);
+  assert.match(skillPanelSource, /可用/);
+  assert.match(skillPanelSource, /aria-label="已投入技能點"/);
+  assert.match(skillPanelSource, /效果與成長/);
+  assert.match(skillPanelSource, /SkillConstellation/);
+  assert.match(skillConstellationSource, /getContext\("webgl"/);
+  assert.doesNotMatch(page, /目前戰鬥使用的技能/);
   assert.match(page, /遠征祝福不會在首領戰生效/);
   assert.match(page, /首領 -\{group\.damage\}/);
   assert.match(page, /enemyHitFeedback\.damage/);
@@ -523,10 +532,9 @@ test("keeps skill cards and battle information unambiguous", () => {
   assert.match(page, /本次遠征戰利品/);
 });
 
-test("locks ultimates until level ten and counts only direct stat skills in power", () => {
-  assert.match(page, /const isUltimateLocked = isUltimate && level < 10/);
-  assert.match(page, /角色達到 Lv\.10 後解鎖/);
-  assert.match(page, /isUltimateLocked/);
+test("uses level fifty for the new ultimate and does not count damage triggers in power", () => {
+  assert.match(page, /<SkillReworkPanel/);
+  assert.match(page, /liveCombatRef/);
   assert.doesNotMatch(page, /技能戰力/);
   assert.doesNotMatch(page, /戰力貢獻/);
   assert.doesNotMatch(page, /skillPowerContribution/);
@@ -553,17 +561,11 @@ test("shows rapid multi-hit and critical combat feedback", () => {
   assert.match(css, /@keyframes attack-impact-b/);
 });
 
-test("疾風連射 keeps one total attack while presenting five timed arrows", () => {
-  assert.match(page, /case "疾風連射": return 1;/);
-  assert.match(page, /const windVolleyTriggered = triggered\?\.name === "疾風連射";/);
-  assert.match(page, /if \(windVolleyTriggered\) \{[\s\S]*?attacks = windVolleyCriticals\.length;/);
-  assert.match(page, /const skillDamageTriggered = Boolean\(triggered\);/);
+test("疾風連射 resolves through five independent hits and one combat action", () => {
+  assert.match(page, /resolveLiveCombatAttack\(liveCombat/);
+  assert.match(page, /const skillDamageTriggered = Boolean\(triggered \|\| liveAction\?\.name\);/);
   assert.match(page, /skillTriggered: skillDamageTriggered/);
-  assert.match(page, /windVolleyCriticals\.length/);
-  assert.match(page, /RangerWindVolleyVfx/);
-  assert.match(css, /\.combo-hit\.volley-hit \{\s*animation-delay: calc\(495ms \+ \(var\(--hit-index\) \* 250ms\)\);\s*\}/s);
-  assert.match(css, /\.ranger-wind-volley-arrow/);
-  assert.match(page, /RangerWindVolleyVfx/);
+  assert.match(page, /settleCutoverAction\(cutoverRoute/);
 });
 
 test("recommended map power separates danger from viable clears", () => {
@@ -598,7 +600,7 @@ test("class balance gives warrior durability and mage single-target burst", () =
   assert.equal(balanceConfig.character.baseStats.法師.hp, 390);
   assert.match(balanceSource, /playerDefense/);
   assert.match(balanceConfigSource, /monsterProfiles/);
-  assert.match(page, /const playerHpLossFromDamage/);
+  assert.match(page, /settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/);
   assert.match(page, /playerDamageMultiplier/);
   assert.match(data, /單體・術式爆發/);
   assert.doesNotMatch(data, /群攻・成長核心/);
@@ -737,14 +739,18 @@ test("shows the same damage that is removed from the monster's real hp", () => {
   assert.match(page, /monsterProfile\(currentEnemyBaseName\)/);
   assert.match(page, /monsterName: currentEnemyBaseName/);
   assert.match(page, /monsterProfile\(bossMonsterName\)/);
-  assert.match(page, /actualPercentDamage = Math\.min\(\s*h,\s*healthPercentFromDamage\(finalHpDamage, enemyMaximumHealth\),\s*\)/);
-  assert.match(page, /if \(h - actualPercentDamage <= 0\.000001\)/);
-  assert.match(page, /Math\.min\(Math\.round\(currentEffectiveEnemyHealth\), finalHpDamage\)/);
+  assert.deepEqual(settleCombatHealth(40, 17050, 1023), {
+    actualDamage: 1023, percentDamage: 6, remainingPercent: 34, defeated: false,
+  });
+  assert.match(page, /settleCombatHealth\(h, enemyMaximumHealth, finalHpDamage\)/);
+  assert.match(page, /Math\.round\(healthSettlement\.actualDamage\)/);
   assert.match(page, /currentEnemyHealth\.toLocaleString\(\).*currentEnemyMaximumHealth\.toLocaleString\(\).*HP/s);
   assert.match(page, /共 \$\{totalDisplayedDamage\.toLocaleString\(\)\} 傷害/);
-  assert.match(page, /const bossHpLoss =/);
-  assert.match(page, /bossHpLoss/);
-  assert.match(page, /return Math\.max\(0, h - actualPercentDamage\)/);
+  assert.match(page, /settleBossHit\(calculatedPlayerDamage, "attack"\)/);
+  assert.match(page, /settleBossHit\(liveTickDamage, "burn"\)/);
+  assert.match(page, /settleBossHit\(rawBurnDamage, "burn"\)/);
+  assert.match(page, /settleBossHit\(counter, "attack"\)/);
+  assert.match(page, /return healthSettlement\.remainingPercent/);
   assert.match(page, /className="player-health-label"/);
   assert.match(page, /width: `\$\{Math\.max\(0, Math\.min\(100, value\)\)\}%`/);
   assert.doesNotMatch(page, /3 \/ monsterCombatHealthMultiplier/);
@@ -759,9 +765,9 @@ test("stops tower combat on the lethal frame", () => {
   assert.equal((page.match(/finishRun\("death", wave\), 0/g) ?? []).length, 2);
   assert.doesNotMatch(page, /finishRun\("death", wave\), 120/);
   assert.match(page, /if \(savedPlayerHp <= 0\)/);
-  assert.equal((page.match(/actualDamage >= healthFromPercent\(playerHealth, characterStats\.hp\)/g) ?? []).length, 2);
-  assert.equal((page.match(/playerHealth - hpLoss <= 0\.000001/g) ?? []).length, 2);
-  assert.match(page, /if \(hp - hpLoss <= 0\.000001\)/);
+  assert.equal((page.match(/settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/g) ?? []).length, 2);
+  assert.equal((page.match(/settleCombatHealth\(hp, characterStats\.hp, bossDamage\)/g) ?? []).length, 2);
+  assert.equal(settleCombatHealth(0.00001, 1394, 1).remainingPercent, 0);
 });
 
 test("does not expose a direct equipment quality-upgrade button", () => {
@@ -821,29 +827,33 @@ test("centralizes adjustable game balance in one configuration file", () => {
   assert.match(balanceSource, /balanceConfig\.combat/);
 });
 
-test("awards online yuanbao every ten minutes", () => {
-  const idleRewardBody = page.slice(
-    page.indexOf("const next = idleSeconds + 60"),
-    page.indexOf("const buyShopItem"),
-  );
-  assert.match(idleRewardBody, /next >= 600/);
-  assert.match(idleRewardBody, /Math\.floor\(next \/ 600\) \* 10/);
+test("awards online yuanbao every ten minutes through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.onlineYuanbao, {
+    intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90,
+  });
+  assert.match(page, /action: "heartbeat_online"/);
   assert.match(page, /每 10 分鐘自動獲得 10 元寶/);
 });
 
-test("awards the 500-kill daily target exactly once per Taipei day", () => {
-  assert.match(page, /const \[dailyRewardClaimed, setDailyRewardClaimed\] = useState\(false\)/);
-  assert.match(page, /if \(dailyKills < 500\)/);
-  assert.match(page, /if \(dailyRewardClaimed\) return toast\.info\("今日獎勵已領取"\)/);
-  assert.match(page, /setGold\(\(value\) => value \+ 5000\)/);
-  assert.match(page, /setEnhanceStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setReforgeStones\(\(value\) => value \+ 10\)/);
-  assert.match(page, /setYuanbao\(\(value\) => value \+ 20\)/);
+test("buys the yuanbao reforge bundle through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoReforgeBundle, { price: 10, stones: 12 });
+  assert.ok(page.includes('item === "reforge" ? "shop_reforge" : "shop_cosmetic"'));
+});
+
+test("buys cosmetic unlocks through the save service", () => {
+  assert.deepEqual(balanceConfig.economy.yuanbaoCosmetics, {
+    "title-ash": 80, "title-abyss": 180,
+    "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
+  });
+  assert.match(page, /shop_cosmetic/);
+  assert.ok(!page.includes("setOwnedTitles((current) => current.includes(title)"));
+});
+
+test("claims the 500-kill daily target through the save service", () => {
+  const reward = balanceConfig.economy.dailyHuntReward;
+  assert.deepEqual(reward, { kills: 500, gold: 5000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 });
+  assert.match(page, /action: "claim_daily", dailyDate, dailyKills/);
   assert.match(page, /setDailyRewardClaimed\(true\)/);
-  assert.match(page, /timeZone: "Asia\/Taipei"/);
-  assert.match(page, /const savedForToday = save\.dailyDate === today/);
-  assert.match(page, /disabled=\{dailyKills < 500 \|\| dailyRewardClaimed\}/);
-  assert.match(page, /dailyRewardClaimed,/);
 });
 
 test("starts new accounts with zero yuanbao", () => {

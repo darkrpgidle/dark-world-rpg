@@ -50,14 +50,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -127,6 +119,16 @@ import {
   type SocketedGem,
 } from "./gem-system";
 import { SkillEffectCanvas } from "./skill-effect-canvas";
+import { SkillReworkPanel } from "./skill-rework-panel";
+import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoints, type SkillBuild } from "./skill-rework";
+import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
+import { advanceLiveCombatEvents, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
+import { settleCombatHealth } from "./skill-health-settlement";
+import { createBossDamageLedger, settleBossDamageEvent } from "./skill-boss-damage";
+import { skillPassivePanelStats } from "./skill-passive-panel";
+import { createCombatVictoryGuard } from "./skill-combat-victory";
+import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
+import type { SkillSaveAction } from "./skill-save-policy";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
@@ -973,49 +975,6 @@ function EquipmentIcon({ item, className = "" }: { item: Item; className?: strin
       draggable={false}
     />
   );
-}
-
-function skillValue(name: string, level: number) {
-  const lv = Math.max(1, level);
-  const values: Record<
-    string,
-    { metric: string; value: (n: number) => string }
-  > = {
-    裂地斬: { metric: "傷害／破防", value: (n) => `${120 + n * 20}%／${20 + n * 5}%` },
-    鮮血怒吼: {
-      metric: "傷害加成／吸血（5 次）",
-      value: (n) => `+${bloodRoarDamageBonus(n)}%／${bloodRoarLifesteal(n)}%`,
-    },
-    鋼鐵壁壘: {
-      metric: "防禦／生命",
-      value: (n) => `${3 + n * 2.5}%／+${30 + n * 25}`,
-    },
-    處決: { metric: "每 10 次攻擊總倍率", value: (n) => `${[160, 180, 200, 220, 250][Math.min(5, Math.max(1, n)) - 1]}%` },
-    穿雲箭: { metric: "傷害／忽略防禦", value: (n) => `${120 + n * 20}%／${20 + n * 5}%` },
-    疾風連射: {
-      metric: "連射段數／總傷害",
-      value: (n) => `5 段／${Math.round(500 * windVolleyDamageMultiplier(n))}%基礎`,
-    },
-    獵手本能: {
-      metric: "暴擊率／閃避值／暴擊追加",
-      value: (n) => `${2 + n}%／+${2 + n}／${Math.min(30, 6 + n)}%（追加 1 次攻擊）`,
-    },
-    致命標記: { metric: "前 5 下逐次追加／第 6 下爆炸", value: (n) => `每下追加 +${deadlyMarkBonusPct(n)}%／${Math.round(deadlyMarkExplosionMultiplier(n) * 100)}%` },
-    霜火新星: { metric: "傷害／灼燒", value: (n) => `${140 + n * 20}%／${1.5 + n * 0.5}%最大生命` },
-    奧術回響: { metric: "追加傷害", value: (n) => `${110 + n * 20}%` },
-    魔力護盾: { metric: "傷害減免", value: (n) => `${45 + n * 3.75}%` },
-    隕星術: { metric: "傷害／首領加成", value: (n) => `${300 + n * 50}%／${15 + n * 2}%` },
-  };
-  const rule = values[name] ?? {
-    metric: "效果加成",
-    value: (n: number) => `+${n * 5}%`,
-  };
-  return {
-    metric: rule.metric,
-    current: level === 0 ? "未解鎖" : rule.value(lv),
-    next: rule.value(Math.min(10, lv + 1)),
-    value: rule.value,
-  };
 }
 
 function bloodRoarDamageBonus(level: number) {
@@ -2163,6 +2122,9 @@ function Game({
     hits: { damage: number; label: string }[];
     volley: boolean;
   }[]>([]);
+  const [dotDamageGroups, setDotDamageGroups] = useState<{
+    key: number; kind: "bleed" | "burn"; damage: number;
+  }[]>([]);
   const [enemyHitFeedback, setEnemyHitFeedback] = useState<{
     damage: number;
     dodged: boolean;
@@ -2233,12 +2195,15 @@ function Game({
     1: [],
     2: [],
   });
-  const [skillPoints, setSkillPoints] = useState(1);
+  const [skillPoints, setSkillPoints] = useState(0);
+  const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
+  const liveCombatRef = useRef<LiveCombatBattle | null>(null);
+  const [skillAscensions, setSkillAscensions] = useState<SkillAscensionState>(createSkillAscensions);
+  const [skillActionBusy, setSkillActionBusy] = useState(false);
+  const skillActionInFlightRef = useRef(false);
+  const skillActionRetryRef = useRef<{ key: string; id: string } | null>(null);
   const [skills, setSkills] = useState(() =>
-    skillsByClass[playerClass].map((skill, index) => ({
-      ...skill,
-      level: index === 0 ? 1 : 0,
-    })),
+    skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })),
   );
   const [bossTickets, setBossTickets] = useState(10);
   const [worldAttempts, setWorldAttempts] = useState(3);
@@ -2300,6 +2265,11 @@ function Game({
   const [dailyKills, setDailyKills] = useState(0);
   const [dailyDate, setDailyDate] = useState("");
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState(false);
+  const [dailyClaimBusy, setDailyClaimBusy] = useState(false);
+  const dailyClaimInFlightRef = useRef(false);
+  const [shopPurchaseBusy, setShopPurchaseBusy] = useState(false);
+  const shopPurchaseInFlightRef = useRef(false);
+  const shopPurchaseRetryRef = useRef<{ id: string; item: string } | null>(null);
   const [worldDamage, setWorldDamage] = useState(0);
   const [worldRoundDamage, setWorldRoundDamage] = useState(0);
   const [worldBossSecondsLeft, setWorldBossSecondsLeft] = useState(WORLD_BOSS_ROUND_MS / 1_000);
@@ -2311,6 +2281,7 @@ function Game({
   const logIdRef = useRef(10_000);
   const lootIdRef = useRef(20_000);
   const towerDeathPendingRef = useRef(false);
+  const towerVictoryGuardRef = useRef(createCombatVictoryGuard());
   const bloodRoarStateRef = useRef({ battleKey: "", remaining: 0, used: false });
   const bloodRoarHideTimerRef = useRef<number | null>(null);
   const bloodRoarVisualTokenRef = useRef(0);
@@ -2512,9 +2483,12 @@ function Game({
   const activeSetCount = equippedSetPieceCount(equippedGear);
   const activeSetAttackMultiplier = equippedSetAttackMultiplier(equippedGear);
   const activeSetAttackBonusPct = Math.round((activeSetAttackMultiplier - 1) * 100);
+  const skillPassiveStats = skillPassivePanelStats(skillReworkBuild, playerClass, playerHp);
+  const skillHealthBonus = skillPassiveStats.maxHealthBonusPercent;
+  const rangerBaseStats = playerClass === "遊俠" ? skillPassiveStats : null;
   const characterStats = {
     ...baseCharacterStats,
-    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1)),
+    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1) * (1 + skillHealthBonus / 100)),
     attack: Math.round(
       baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) *
       (hasBlessing("stat-attack") ? 1.15 : 1) *
@@ -2527,7 +2501,7 @@ function Game({
     ),
     speed: baseCharacterStats.speed + rebirthTalents.combatAttackSpeed * 5 + (hasBlessing("stat-speed") ? 15 : 0),
     hit: baseCharacterStats.hit + (hasBlessing("stat-hit") ? 10 : 0),
-    crit: baseCharacterStats.crit + rebirthTalents.combatCritRate * 4 + (hasBlessing("stat-crit") ? (blessingUpgraded("stat-crit") ? 18 : 12) : 0),
+    crit: baseCharacterStats.crit + rebirthTalents.combatCritRate * 4 + (hasBlessing("stat-crit") ? (blessingUpgraded("stat-crit") ? 18 : 12) : 0) + (rangerBaseStats?.criticalChancePoints ?? 0),
     critDamage: baseCharacterStats.critDamage + rebirthTalents.combatCritDamage * 10,
     lifesteal:
       baseCharacterStats.lifesteal +
@@ -2543,10 +2517,9 @@ function Game({
     skillDamage: baseCharacterStats.skillDamage + rebirthTalents.growthSkill * 5,
   };
   const combatAttackSpeed =
-    characterStats.speed +
+    characterStats.speed * (1 + ((rangerBaseStats?.attackSpeedBonusPercent ?? 0) +
+      (liveCombatRef.current ? liveCombatSpeedBonus(liveCombatRef.current) : 0)) / 100) +
     (hasBlessing("rapid") ? (blessingUpgraded("rapid") ? 35 : 20) : 0);
-  const playerHpLossFromDamage = (damage: number) =>
-    healthPercentFromDamage(damage, characterStats.hp);
   const currentWaveBoss = wave === MAP_FLOORS;
   const currentWaveGuardian = wave % 10 === 0 && !currentWaveBoss;
   const currentWaveElite = wave % 5 === 0 && !currentWaveGuardian && !currentWaveBoss;
@@ -2803,6 +2776,8 @@ function Game({
               setActiveLoadout(save.activeLoadout);
             }
             if (Array.isArray(save.skills)) setSkills(save.skills);
+            setSkillReworkBuild(restoreSkillBuild(save.skillReworkBuild, playerClass, savedLevel));
+            setSkillAscensions(restoreSkillAscensions(save.skillAscensions, playerClass));
             const needsBossTicketReset = save.bossTicketResetVersion !== PERSONAL_BOSS_RESET_VERSION;
             setBossTickets(needsBossTicketReset ? 10 : (save.bossTickets ?? 10));
             setHighestFloor(save.highestFloor ?? savedWave);
@@ -3003,6 +2978,8 @@ function Game({
         loadouts,
         activeLoadout,
         skills,
+        skillReworkBuild,
+        skillAscensions,
         bossTickets,
         bossTicketResetVersion: PERSONAL_BOSS_RESET_VERSION,
         worldAttempts,
@@ -3123,6 +3100,8 @@ function Game({
     loadouts,
     activeLoadout,
     skills,
+    skillReworkBuild,
+    skillAscensions,
     bossTickets,
     worldAttempts,
     highestFloor,
@@ -3236,65 +3215,166 @@ function Game({
     });
   }, [dailyDate, now]);
 
-  const claimDailyHuntReward = () => {
-    if (dailyKills < 500)
+  const claimDailyHuntReward = async () => {
+    const reward = balanceConfig.economy.dailyHuntReward;
+    if (dailyKills < reward.kills)
       return toast.info("今日獵殺尚未完成", {
-        description: `還需擊敗 ${500 - dailyKills} 隻怪物`,
+        description: `還需擊敗 ${reward.kills - dailyKills} 隻怪物`,
       });
     if (dailyRewardClaimed) return toast.info("今日獎勵已領取");
-    setGold((value) => value + 5000);
-    setEnhanceStones((value) => value + 10);
-    setReforgeStones((value) => value + 10);
-    setYuanbao((value) => value + 20);
-    setDailyRewardClaimed(true);
-    pushLog("收益", "完成今日獵殺 500 隻：金幣 +5,000・強化石 +10・洗鍊石 +10・元寶 +20");
-    toast.success("今日獵殺獎勵已領取", {
-      description: "金幣 +5,000・強化石 +10・洗鍊石 +10・元寶 +20",
-    });
+    if (!saveReady || sessionSuperseded || dailyClaimInFlightRef.current) return;
+    dailyClaimInFlightRef.current = true;
+    setDailyClaimBusy(true);
+    try {
+      const response = await fetch("/api/save", {
+        method: "POST",
+        headers: loginHeaders(loginId, true),
+        body: JSON.stringify({ playerId, action: "claim_daily", dailyDate, dailyKills }),
+      });
+      const result = await response.json();
+      if (response.status === 401 || result?.error === "maintenance") {
+        pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+          : result?.error === "session_replaced" ? "replaced" : "expired");
+        return;
+      }
+      if (!response.ok || result?.ok !== true || result?.dailyRewardClaimed !== true) {
+        toast.error("今日獵殺獎勵未領取，請重新載入確認進度");
+        return;
+      }
+      if (result.accepted === false) {
+        if (Number.isSafeInteger(result.gold)) setGold(result.gold);
+        if (Number.isSafeInteger(result.enhanceStones)) setEnhanceStones(result.enhanceStones);
+        if (Number.isSafeInteger(result.reforgeStones)) setReforgeStones(result.reforgeStones);
+        if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+        toast.info("今日獎勵已領取");
+      } else {
+        setGold((value) => value + reward.gold);
+        setEnhanceStones((value) => value + reward.enhanceStones);
+        setReforgeStones((value) => value + reward.reforgeStones);
+        setYuanbao((value) => value + reward.yuanbao);
+        const summary = `金幣 +${reward.gold.toLocaleString()}・強化石 +${reward.enhanceStones}・洗鍊石 +${reward.reforgeStones}・元寶 +${reward.yuanbao}`;
+        pushLog("收益", `完成今日獵殺 ${reward.kills} 隻：${summary}`);
+        toast.success("今日獵殺獎勵已領取", { description: summary });
+      }
+      setDailyRewardClaimed(true);
+      if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+      setSaveUpdatedAt(result.updatedAt ?? null);
+    } catch {
+      toast.error("連線中斷，請重試今日獵殺獎勵");
+    } finally {
+      dailyClaimInFlightRef.current = false;
+      setDailyClaimBusy(false);
+    }
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const next = idleSeconds + 60;
-      if (next >= 600) {
-        const rewards = Math.floor(next / 600) * 10;
-        setYuanbao((value) => value + rewards);
-        pushLog("收益", `泡點模式達成，獲得元寶 +${rewards}`);
-        toast.success("泡點收益已發放", { description: `元寶 +${rewards}` });
-        requestPrioritySave();
+    if (!saveReady || !playerId || sessionSuperseded) return;
+    let cancelled = false;
+    let inFlight = false;
+    const heartbeat = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch("/api/save", {
+          method: "POST",
+          headers: loginHeaders(loginId, true),
+          body: JSON.stringify({ playerId, action: "heartbeat_online" }),
+        });
+        const result = await response.json();
+        if (cancelled) return;
+        if (response.status === 401 || result?.error === "maintenance") {
+          pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+            : result?.error === "session_replaced" ? "replaced" : "expired");
+          return;
+        }
+        if (!response.ok || result?.ok !== true || result.accepted !== true) return;
+        if (Number.isSafeInteger(result.idleSeconds)) setIdleSeconds(result.idleSeconds);
+        const reward = Number(result.reward);
+        if (Number.isSafeInteger(reward) && reward > 0) {
+          setYuanbao((value) => value + reward);
+          if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+          pushLog("收益", `泡點模式達成，獲得元寶 +${reward}`);
+          toast.success("泡點收益已發放", { description: `元寶 +${reward}` });
+        }
+        setSaveUpdatedAt(result.updatedAt ?? null);
+      } catch {
+        // The next heartbeat resumes accrual without paying for the full gap.
+      } finally {
+        inFlight = false;
       }
-      setIdleSeconds(next % 600);
-    }, 60_000);
-    return () => window.clearTimeout(timer);
-  }, [idleSeconds, pushLog, requestPrioritySave]);
-
-  const buyShopItem = (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
-    const yuanbaoPrices: Partial<Record<typeof item, number>> = {
-      "title-ash": 80, "title-abyss": 180, "appearance-ember": 120,
-      "appearance-arcane": 180, "appearance-abyss": 300, reforge: 10, gamble: 10,
     };
-    const goldPrices: Partial<Record<typeof item, number>> = { "gold-reforge": 200000, "gold-enhance": 100000 };
-    const yuanbaoPrice = yuanbaoPrices[item];
-    const goldPrice = goldPrices[item];
-    if (yuanbaoPrice) {
-      if (yuanbao < yuanbaoPrice) return toast.error("元寶不足", { description: `需要 ${yuanbaoPrice} 元寶` });
-      setYuanbao((value) => value - yuanbaoPrice);
-      if (item.startsWith("title-")) {
-        const title = item === "title-ash" ? "ash-conqueror" : "abyss-survivor";
-        setOwnedTitles((current) => current.includes(title) ? current : [...current, title]);
-        setSelectedTitle(title);
-        toast.success("稱號已解鎖並裝備", { description: TITLE_OPTIONS[title].name });
-        return;
+    void heartbeat();
+    const timer = window.setInterval(() => { void heartbeat(); }, 60_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [saveReady, playerId, loginId, sessionSuperseded, pauseSupersededSession, pushLog]);
+
+  const buyShopItem = async (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => {
+    const cosmeticPrices: Partial<Record<typeof item, number>> = balanceConfig.economy.yuanbaoCosmetics;
+    const cosmeticPrice = cosmeticPrices[item];
+    if (item === "reforge" || cosmeticPrice !== undefined) {
+      if (shopPurchaseInFlightRef.current) return;
+      if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
+      const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : (cosmeticPrice ?? 0);
+      if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
+      if (shopPurchaseRetryRef.current && shopPurchaseRetryRef.current.item !== item)
+        return toast.error("請先重試尚未確認的上一筆購買");
+      shopPurchaseInFlightRef.current = true;
+      setShopPurchaseBusy(true);
+      const purchaseId = shopPurchaseRetryRef.current?.id ?? crypto.randomUUID();
+      shopPurchaseRetryRef.current = { id: purchaseId, item };
+      try {
+        const response = await fetch("/api/save", {
+          method: "POST",
+          headers: loginHeaders(loginId, true),
+          body: JSON.stringify({
+            playerId, action: item === "reforge" ? "shop_reforge" : "shop_cosmetic",
+            purchaseId, ...(item === "reforge" ? {} : { shopItem: item }),
+          }),
+        });
+        const result = await response.json();
+        if (response.status === 401) {
+          pauseSupersededSession(result?.error === "session_replaced" ? "replaced" : "expired");
+          return;
+        }
+        if (!response.ok || result?.ok !== true || typeof result.accepted !== "boolean") {
+          toast.error(result?.error === "purchase_rejected" ? "元寶不足、已擁有或存檔異常" : "購買失敗，請重試");
+          return;
+        }
+        if (result.accepted) {
+          setYuanbao((value) => value - price);
+          if (item === "reforge") {
+            const stones = balanceConfig.economy.yuanbaoReforgeBundle.stones;
+            setReforgeStones((value) => value + stones);
+            pushLog("收益", `商城購買洗鍊石 ×${stones}，消耗元寶 ${price}`);
+            toast.success("購買成功", { description: `洗鍊石 +${stones}` });
+          } else {
+            toast.success("外觀或稱號已解鎖並裝備");
+          }
+        } else {
+          if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+          if (item === "reforge" && Number.isSafeInteger(result.reforgeStones))
+            setReforgeStones(result.reforgeStones);
+          toast.info("該筆購買已完成");
+        }
+        if (Array.isArray(result.ownedTitles)) setOwnedTitles(result.ownedTitles);
+        if (Array.isArray(result.ownedAppearances)) setOwnedAppearances(result.ownedAppearances);
+        if (typeof result.selectedTitle === "string" && result.ownedTitles?.includes(result.selectedTitle))
+          setSelectedTitle(result.selectedTitle as TitleId);
+        if (typeof result.selectedAppearance === "string" && result.ownedAppearances?.includes(result.selectedAppearance))
+          setSelectedAppearance(result.selectedAppearance as AppearanceId);
+        if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+        setSaveUpdatedAt(result.updatedAt ?? null);
+        shopPurchaseRetryRef.current = null;
+      } catch {
+        toast.error("連線中斷，請重試同一筆購買");
+      } finally {
+        shopPurchaseInFlightRef.current = false;
+        setShopPurchaseBusy(false);
       }
-      if (item.startsWith("appearance-")) {
-        const appearance = item.replace("appearance-", "") as "ember" | "arcane" | "abyss";
-        const id = `${appearance}-aura` as AppearanceId;
-        setOwnedAppearances((current) => current.includes(id) ? current : [...current, id]);
-        setSelectedAppearance(id);
-        toast.success("外觀特效已解鎖並裝備", { description: APPEARANCE_OPTIONS[id].name });
-        return;
-      }
+      return;
     }
+    const goldPrices: Partial<Record<typeof item, number>> = { "gold-reforge": 200000, "gold-enhance": 100000 };
+    const goldPrice = goldPrices[item];
     if (goldPrice) {
       if (gold < goldPrice) return toast.error("金幣不足", { description: `需要 ${goldPrice.toLocaleString()} 金幣` });
       setGold((value) => value - goldPrice);
@@ -3305,12 +3385,6 @@ function Game({
     }
     if (yuanbao < 10) return toast.error("元寶不足", { description: "需要 10 元寶" });
     setYuanbao((value) => value - 10);
-    if (item === "reforge") {
-      setReforgeStones((value) => value + 12);
-      pushLog("收益", "商城購買洗鍊石 ×12，消耗元寶 10");
-      toast.success("購買成功", { description: "洗鍊石 +12" });
-      return;
-    }
     const targetMap = Math.max(1, unlockedMapId);
     const reward = createGambleReward(targetMap, Math.random(), Date.now());
     if (reward.type === "reforge") {
@@ -3340,7 +3414,7 @@ function Game({
         }
         if (levelUps > 0) {
           setLevel(nextLevel);
-          setSkillPoints((points) => points + levelUps);
+          setSkillPoints(earnedSkillPoints(nextLevel));
           pushLog("成長", `經驗累積完成，角色提升至 Lv.${nextLevel}`);
         }
         return nextLevel >= 100 ? 0 : remaining;
@@ -3780,8 +3854,54 @@ function Game({
   };
 
   const canRebirth = level >= 100 && (mapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
-  const rebirth = () => {
+  const runSkillAction = async (action: SkillSaveAction): Promise<boolean> => {
+    if (!saveReady || sessionSuperseded || skillActionInFlightRef.current) return false;
+    skillActionInFlightRef.current = true;
+    setSkillActionBusy(true);
+    const key = JSON.stringify(action);
+    const id = skillActionRetryRef.current?.key === key
+      ? skillActionRetryRef.current.id : crypto.randomUUID();
+    skillActionRetryRef.current = { key, id };
+    try {
+      const response = await fetch("/api/save", {
+        method: "POST",
+        headers: loginHeaders(loginId, true),
+        body: JSON.stringify({ playerId, action: "skill", skillAction: action, skillActionId: id }),
+      });
+      const result = await response.json();
+      if (response.status === 401 || result?.error === "maintenance") {
+        pauseSupersededSession(result?.error === "maintenance" ? "maintenance"
+          : result?.error === "session_replaced" ? "replaced" : "expired");
+        return false;
+      }
+      if (!response.ok || result?.ok !== true) {
+        skillActionRetryRef.current = null;
+        toast.error("新版技能操作未完成，請重新載入後再試");
+        return false;
+      }
+      if (action.kind === "paid_reset") {
+        if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
+        if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
+      }
+      setSkillReworkBuild(restoreSkillBuild(result.skillReworkBuild, playerClass, level));
+      setSkillAscensions(restoreSkillAscensions(result.skillAscensions, playerClass));
+      setSaveUpdatedAt(result.updatedAt ?? null);
+      skillActionRetryRef.current = null;
+      return true;
+    } catch {
+      toast.error("連線中斷，請重試新版技能操作");
+      return false;
+    } finally {
+      skillActionInFlightRef.current = false;
+      setSkillActionBusy(false);
+    }
+  };
+
+  const rebirth = async () => {
     if (!canRebirth) return;
+    // Legacy rebirth progression remains separate; the new preview unlocks
+    // ascensions only after this action has been accepted by the save server.
+    if (!(await runSkillAction({ kind: "begin_rebirth" }))) return;
     towerDeathPendingRef.current = false;
     resetCombatPerks();
     setRebirthCount((value) => Math.min(MAX_REBIRTHS, value + 1));
@@ -3801,8 +3921,8 @@ function Game({
     setUnseenItemIds([]);
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
-    setSkills(skillsByClass[playerClass].map((skill, index) => ({ ...skill, level: index === 0 ? 1 : 0 })));
-    setSkillPoints(1);
+    setSkills(skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })));
+    setSkillPoints(0);
     setCompletedRuns(0);
     setStoredSeconds(0);
     setBlessings([]);
@@ -3876,6 +3996,17 @@ function Game({
 
   useEffect(() => {
     if (!battleOn || activeBossBattle || runSummary) return;
+    // The live skill queue still owns hits, rewards and death handling. Keep its
+    // settlement route on legacy until the replacement owns all three together.
+    const cutoverRoute = beginSkillBattleCutover({
+      battleId: `tower:${runStartedAt}:${mapId}`,
+      encounter: "tower",
+      enableRework: false,
+      reworkReady: false,
+    });
+    let actionSequence = 0;
+    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, `tower:${runStartedAt}:${mapId}`,
+      `${runStartedAt}:${mapId}:${wave}`, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const monsterAttackSpeed = monsterProfile(currentEnemyBaseName).speed * 100;
     let playerClock = 0;
@@ -3900,9 +4031,165 @@ function Game({
     if (markedRemaining > 0 && hasSkillMythic("致命標記")) {
       showCombatStatus({ name: "致命標記 ×2", target: "enemy", remaining: markedRemaining + 1, unit: "攻擊", tone: "gold" });
     }
+    const targetKey = `${runStartedAt}:${mapId}:${wave}`;
+    const resolveTowerKill = (executionFinisher: boolean, markExplosionWasActive: boolean, tier: "normal" | "elite" | "guardian" | "boss") => {
+      if (!towerVictoryGuardRef.current.claim(targetKey)) return executionFinisher ? 0 : 100;
+      if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
+      combatPerksRef.current.firstEnemyAttackReady = true;
+      combatPerksRef.current.revengeStacks = 0;
+      combatPerksRef.current.ironWallBonus = 0;
+      combatPerksRef.current.arcaneEchoReady = false;
+      combatPerksRef.current.arcaneStacks = 0;
+      if (markExplosionWasActive && hasPerk("skill-ranger-queen-contract")) {
+        nextEnemyMarkStacksRef.current = 2;
+      }
+      // A mark belongs to its current target. Clear an un detonated
+      // mark immediately when that target dies; an explosion already
+      // in progress is allowed to finish independently.
+      setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setEnemyDefeated(true);
+      window.setTimeout(() => setEnemyDefeated(false), executionFinisher ? 980 : 320);
+      setEnemyHitFeedback(null);
+      const enemy = baseMonsterName(enemyName);
+      const goldRules = balanceConfig.economy.gold;
+      const goldTier = currentWaveBoss ? "boss" : currentWaveGuardian ? "guardian" : currentWaveElite ? "elite" : "normal";
+      const goldBase = goldRules.monsterDropBaseByMap[mapId - 1] ?? goldRules.monsterDropBaseByMap[0];
+      const goldGain = Math.round(
+        goldBase * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
+        goldRules.tierMultiplier[goldTier] *
+        (hasBlessing("stat-gold") ? 1.2 : 1) *
+        (1 + (characterStats.goldBonus / 100) * goldRules.goldAffixEffectiveness),
+      );
+      const enhanceGain =
+        Math.random() <
+        enhancementStoneDropChance(
+          currentWaveBoss || currentWaveGuardian ? 1 : currentWaveElite ? 0.3 : 0.06,
+          characterStats.resourceDrop + characterStats.enhanceDrop,
+          hasBlessing("stat-enhance") ? 0.1 : 0,
+        )
+          ? currentWaveBoss || currentWaveGuardian
+            ? 1 + Math.floor(Math.random() * 3)
+            : 1
+          : 0;
+      const reforgeGain =
+        Math.random() <
+        Math.min(
+          1,
+          (currentWaveBoss ? 0.35 : currentWaveGuardian ? 0.15 : currentWaveElite ? 0.04 : 0.008) +
+            (characterStats.resourceDrop + characterStats.reforgeDrop) / 100 +
+            (hasBlessing("stat-reforge") ? 0.05 : 0),
+        )
+          ? 1
+          : 0;
+      const yuanbaoGain =
+        Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
+      const gemDrop = rollGemDrop(mapId);
+      const drillingStoneDrop = rollDrillingStoneDrop();
+      setGold((value) => value + goldGain);
+      setEnhanceStones((value) => value + enhanceGain);
+      setReforgeStones((value) => value + reforgeGain);
+      setYuanbao((value) => value + yuanbaoGain);
+      if (gemDrop) {
+        setGemInventory((inventory) => addGemStack(inventory, gemDrop));
+        const gem = getGemDefinition(gemDrop.gemId, gemDrop.tier);
+        pushLog("掉落", `獲得${gem.tierLabel}${gem.name}`);
+      }
+      if (drillingStoneDrop) {
+        setDrillingStones((value) => value + 1);
+        pushLog("掉落", "獲得打孔石 ×1");
+      }
+      setRunKills((value) => value + 1);
+      setDailyKills((value) => value + 1);
+      const experienceGain = Math.round(
+        mapExperienceGain(currentMap, tier, level) *
+          (1 + characterStats.expBonus / 100),
+      );
+      grantExperience(experienceGain);
+      setRunGold((value) => value + goldGain);
+      setRunEnhance((value) => value + enhanceGain);
+      setRunReforge((value) => value + reforgeGain);
+      if (currentWaveElite) setRunElites((value) => value + 1);
+      if (currentWaveGuardian || currentWaveBoss)
+        setRunGuardians((value) => value + 1);
+      setResourceDrop({
+        key: Date.now(),
+        gold: goldGain,
+        enhance: enhanceGain,
+        reforge: reforgeGain,
+        yuanbao: yuanbaoGain,
+      });
+      setPlayerHp(100);
+      enemyAttackCount = 0;
+      setCombatStatuses([]);
+      defenseBreakRemaining = 0;
+      markedRemaining = 0;
+      markExplosionPending = false;
+      fissureRemaining = 0;
+      fissureDetonationPending = false;
+      burningUntil = 0;
+      setBloodShieldReady(true);
+      setRound(1);
+      revealBattleDrop(tier, wave);
+      pushLog(
+        "戰鬥",
+        `第 ${wave} 層擊敗${enemy}，金幣 +${goldGain}${enhanceGain ? `・強化石 +${enhanceGain}` : ""}${reforgeGain ? `・洗鍊石 +${reforgeGain}` : ""}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
+      );
+      pushLog("成長", `獲得 ${experienceGain.toLocaleString()} 經驗`);
+      if (wave >= MAP_FLOORS) {
+        setMapBestFloors((old) => ({ ...old, [mapId]: MAP_FLOORS }));
+        setTimeout(() => finishRun("complete", MAP_FLOORS), 250);
+        return 100;
+      }
+      const nextWave = wave + 1;
+      const nextEnemy = nextWave >= MAP_FLOORS
+        ? currentMap.monsters[4]
+        : nextWave % 10 === 0 || nextWave % 5 === 0
+          ? currentMap.monsters[4]
+          : currentMap.monsters[Math.floor(Math.random() * 4)];
+      setHighestFloor((value) => Math.max(value, nextWave));
+      setMapBestFloors((old) => ({
+        ...old,
+        [mapId]: Math.max(old[mapId] ?? 0, nextWave),
+      }));
+      const advanceToNextEnemy = () => {
+        setWave(nextWave);
+        setEnemyName(baseMonsterName(nextEnemy));
+        if (executionFinisher) setEnemyHp(100);
+        towerDeathPendingRef.current = false;
+        if (currentWaveGuardian) setTimeout(offerBlessings, 450);
+      };
+      if (executionFinisher) {
+        towerDeathPendingRef.current = true;
+        window.setTimeout(advanceToNextEnemy, 1_050);
+        return 0;
+      }
+      advanceToNextEnemy();
+      return 100;
+    };
     const timer = setInterval(
       () => {
         if (towerDeathPendingRef.current) return;
+        if (towerVictoryGuardRef.current.has(targetKey)) return;
+        const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
+        const tickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
+        if (tickDamage > 0) {
+          const dotKey = Date.now();
+          const byKind = new Map<"bleed" | "burn", number>();
+          for (const event of dotTicks) {
+            if (event.damage > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + Math.round(event.damage));
+          }
+          const dotGroups = [...byKind].map(([kind, damage], index) => ({ key: dotKey + index, kind, damage }));
+          setDotDamageGroups((current) => [...current, ...dotGroups]);
+          window.setTimeout(() => setDotDamageGroups((current) =>
+            current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
+          const tickTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
+          const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName);
+          setEnemyHp((health) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+            const settled = settleCombatHealth(health, maximum, tickDamage);
+            return settled.defeated ? resolveTowerKill(false, false, tickTier) : settled.remainingPercent;
+          });
+        }
         const battleKey = `${mapId}:${wave}`;
         if (bloodRoarStateRef.current.battleKey !== battleKey) {
           bloodRoarStateRef.current = { battleKey, remaining: 0, used: false };
@@ -3938,7 +4225,13 @@ function Game({
         if (burningUntil > Date.now() && Date.now() >= nextBurnAt) {
           nextBurnAt = Date.now() + 1000;
           const burnLevel = skills.find((skill) => skill.name === "霜火新星")?.level ?? 1;
-          setEnemyHp((health) => Math.max(0, health - (1.5 + burnLevel * 0.5)));
+          const burnTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
+          const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName);
+          setEnemyHp((health) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
+            const settled = settleCombatHealth(health, maximumHealth, maximumHealth * (1.5 + burnLevel * 0.5) / 100);
+            return settled.defeated ? resolveTowerKill(false, false, burnTier) : settled.remainingPercent;
+          });
         }
         const dynamicDamageReduction = characterStats.damageReduction +
           (hasPerk("special-ashguard") && playerHp < 40 ? 8 : 0);
@@ -3999,7 +4292,7 @@ function Game({
                     (1 - Math.min(balanceConfig.progression.damageReductionCap, dynamicDamageReduction) / 100),
                 ),
               );
-              if (Math.random() * 100 < effectiveDodge) {
+              if (!liveCombatRef.current && Math.random() * 100 < effectiveDodge) {
                 if (hasPerk("special-shadowwalker")) {
                   combatPerksRef.current.dodgeSpeedAttacks = 3;
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
@@ -4041,20 +4334,36 @@ function Game({
                 setBloodShieldReady(false);
                 setCausePrompt(`血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`);
               }
-              const actualDamage = Math.min(
-                healthFromPercent(playerHealth, characterStats.hp),
-                monsterDamage,
-              );
-              const hpLoss = playerHpLossFromDamage(actualDamage);
+              if (liveCombatRef.current) {
+                const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
+                  healthPercent: playerHealth, maxHealth: characterStats.hp,
+                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
+                });
+                monsterDamage = liveDefense.damage;
+                if (liveDefense.counterDamagePercent > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  setEnemyHp((health) => {
+                    if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+                    const settled = settleCombatHealth(health, maximum, counter);
+                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                  });
+                }
+                if (liveDefense.blocked || liveDefense.dodged) {
+                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
+                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  return playerHealth;
+                }
+              }
+              const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
+              const actualDamage = healthSettlement.actualDamage;
               if (hasPerk("special-revenge-thorn")) {
                 combatPerksRef.current.revengeStacks = Math.min(3, combatPerksRef.current.revengeStacks + 1);
               }
               setPlayerHitFeedback({ damage: actualDamage, dodged: false, key: next });
               setEnemyHitFeedback({ damage: actualDamage, dodged: false, key: next });
-              if (
-                actualDamage >= healthFromPercent(playerHealth, characterStats.hp) ||
-                playerHealth - hpLoss <= 0.000001
-              ) {
+              if (healthSettlement.defeated) {
                 if (!towerDeathPendingRef.current) {
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
@@ -4063,7 +4372,7 @@ function Game({
                 }
                 return 0;
               }
-              return playerHealth - hpLoss;
+              return healthSettlement.remainingPercent;
             });
             return next;
           }
@@ -4105,9 +4414,16 @@ function Game({
           const setTriggered =
             activeSetCount >= SET_RESONANCE_ATTACKS &&
             playerAttackCount % SET_RESONANCE_ATTACKS === 0;
+          const liveCombat = liveCombatRef.current;
+          const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
+            now: Date.now(), healthPercent: playerHp, attack: characterStats.attack,
+            hitChance: effectiveHit, criticalChance: characterStats.crit,
+            criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
+          }) : null;
+          const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
           let triggered: Skill | null = null;
-          let triggeredMultiplier = 1;
-          let triggeredDefenseIgnore = defenseBreakRemaining > 0 ? 35 : 0;
+          let triggeredMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
+          let triggeredDefenseIgnore = liveAction?.defenseIgnore ?? (defenseBreakRemaining > 0 ? 35 : 0);
           let frostfireDetonationDamage = 0;
           let meteorSecondTriggered = false;
           const bloodRoarWasActive = bloodRoarStateRef.current.remaining > 0;
@@ -4140,13 +4456,13 @@ function Game({
             if (markedRemaining > 0) markedRemaining -= 1;
             else if (markExplosionPending) markExplosionPending = false;
             const learned = skills.filter((skill) => skill.level > 0);
-            const hasSkill = (name: string) => learned.find((skill) => skill.name === name);
+            const hasSkill = (name: string) => liveCombat ? undefined : learned.find((skill) => skill.name === name);
             const executionThreshold = hasPerk("skill-warrior-executioner") ? 8 : 10;
             const executionSkill = playerClass === "戰士" && warriorAttackCount % executionThreshold === 0
               ? hasSkill("處決")
               : undefined;
             const executionReady = Boolean(executionSkill);
-            if (skillCooldown <= 0 || executionReady) {
+            if (!liveCombat && (skillCooldown <= 0 || executionReady)) {
               const candidates = playerClass === "戰士"
                 ? [
                     ...(executionSkill ? [{ skill: executionSkill, chance: 1 }] : []),
@@ -4242,7 +4558,7 @@ function Game({
           if (Math.random() < thirdChance) attacks++;
           const windVolleyTriggered = triggered?.name === "疾風連射";
           const hunterLevel = skills.find((skill) => skill.name === "獵手本能")?.level ?? 0;
-          const critical = Math.random() * 100 < Math.min(100, characterStats.crit);
+          const critical = liveAction?.critical ?? Math.random() * 100 < Math.min(100, characterStats.crit);
           const hunterChance = hasPerk("skill-ranger-hunter-eye") ? 0.2 : skillProcChance("獵手本能", hunterLevel);
           const hunterBonus = playerClass === "遊俠" && critical && Math.random() < hunterChance;
           if (hunterBonus && !windVolleyTriggered) attacks += 1;
@@ -4283,7 +4599,7 @@ function Game({
               ? 60
               : 20 + triggered.level * 5;
           }
-          const windCriticalMultiplier = windVolleyTriggered
+          const windCriticalMultiplier = liveAction ? 1 : windVolleyTriggered
             ? windVolleyCriticals.reduce<number>(
                 (total, isCritical) => total + (isCritical ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100 : 1),
                 0,
@@ -4291,7 +4607,7 @@ function Game({
             : critical
               ? 1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100
               : 1;
-          const skillDamageTriggered = Boolean(triggered);
+          const skillDamageTriggered = Boolean(triggered || liveAction?.name);
           const blessingEchoMultiplier =
             triggered && hasBlessing("echo")
               ? blessingUpgraded("echo")
@@ -4306,6 +4622,7 @@ function Game({
               (activeAttackPerks.killBuffRemaining > 0 ? 1.12 : 1) *
               (activeAttackPerks.firstEnemyAttackReady ? 1.3 : 1)
             : 1;
+          const hitRoll = Math.random() * 100;
           const combatValues = towerCombatValues({
             combatPower,
             recommendedPower: currentRecommendedPower,
@@ -4327,13 +4644,13 @@ function Game({
               (bloodRoarWasActive ? 1 + bloodRoarDamageBonus(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0) / 100 : 1),
             skillDamage: characterStats.skillDamage +
               (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
-              (skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
+              (!liveAction && skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
             eliteDamage: 0,
             bossReduction: characterStats.bossReduction,
             lowHealthDamage: characterStats.lowHealthDamage,
             lowHealthReduction: characterStats.lowHealthReduction,
             lowHealth: playerHp <= 35,
-            roll: hitRoll / 100,
+            roll: liveAction ? 0 : hitRoll / 100,
             monsterName: currentEnemyBaseName,
             playerDefense: characterStats.defense,
             playerAttack: offensiveAttack,
@@ -4355,6 +4672,7 @@ function Game({
             currentWaveBoss || currentWaveGuardian || currentWaveElite
               ? 1 + characterStats.bossDamage / 100
               : 1;
+          if (liveAction?.damagePercent === 0) combatValues.playerDamage = 0;
           const baseHpDamage = Math.round(
             combatValues.playerDamage *
               windCriticalMultiplier *
@@ -4364,7 +4682,7 @@ function Game({
             ? Math.round(combatValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100) : 0;
           const setResonanceDamage = setTriggered
             ? Math.round(combatValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100) : 0;
-          let hpDamage = baseHpDamage + setElementalDamage + setResonanceDamage;
+          let hpDamage = baseHpDamage + setElementalDamage + setResonanceDamage + actionDotDamage;
           if (fissureDetonationThisAttack) hpDamage += Math.round(combatValues.playerDamage);
           if (activeAttackPerks?.ironWallBonus) hpDamage += activeAttackPerks.ironWallBonus;
           if (bloodRoarFinalAttack) hpDamage += Math.round(combatValues.playerDamage * 2.5);
@@ -4375,7 +4693,7 @@ function Game({
               combatValues.playerDamage * 0.7 * (1 + characterStats.critDamage / 100),
             );
           }
-          const effectName = bloodRoarFinalAttack
+          const effectName = liveAction?.name ?? (bloodRoarFinalAttack
             ? "鮮血怒吼・血爆"
             : magicShieldExplosionWasActive
               ? "魔力護盾・爆炸"
@@ -4389,7 +4707,7 @@ function Game({
               ? "致命標記・爆炸"
             : triggered
               ? `${triggered.name}${echoMultiplier > 1 ? "・回響" : ""}`
-              : null;
+              : null);
           setComboCount(attacks);
           if (effectName) queueSkillVisual({ name: effectName, key: next });
           else setSkillEffect(null);
@@ -4423,8 +4741,13 @@ function Game({
               window.setTimeout(() => setExecutionImpactPulse(false), 360);
             }, 750);
           }
-          const hitRoll = Math.random() * 100;
-          if (hitRoll > effectiveHit) {
+          if (liveAction && liveAction.damagePercent <= 0 && actionDotDamage <= 0) {
+            setLastDamage(0);
+            setBattleHits([]);
+            setCausePrompt(liveAction.name ? `${liveAction.name}已施放` : "攻擊落空");
+            return next;
+          }
+          if (!liveAction && hitRoll > effectiveHit) {
             setMissFeedback(next);
             setLastDamage(0);
             setBattleHits([]);
@@ -4434,6 +4757,8 @@ function Game({
             return next;
           }
           setMissFeedback(null);
+          for (const status of liveAction?.statuses ?? [])
+            showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
           const attackDebugParts = [
             effectName ? `特效：${effectName}` : "特效：普通攻擊",
             `命中：${effectiveHit.toFixed(0)}%`,
@@ -4450,7 +4775,9 @@ function Game({
             fissureDetonationThisAttack ? "大地崩解：裂痕引爆" : null,
           ].filter(Boolean).join("｜");
           setCausePrompt(attackDebugParts);
+          const currentAction = ++actionSequence;
           setEnemyHp((h) => {
+            if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
             const execution =
               hasBlessing("execute") &&
               h <= (blessingUpgraded("execute") ? 35 : 30);
@@ -4462,31 +4789,42 @@ function Game({
                 : 1;
             const finalMultiplier =
               (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
-              executionMythicBonus;
-            const finalHpDamage = Math.round(hpDamage * finalMultiplier);
+              executionMythicBonus *
+              (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner") && h < 25 ? 2 : 1);
+            const finalHpDamage = settleCutoverAction(cutoverRoute, {
+              battleId: cutoverRoute.battleId,
+              sequence: currentAction,
+              legacyDamage: Math.round((hpDamage - actionDotDamage) * finalMultiplier) + Math.round(actionDotDamage),
+            }).damage;
             const enemyMaximumHealth = effectiveMonsterMaximumHealth(
               mapId,
               currentRecommendedPower,
               tier,
               currentEnemyBaseName,
             );
-            const actualPercentDamage = Math.min(
-              h,
-              healthPercentFromDamage(finalHpDamage, enemyMaximumHealth),
-            );
-            const currentEffectiveEnemyHealth =
-              healthFromPercent(h, enemyMaximumHealth);
+            const healthSettlement = settleCombatHealth(h, enemyMaximumHealth, finalHpDamage);
+            const actualPercentDamage = healthSettlement.percentDamage;
             const totalDisplayedDamage = Math.max(
               1,
-              Math.min(Math.round(currentEffectiveEnemyHealth), finalHpDamage),
+              Math.round(healthSettlement.actualDamage),
             );
             let mainDisplayedDamage = Math.min(totalDisplayedDamage,
-              Math.round((hpDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
+              Math.round((hpDamage - actionDotDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
             const elementalDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage,
               Math.round(setElementalDamage * finalMultiplier));
             const resonanceDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed,
               Math.round(setResonanceDamage * finalMultiplier));
-            mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed;
+            const dotDisplayedDamage = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed,
+              Math.round(actionDotDamage));
+            mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed - dotDisplayedDamage;
+            const visibleDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
+            let dotRemaining = dotDisplayedDamage;
+            const dotGroupKey = next * 10;
+            for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
+              const damage = Math.min(dotRemaining, Math.max(0, Math.round(event.damage)));
+              dotRemaining -= damage;
+              if (damage > 0) visibleDotGroups.push({ key: dotGroupKey + index, kind: event.kind, damage });
+            }
             const baseHitDamage = Math.floor(mainDisplayedDamage / attacks);
             const remainder = Math.max(0, mainDisplayedDamage - baseHitDamage * attacks);
             const hitDamages = windVolleyTriggered
@@ -4508,6 +4846,11 @@ function Game({
                 ...(elementalDisplayed > 0 ? [{ damage: elementalDisplayed, label: "元素" }] : []),
                 ...(resonanceDisplayed > 0 ? [{ damage: resonanceDisplayed, label: "元素爆發" }] : []),
               ];
+              if (visibleDotGroups.length) {
+                setDotDamageGroups((current) => [...current, ...visibleDotGroups]);
+                window.setTimeout(() => setDotDamageGroups((current) =>
+                  current.filter((event) => event.key < dotGroupKey || event.key >= dotGroupKey + visibleDotGroups.length)), 1_200);
+              }
               if (elementalHits.length) {
                 setSetElementalHits((current) => [...current, { key: next, hits: elementalHits, volley: windVolleyTriggered }]);
                 window.setTimeout(() => setSetElementalHits((current) => current.filter((hit) => hit.key !== next)),
@@ -4574,7 +4917,7 @@ function Game({
             const temporaryLifesteal = bloodRoarWasActive
               ? bloodRoarLifesteal(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0)
               : 0;
-            const totalLifesteal = Math.min(100, dynamicLifesteal + temporaryLifesteal);
+            const totalLifesteal = Math.min(100, dynamicLifesteal + temporaryLifesteal + (liveAction?.lifestealPercent ?? 0));
             if (bloodRoarFinalAttack) {
               setPlayerHp((health) => Math.max(1, health * 0.9));
             }
@@ -4603,141 +4946,8 @@ function Game({
               combatPerksRef.current.nextAttackCritDamage = 40;
               showCombatStatus({ name: "完美獵殺・下一擊暴傷 +40%", target: "player", remaining: 1, unit: "次", tone: "gold" });
             }
-            if (h - actualPercentDamage <= 0.000001) {
-              const executionFinisher = triggered?.name === "處決";
-              if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
-              combatPerksRef.current.firstEnemyAttackReady = true;
-              combatPerksRef.current.revengeStacks = 0;
-              combatPerksRef.current.ironWallBonus = 0;
-              combatPerksRef.current.arcaneEchoReady = false;
-              combatPerksRef.current.arcaneStacks = 0;
-              if (markExplosionWasActive && hasPerk("skill-ranger-queen-contract")) {
-                nextEnemyMarkStacksRef.current = 2;
-              }
-              // A mark belongs to its current target. Clear an un detonated
-              // mark immediately when that target dies; an explosion already
-              // in progress is allowed to finish independently.
-              setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
-              setEnemyDefeated(true);
-              window.setTimeout(() => setEnemyDefeated(false), executionFinisher ? 980 : 320);
-              setEnemyHitFeedback(null);
-              const enemy = baseMonsterName(enemyName);
-              const goldRules = balanceConfig.economy.gold;
-              const goldTier = currentWaveBoss ? "boss" : currentWaveGuardian ? "guardian" : currentWaveElite ? "elite" : "normal";
-              const goldBase = goldRules.monsterDropBaseByMap[mapId - 1] ?? goldRules.monsterDropBaseByMap[0];
-              const goldGain = Math.round(
-                goldBase * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
-                goldRules.tierMultiplier[goldTier] *
-                (hasBlessing("stat-gold") ? 1.2 : 1) *
-                (1 + (characterStats.goldBonus / 100) * goldRules.goldAffixEffectiveness),
-              );
-              const enhanceGain =
-                Math.random() <
-                enhancementStoneDropChance(
-                  currentWaveBoss || currentWaveGuardian ? 1 : currentWaveElite ? 0.3 : 0.06,
-                  characterStats.resourceDrop + characterStats.enhanceDrop,
-                  hasBlessing("stat-enhance") ? 0.1 : 0,
-                )
-                  ? currentWaveBoss || currentWaveGuardian
-                    ? 1 + Math.floor(Math.random() * 3)
-                    : 1
-                  : 0;
-              const reforgeGain =
-                Math.random() <
-                Math.min(
-                  1,
-                  (currentWaveBoss ? 0.35 : currentWaveGuardian ? 0.15 : currentWaveElite ? 0.04 : 0.008) +
-                    (characterStats.resourceDrop + characterStats.reforgeDrop) / 100 +
-                    (hasBlessing("stat-reforge") ? 0.05 : 0),
-                )
-                  ? 1
-                  : 0;
-              const yuanbaoGain =
-                Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
-              const gemDrop = rollGemDrop(mapId);
-              const drillingStoneDrop = rollDrillingStoneDrop();
-              setGold((value) => value + goldGain);
-              setEnhanceStones((value) => value + enhanceGain);
-              setReforgeStones((value) => value + reforgeGain);
-              setYuanbao((value) => value + yuanbaoGain);
-              if (gemDrop) {
-                setGemInventory((inventory) => addGemStack(inventory, gemDrop));
-                const gem = getGemDefinition(gemDrop.gemId, gemDrop.tier);
-                pushLog("掉落", `獲得${gem.tierLabel}${gem.name}`);
-              }
-              if (drillingStoneDrop) {
-                setDrillingStones((value) => value + 1);
-                pushLog("掉落", "獲得打孔石 ×1");
-              }
-              setRunKills((value) => value + 1);
-              setDailyKills((value) => value + 1);
-              const experienceGain = Math.round(
-                mapExperienceGain(currentMap, tier, level) *
-                  (1 + characterStats.expBonus / 100),
-              );
-              grantExperience(experienceGain);
-              setRunGold((value) => value + goldGain);
-              setRunEnhance((value) => value + enhanceGain);
-              setRunReforge((value) => value + reforgeGain);
-              if (currentWaveElite) setRunElites((value) => value + 1);
-              if (currentWaveGuardian || currentWaveBoss)
-                setRunGuardians((value) => value + 1);
-              setResourceDrop({
-                key: Date.now(),
-                gold: goldGain,
-                enhance: enhanceGain,
-                reforge: reforgeGain,
-                yuanbao: yuanbaoGain,
-              });
-              setPlayerHp(100);
-              enemyAttackCount = 0;
-              setCombatStatuses([]);
-              defenseBreakRemaining = 0;
-              markedRemaining = 0;
-              markExplosionPending = false;
-              fissureRemaining = 0;
-              fissureDetonationPending = false;
-              burningUntil = 0;
-              setBloodShieldReady(true);
-              setRound(1);
-              revealBattleDrop(tier, wave);
-              pushLog(
-                "戰鬥",
-                `第 ${wave} 層擊敗${enemy}，金幣 +${goldGain}${enhanceGain ? `・強化石 +${enhanceGain}` : ""}${reforgeGain ? `・洗鍊石 +${reforgeGain}` : ""}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
-              );
-              pushLog("成長", `獲得 ${experienceGain.toLocaleString()} 經驗`);
-              if (wave >= MAP_FLOORS) {
-                setMapBestFloors((old) => ({ ...old, [mapId]: MAP_FLOORS }));
-                setTimeout(() => finishRun("complete", MAP_FLOORS), 250);
-                return 100;
-              }
-              const nextWave = wave + 1;
-              const nextEnemy = nextWave >= MAP_FLOORS
-                ? currentMap.monsters[4]
-                : nextWave % 10 === 0 || nextWave % 5 === 0
-                  ? currentMap.monsters[4]
-                  : currentMap.monsters[Math.floor(Math.random() * 4)];
-              setHighestFloor((value) => Math.max(value, nextWave));
-              setMapBestFloors((old) => ({
-                ...old,
-                [mapId]: Math.max(old[mapId] ?? 0, nextWave),
-              }));
-              const advanceToNextEnemy = () => {
-                setWave(nextWave);
-                setEnemyName(baseMonsterName(nextEnemy));
-                if (executionFinisher) setEnemyHp(100);
-                towerDeathPendingRef.current = false;
-                if (currentWaveGuardian) setTimeout(offerBlessings, 450);
-              };
-              if (executionFinisher) {
-                towerDeathPendingRef.current = true;
-                window.setTimeout(advanceToNextEnemy, 1_050);
-                return 0;
-              }
-              advanceToNextEnemy();
-              return 100;
-            }
-            if (!monsterActs) return Math.max(0, h - actualPercentDamage);
+            if (healthSettlement.defeated) return resolveTowerKill(triggered?.name === "處決", markExplosionWasActive, tier);
+            if (!monsterActs) return healthSettlement.remainingPercent;
             setPlayerHp((playerHealth) => {
               const shieldWasActive = magicShieldCooldown > 0;
               if (magicShieldCooldown > 0) magicShieldCooldown -= 1;
@@ -4751,7 +4961,7 @@ function Game({
                     (1 - Math.min(balanceConfig.progression.damageReductionCap, dynamicDamageReduction) / 100),
                 ),
               );
-              if (Math.random() * 100 < effectiveDodge) {
+              if (!liveCombatRef.current && Math.random() * 100 < effectiveDodge) {
                 if (hasPerk("special-shadowwalker")) {
                   combatPerksRef.current.dodgeSpeedAttacks = 3;
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
@@ -4798,10 +5008,30 @@ function Game({
                   `血誓護盾觸發 → 首次傷害降低 ${Math.round(reduction * 100)}%`,
                 );
               }
-              const actualDamage = Math.min(
-                healthFromPercent(playerHealth, characterStats.hp),
-                monsterDamage,
-              );
+              if (liveCombatRef.current) {
+                const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
+                  healthPercent: playerHealth, maxHealth: characterStats.hp,
+                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
+                });
+                monsterDamage = liveDefense.damage;
+                if (liveDefense.counterDamagePercent > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  setEnemyHp((health) => {
+                    if (towerVictoryGuardRef.current.has(targetKey)) return 100;
+                    const settled = settleCombatHealth(health, maximum, counter);
+                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                  });
+                }
+                if (liveDefense.blocked || liveDefense.dodged) {
+                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
+                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  return playerHealth;
+                }
+              }
+              const healthSettlement = settleCombatHealth(playerHealth, characterStats.hp, monsterDamage);
+              const actualDamage = healthSettlement.actualDamage;
               setEnemyHitFeedback({
                 damage: actualDamage,
                 dodged: false,
@@ -4811,11 +5041,7 @@ function Game({
               if (hasPerk("special-revenge-thorn")) {
                 combatPerksRef.current.revengeStacks = Math.min(3, combatPerksRef.current.revengeStacks + 1);
               }
-              const hpLoss = playerHpLossFromDamage(actualDamage);
-              if (
-                actualDamage >= healthFromPercent(playerHealth, characterStats.hp) ||
-                playerHealth - hpLoss <= 0.000001
-              ) {
+              if (healthSettlement.defeated) {
                 if (!towerDeathPendingRef.current) {
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
@@ -4824,9 +5050,9 @@ function Game({
                 }
                 return 0;
               }
-              return playerHealth - hpLoss;
+              return healthSettlement.remainingPercent;
             });
-            return Math.max(0, h - actualPercentDamage);
+            return healthSettlement.remainingPercent;
           });
           return next;
         });
@@ -4860,11 +5086,14 @@ function Game({
     bloodShieldReady,
     combatAttackSpeed,
     skills,
+    skillReworkBuild,
+    skillAscensions,
     blessings,
     currentWaveElite,
     currentWaveGuardian,
     currentWaveBoss,
     wave,
+    runStartedAt,
     enemyName,
     mapId,
     level,
@@ -5395,6 +5624,15 @@ function Game({
 
   useEffect(() => {
     if (!activeBossBattle || bossOutcome) return;
+    const cutoverRoute = beginSkillBattleCutover({
+      battleId: `boss:${activeBossBattle.mode}:${activeBossBattle.name}:${worldBossDeadlineRef.current ?? "personal"}`,
+      encounter: activeBossBattle.mode === "world" ? "world-boss" : "personal-boss",
+      enableRework: false,
+      reworkReady: false,
+    });
+    let actionSequence = 0;
+    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, activeBossBattle,
+      activeBossBattle.name, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const bossMonsterName = baseMonsterName(activeBossBattle.name);
     // 個人首領採固定節奏，避免沿用各怪物原始攻速而造成首領間的壓力落差。
@@ -5408,9 +5646,108 @@ function Game({
     let warriorBossAttackCount = 0;
     let bossPlayerAttackCount = 0;
     const hasPerk = (id: string) => hasCatalogItem(equippedGearRef.current, id);
+    const resolveBossVictory = (source: "attack" | "burn") => {
+      if (bossRoundEndedRef.current) return 0;
+      bossRoundEndedRef.current = true;
+      worldBossDeadlineRef.current = null;
+      abyssBossSequenceRef.current += 1;
+      bossCinematicLockRef.current = false;
+      setAbyssBossEffect(null);
+      setAbyssImpactPulse(false);
+      setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setBossOutcome("win");
+      setBossPlayerHp(100);
+      const report = [
+        `每秒攻擊 ${(baseCharacterStats.speed / 100).toFixed(2)} 次，你取得先手（遠征祝福未生效）。`,
+        source === "burn" ? "灼燒造成最後一擊。" : "技能與裝備造成最後一擊。",
+        `戰鬥勝利｜${activeBossBattle.name}倒下。`,
+      ];
+      setBattleReport(report);
+      if (activeBossBattle.mode === "personal") {
+        setBossTickets((value) => value - 1);
+        const bossParts = activeBossBattle.name.endsWith("・殘影");
+        const bossMapId = Math.max(
+          1,
+          Number(personalBosses.find((boss) => boss.name === activeBossBattle.name)?.id.split("-")[0] ?? 1),
+        );
+        const dropCount = Math.random() > 0.55 ? 2 : 1;
+        const bossDrops = Array.from({ length: dropCount }, (_, index) =>
+          rollCatalogDrop(
+            bossMapId,
+            bossParts ? "personal-shadow" : "personal-true",
+            playerClass,
+            index,
+          ) ?? createDrop(bossMapId, "首領", index, bossParts ? 3 : 4),
+        );
+        addLoot(
+          bossDrops,
+          `擊敗${activeBossBattle.name}`,
+        );
+        const reforgeGain =
+          (Number(bossMapId) * 2 - (bossParts ? 1 : 0)) * 4;
+        const yuanbaoGain =
+          Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
+        setReforgeStones((value) => value + reforgeGain);
+        setYuanbao((value) => value + yuanbaoGain);
+        setBattleReport((lines) => [
+          ...lines,
+          `獲得${bossDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : bossParts ? "史詩" : "傳奇"}裝備 ${dropCount} 件・洗鍊石 +${reforgeGain}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
+        ]);
+      } else {
+        const dropCount = 2;
+        const worldDrops = Array.from({ length: dropCount }, (_, index) =>
+          rollCatalogDrop(9, "world", playerClass, index) ?? createDrop(9, "首領", index, 4),
+        );
+        addLoot(worldDrops, `擊敗${activeBossBattle.name}`);
+        setBattleReport((lines) => [
+          ...lines,
+          `世界首領獎勵：${worldDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : "傳奇"}裝備 ${dropCount} 件`,
+        ]);
+      }
+      pushLog("首領", `擊敗 ${activeBossBattle.name}`);
+      bossEnemyHpRef.current = 0;
+      return 0;
+    };
+    let bossDamageLedger = createBossDamageLedger(activeBossBattle.hp, bossEnemyHpRef.current);
+    const settleBossHit = (rawDamage: number, source: "attack" | "burn") => {
+      if (bossRoundEndedRef.current) return settleBossDamageEvent(bossDamageLedger, 0);
+      const settled = settleBossDamageEvent(bossDamageLedger, rawDamage);
+      bossDamageLedger = settled.ledger;
+      bossEnemyHpRef.current = settled.remainingPercent;
+      if (settled.newVictory) resolveBossVictory(source);
+      setBossEnemyHp(settled.remainingPercent);
+      return settled;
+    };
     const timer = setInterval(
       () => {
-        if (bossCinematicLockRef.current) return;
+        if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
+        const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
+        const liveTickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
+        if (liveTickDamage > 0) {
+          const settled = settleBossHit(liveTickDamage, "burn");
+          let visibleDotDamage = settled.actualDamage;
+          const dotKey = Date.now();
+          const byKind = new Map<"bleed" | "burn", number>();
+          for (const event of dotTicks) {
+            const applied = Math.min(visibleDotDamage, Math.max(0, Math.round(event.damage)));
+            visibleDotDamage -= applied;
+            if (applied > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + applied);
+          }
+          const dotGroups = [...byKind].map(([kind, damage], index) => ({
+            key: dotKey + index, kind, damage,
+          }));
+          if (dotGroups.length) {
+            setDotDamageGroups((current) => [...current, ...dotGroups]);
+            window.setTimeout(() => setDotDamageGroups((current) =>
+              current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
+          }
+          if (activeBossBattle.mode === "world" && settled.actualDamage > 0) {
+            setWorldDamage((value) => value + settled.actualDamage);
+            setWorldRoundDamage((value) => value + settled.actualDamage);
+          }
+          setLastBossDamage(settled.actualDamage);
+          if (settled.defeated) return;
+        }
         playerClock += tickMs;
         bossClock += tickMs;
         const activeWorldBurn = worldBossBurnRef.current;
@@ -5420,17 +5757,19 @@ function Game({
           Date.now() >= activeWorldBurn.nextAt
         ) {
           activeWorldBurn.nextAt = Date.now() + 1_000;
-          const burnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
-          const burnHpLoss = healthPercentFromDamage(burnDamage, activeBossBattle.hp);
-          setBossEnemyHp((hp) => Math.max(0, hp - burnHpLoss));
-          setWorldDamage((value) => value + burnDamage);
-          setWorldRoundDamage((value) => value + burnDamage);
-          setLastBossDamage(burnDamage);
-          const burnKey = Date.now();
-          setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnDamage }]);
-          window.setTimeout(() => {
-            setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
-          }, 1_200);
+          const rawBurnDamage = Math.max(1, activeWorldBurn.damagePerSecond);
+          const burnSettlement = settleBossHit(rawBurnDamage, "burn");
+          if (burnSettlement.actualDamage > 0) {
+            setWorldDamage((value) => value + burnSettlement.actualDamage);
+            setWorldRoundDamage((value) => value + burnSettlement.actualDamage);
+            setLastBossDamage(burnSettlement.actualDamage);
+            const burnKey = Date.now();
+            setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnSettlement.actualDamage }]);
+            window.setTimeout(() => {
+              setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
+            }, 1_200);
+          }
+          if (burnSettlement.defeated) return;
         }
         const playerInterval = 100000 / Math.max(1, combatAttackSpeed);
         const bossInterval = 100000 / bossAttackSpeed;
@@ -5447,9 +5786,22 @@ function Game({
         setBattlePulse((value) => value + 1);
         setEnemyHitFeedback(null);
         setPlayerHitFeedback(null);
-        let bossSkillMultiplier = 1;
-        let bossSkill: Skill | null = null;
-        let bossDefenseIgnore = hasPerk("special-blackfang") ? 8 : 0;
+        const liveCombat = liveCombatRef.current;
+        const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
+          now: next, healthPercent: bossPlayerHpRef.current, attack: characterStats.attack,
+          hitChance: hitChanceFromRatings(characterStats.hit,
+            20 + activeBossBattle.level * balanceConfig.combat.evasionModel.bossEvasionPerLevel),
+          criticalChance: characterStats.crit,
+          criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
+        }) : null;
+        const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
+        let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
+        if (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner")
+            && bossEnemyHpRef.current < 25) bossSkillMultiplier *= 2;
+        let bossSkill: Skill | null = liveAction?.name
+          ? { name: liveAction.name, desc: "", level: skillReworkBuild.ranks[liveAction.name] ?? 1, max: 5, cost: 0 } : null;
+        let bossDefenseIgnore = (hasPerk("special-blackfang") ? 8 : 0) + (liveAction?.defenseIgnore ?? 0);
+        if (liveAction?.name) queueSkillVisual({ name: liveAction.name, key: next });
         let bossGuaranteedCritical = false;
         let bossCritDamageBonus = 0;
         let bossExecutionDamageMultiplier = 1;
@@ -5476,13 +5828,13 @@ function Game({
           }
           if (bossSkillCooldown > 0) bossSkillCooldown -= 1;
           const learned = skills.filter((skill) => skill.level > 0);
-          const hasSkill = (name: string) => learned.find((skill) => skill.name === name);
+          const hasSkill = (name: string) => liveCombat ? undefined : learned.find((skill) => skill.name === name);
           const executionThreshold = hasPerk("skill-warrior-executioner") ? 8 : 10;
           const executionSkill = playerClass === "戰士" && warriorBossAttackCount % executionThreshold === 0
             ? hasSkill("處決")
             : undefined;
           const executionReady = Boolean(executionSkill);
-          if (bossSkillCooldown <= 0 || executionReady) {
+          if (!liveCombat && (bossSkillCooldown <= 0 || executionReady)) {
             const candidates = playerClass === "戰士"
               ? [
                   ...(executionSkill ? [{ skill: executionSkill, chance: 1 }] : []),
@@ -5635,8 +5987,8 @@ function Game({
           playerLevel: level,
           bossLevel: activeBossBattle.level,
           monsterName: bossMonsterName,
-          roll: Math.random(),
-          attackRoll: Math.random(),
+          roll: liveAction ? 1 : Math.random(),
+          attackRoll: liveAction ? 0 : Math.random(),
           counterRoll: Math.random(),
           playerDamageMultiplier:
             bossSkillMultiplier *
@@ -5652,22 +6004,42 @@ function Game({
           skillDamage:
             characterStats.skillDamage +
             (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
-            (bossSkill && hasPerk("skill-mage-eternal-core") ? 25 : 0),
+            (!liveAction && bossSkill && hasPerk("skill-mage-eternal-core") ? 25 : 0),
           monsterAttack: bossBaseline.monsterDamage,
           monsterDefense: bossBaseline.monsterDefense,
           monsterMultiplier: activeBossBattle.multiplier,
         });
+        if (liveAction?.damagePercent === 0) bossValues.playerDamage = 0;
+        for (const status of liveAction?.statuses ?? [])
+          showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
         const bossElementalDamage = playerActs && activeSetCount >= 6
           ? bossValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100 : 0;
         const bossResonanceDamage = playerActs && setResonanceTriggered
           ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100 : 0;
         const calculatedPlayerDamage = playerActs
-          ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage : 0;
-        const remainingBossHealth = healthFromPercent(bossEnemyHpRef.current, activeBossBattle.hp);
-        const playerDamage = Math.min(remainingBossHealth, calculatedPlayerDamage);
+          ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage + actionDotDamage : 0;
+        const bossHealthSettlement = playerActs
+          ? settleBossHit(calculatedPlayerDamage, "attack")
+          : settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, 0);
+        const playerDamage = playerActs
+          ? settleCutoverAction(cutoverRoute, {
+              battleId: cutoverRoute.battleId,
+              sequence: ++actionSequence,
+              legacyDamage: bossHealthSettlement.actualDamage,
+            }).damage
+          : 0;
         const shownBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
         const shownBossElemental = Math.min(playerDamage - shownBossMain, bossElementalDamage);
-        const shownBossResonance = Math.max(0, playerDamage - shownBossMain - shownBossElemental);
+        const shownBossResonance = Math.min(playerDamage - shownBossMain - shownBossElemental, bossResonanceDamage);
+        const shownBossDot = Math.min(playerDamage - shownBossMain - shownBossElemental - shownBossResonance, actionDotDamage);
+        const bossDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
+        let bossDotRemaining = shownBossDot;
+        const bossDotKey = Date.now() * 10;
+        for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
+          const damage = Math.min(bossDotRemaining, Math.max(0, Math.round(event.damage)));
+          bossDotRemaining -= damage;
+          if (damage > 0) bossDotGroups.push({ key: bossDotKey + index, kind: event.kind, damage });
+        }
         if (activeBossBattle.mode === "world" && playerActs) {
           setWorldDamage((value) => value + playerDamage);
           setWorldRoundDamage((value) => value + playerDamage);
@@ -5680,10 +6052,25 @@ function Game({
         const calculatedBossDamage = bossActs
           ? Math.round(bossValues.counterDamage * (abyssSpecialReady ? 1.6 : 1))
           : 0;
-        const bossDamage = Math.min(
+        let bossDamage = Math.min(
           healthFromPercent(bossPlayerHpRef.current, characterStats.hp),
           calculatedBossDamage,
         );
+        if (bossActs && liveCombatRef.current && !bossHealthSettlement.defeated) {
+          const defense = resolveLiveEnemyAttack(liveCombatRef.current, {
+            healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,
+             defense: characterStats.defense, equippedItems: equippedGearRef.current,
+          });
+          bossDamage = defense.damage;
+          if (defense.counterDamagePercent > 0) {
+            const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100);
+            const counterSettlement = settleBossHit(counter, "attack");
+            if (activeBossBattle.mode === "world" && counterSettlement.actualDamage > 0) {
+              setWorldDamage((value) => value + counterSettlement.actualDamage);
+              setWorldRoundDamage((value) => value + counterSettlement.actualDamage);
+            }
+          }
+        }
         if (playerActs && bossMarkExplosionWasActive) {
           queueSkillVisual({ name: "致命標記・爆炸", key: next });
           setDeadlyMarkEffect((current) => current ? { ...current, detonationKey: next } : current);
@@ -5707,6 +6094,11 @@ function Game({
               ...(shownBossElemental > 0 ? [{ damage: shownBossElemental, label: "元素" }] : []),
               ...(shownBossResonance > 0 ? [{ damage: shownBossResonance, label: "元素爆發" }] : []),
             ];
+            if (bossDotGroups.length) {
+              setDotDamageGroups((current) => [...current, ...bossDotGroups]);
+              window.setTimeout(() => setDotDamageGroups((current) =>
+                current.filter((event) => event.key < bossDotKey || event.key >= bossDotKey + bossDotGroups.length)), 1_200);
+            }
             if (elementalHits.length)
               setSetElementalHits((current) => [...current, { key: groupKey, hits: elementalHits, volley: false }]);
             window.setTimeout(() => {
@@ -5724,92 +6116,21 @@ function Game({
           if (bossDamageDisplayDelay > 0) window.setTimeout(publishBossDamage, bossDamageDisplayDelay);
           else publishBossDamage();
         }
-        if (playerActs && playerDamage > 0 && characterStats.lifesteal > 0)
+        if (playerActs && playerDamage > 0 && characterStats.lifesteal + (liveAction?.lifestealPercent ?? 0) > 0)
           setBossPlayerHp((health) => {
             const nextHealth = Math.min(
               100,
               health + healthPercentFromDamage(
-                (playerDamage * Math.min(100, characterStats.lifesteal)) / 100,
+                (playerDamage * Math.min(100, characterStats.lifesteal + (liveAction?.lifestealPercent ?? 0))) / 100,
                 characterStats.hp,
               ),
             );
             bossPlayerHpRef.current = nextHealth;
             return nextHealth;
           });
-        const bossHpLoss =
-          playerDamage <= 0
-            ? 0
-            : healthPercentFromDamage(playerDamage, activeBossBattle.hp);
-        const abyssSpecialTriggered = abyssSpecialReady && bossEnemyHpRef.current > bossHpLoss;
+        const abyssSpecialTriggered = abyssSpecialReady && !bossRoundEndedRef.current;
         if (bossActs && !abyssSpecialTriggered)
-          setLastBossCounterDamage(bossEnemyHpRef.current <= bossHpLoss ? 0 : bossDamage);
-        if (playerActs) setBossEnemyHp((hp) => {
-          if (hp <= bossHpLoss) {
-            if (bossRoundEndedRef.current) return hp;
-            bossRoundEndedRef.current = true;
-            worldBossDeadlineRef.current = null;
-            abyssBossSequenceRef.current += 1;
-            bossCinematicLockRef.current = false;
-            setAbyssBossEffect(null);
-            setAbyssImpactPulse(false);
-            setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
-            setBossOutcome("win");
-            setBossPlayerHp(100);
-            const report = [
-              `每秒攻擊 ${(baseCharacterStats.speed / 100).toFixed(2)} 次，你取得先手（遠征祝福未生效）。`,
-              `技能與裝備造成最後一擊。`,
-              `戰鬥勝利｜${activeBossBattle.name}倒下。`,
-            ];
-            setBattleReport(report);
-            if (activeBossBattle.mode === "personal") {
-              setBossTickets((value) => value - 1);
-              const bossParts = activeBossBattle.name.endsWith("・殘影");
-              const bossMapId = Math.max(
-                1,
-                Number(personalBosses.find((boss) => boss.name === activeBossBattle.name)?.id.split("-")[0] ?? 1),
-              );
-              const dropCount = Math.random() > 0.55 ? 2 : 1;
-              const bossDrops = Array.from({ length: dropCount }, (_, index) =>
-                rollCatalogDrop(
-                  bossMapId,
-                  bossParts ? "personal-shadow" : "personal-true",
-                  playerClass,
-                  index,
-                ) ?? createDrop(bossMapId, "首領", index, bossParts ? 3 : 4),
-              );
-              addLoot(
-                bossDrops,
-                `擊敗${activeBossBattle.name}`,
-              );
-              const reforgeGain =
-                (Number(bossMapId) * 2 - (bossParts ? 1 : 0)) * 4;
-              const yuanbaoGain =
-                Math.random() * 100 < characterStats.yuanbaoDrop ? 1 : 0;
-              setReforgeStones((value) => value + reforgeGain);
-              setYuanbao((value) => value + yuanbaoGain);
-              setBattleReport((lines) => [
-                ...lines,
-                `獲得${bossDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : bossParts ? "史詩" : "傳奇"}裝備 ${dropCount} 件・洗鍊石 +${reforgeGain}${yuanbaoGain ? `・元寶 +${yuanbaoGain}` : ""}`,
-              ]);
-            } else {
-              const dropCount = 2;
-              const worldDrops = Array.from({ length: dropCount }, (_, index) =>
-                rollCatalogDrop(9, "world", playerClass, index) ?? createDrop(9, "首領", index, 4),
-              );
-              addLoot(worldDrops, `擊敗${activeBossBattle.name}`);
-              setBattleReport((lines) => [
-                ...lines,
-                `世界首領獎勵：${worldDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : "傳奇"}裝備 ${dropCount} 件`,
-              ]);
-            }
-            pushLog("首領", `擊敗 ${activeBossBattle.name}`);
-            bossEnemyHpRef.current = 0;
-            return 0;
-          }
-          const nextHp = hp - bossHpLoss;
-          bossEnemyHpRef.current = nextHp;
-          return nextHp;
-        });
+          setLastBossCounterDamage(bossRoundEndedRef.current ? 0 : bossDamage);
         if (abyssSpecialTriggered) {
           const sequence = ++abyssBossSequenceRef.current;
           bossCinematicLockRef.current = true;
@@ -5822,8 +6143,8 @@ function Game({
             setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
             setLastBossCounterDamage(bossDamage);
             setBossPlayerHp((hp) => {
-              const hpLoss = playerHpLossFromDamage(bossDamage);
-              if (hp - hpLoss <= 0.000001) {
+              const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
+              if (healthSettlement.defeated) {
                 if (bossRoundEndedRef.current) return hp;
                 bossRoundEndedRef.current = true;
                 worldBossDeadlineRef.current = null;
@@ -5837,7 +6158,7 @@ function Game({
                 bossPlayerHpRef.current = 0;
                 return 0;
               }
-              const nextHp = hp - hpLoss;
+              const nextHp = healthSettlement.remainingPercent;
               bossPlayerHpRef.current = nextHp;
               return nextHp;
             });
@@ -5850,9 +6171,9 @@ function Game({
           }, 2_200);
         }
         if (bossActs && !abyssSpecialTriggered) setBossPlayerHp((hp) => {
-          if (bossEnemyHpRef.current <= bossHpLoss) return hp;
-          const hpLoss = playerHpLossFromDamage(bossDamage);
-          if (hp - hpLoss <= 0.000001) {
+          if (bossRoundEndedRef.current) return hp;
+          const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
+          if (healthSettlement.defeated) {
             if (bossRoundEndedRef.current) return hp;
             bossRoundEndedRef.current = true;
             worldBossDeadlineRef.current = null;
@@ -5868,7 +6189,7 @@ function Game({
             bossPlayerHpRef.current = 0;
             return 0;
           }
-          const nextHp = hp - hpLoss;
+          const nextHp = healthSettlement.remainingPercent;
           bossPlayerHpRef.current = nextHp;
           return nextHp;
         });
@@ -5909,6 +6230,8 @@ function Game({
     activeSetCount,
     playerClass,
     skills,
+    skillReworkBuild,
+    skillAscensions,
   ]);
 
   const leaveBossBattle = () => {
@@ -5934,7 +6257,7 @@ function Game({
     { label: "戰力", value: combatPower.toLocaleString() },
     { label: "攻擊", value: characterStats.attack.toLocaleString() },
     { label: "防禦", value: characterStats.defense.toLocaleString() },
-    { label: "每秒攻擊", value: `${(characterStats.speed / 100).toFixed(2)} 次` },
+    { label: "每秒攻擊", value: `${(combatAttackSpeed / 100).toFixed(2)} 次` },
   ];
 
   return (
@@ -6897,6 +7220,14 @@ function Game({
                         ))}
                       </div>
                     ))}
+                    {dotDamageGroups.map((event) => (
+                      <div key={`dot-damage-${event.key}`} className={`damage-float dot-damage-float ${activeBossBattle ? "boss-damage-float" : "player-damage-float"}`}>
+                        <div className="combo-hit dot-damage-hit">
+                          <small>{event.kind === "bleed" ? "流血" : "灼燒"}</small>
+                          <b>-{event.damage.toLocaleString()}</b>
+                        </div>
+                      </div>
+                    ))}
                     {setElementalHits.map((group) => (
                       <div key={`set-elemental-${group.key}`} className={`damage-float set-elemental-float ${group.volley ? "volley-elemental-float" : ""}`}>
                         {group.hits.map((hit, index) => (
@@ -7247,18 +7578,20 @@ function Game({
                   <div>
                     <p className="eyebrow">DAILY TARGET</p>
                     <h3>今日獵殺</h3>
-                    <span>擊敗怪物 {Math.min(500, dailyKills)} / 500</span>
+                    <span>擊敗怪物 {Math.min(balanceConfig.economy.dailyHuntReward.kills, dailyKills)} / {balanceConfig.economy.dailyHuntReward.kills}</span>
                     <small className="daily-reward-copy">
-                      獎勵：金幣 5,000・強化石 10・洗鍊石 10・元寶 20
+                      獎勵：金幣 {balanceConfig.economy.dailyHuntReward.gold.toLocaleString()}・強化石 {balanceConfig.economy.dailyHuntReward.enhanceStones}・洗鍊石 {balanceConfig.economy.dailyHuntReward.reforgeStones}・元寶 {balanceConfig.economy.dailyHuntReward.yuanbao}
                     </small>
                     <button
                       className="btn btn-primary daily-claim"
-                      disabled={dailyKills < 500 || dailyRewardClaimed}
+                      disabled={dailyKills < balanceConfig.economy.dailyHuntReward.kills || dailyRewardClaimed || dailyClaimBusy}
                       onClick={claimDailyHuntReward}
                     >
                       {dailyRewardClaimed
                         ? "今日已領取"
-                        : dailyKills >= 500
+                        : dailyClaimBusy
+                          ? "領取中…"
+                        : dailyKills >= balanceConfig.economy.dailyHuntReward.kills
                           ? "領取獎勵"
                           : "尚未完成"}
                     </button>
@@ -7707,11 +8040,17 @@ function Game({
                         ["生命", characterStats.hp.toLocaleString()],
                         ["攻擊", characterStats.attack.toLocaleString()],
                         ["防禦", characterStats.defense.toLocaleString()],
-                        ["每秒攻擊", `${(characterStats.speed / 100).toFixed(2)} 次`],
+                        ["每秒攻擊", `${(combatAttackSpeed / 100).toFixed(2)} 次`],
                         [
                           "閃避值",
-                          `${Math.min(DODGE_CAP, characterStats.dodge)}${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
+                          `${characterStats.dodge}${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
                         ],
+                        ...(playerClass === "戰士" && skillPassiveStats.blockChancePoints > 0
+                          ? [["格擋率", `${skillPassiveStats.blockChancePoints}%`]] : []),
+                        ...(playerClass === "戰士" && skillPassiveStats.lowHealthDamageReductionPercent > 0
+                          ? [["低血額外減傷", `+${skillPassiveStats.lowHealthDamageReductionPercent}%`]] : []),
+                        ...(playerClass === "法師" && skillPassiveStats.initialShieldBonusPercent > 0
+                          ? [["護盾強度", `+${skillPassiveStats.initialShieldBonusPercent}%`]] : []),
                         ["暴擊", `${Math.min(100, characterStats.crit)}%`],
                         ["暴擊傷害", `+${characterStats.critDamage}%`],
                         ["吸血", `${Math.min(100, characterStats.lifesteal)}%`],
@@ -7878,106 +8217,19 @@ function Game({
             <div className="page-section">
               <PageTitle
                 title={`${playerClass}技能`}
-                sub="升級技能會提高技能效果；只有直接增加角色面板數值的技能會反映在戰力。"
-              >
-                <span className="skill-points">
-                  <Sparkles /> {skillPoints} 技能點
-                </span>
-              </PageTitle>
-              <SkillGrowthTable skills={skills} />
-              <div className="skills-grid">
-                {skills.map((skill, i) => (
-                  (() => {
-                    const isUltimate = i === 3;
-                    const isUltimateLocked = isUltimate && level < 10;
-                    return (
-                  <Panel
-                    key={skill.name}
-                    className={`skill-card ${skill.level === 0 || isUltimateLocked ? "locked" : ""}`}
-                  >
-                    <div className="skill-icon">
-                      {i === 3 ? <Crown /> : <WandSparkles />}
-                    </div>
-                    <div>
-                      <small>
-                        {isUltimate ? "奧義" : i === 2 ? "被動" : "主動技能"}
-                      </small>
-                      <h3>{skill.name}</h3>
-                      <p>
-                        {skillValue(skill.name, skill.level).metric}：
-                        {skillValue(skill.name, skill.level).current}
-                      </p>
-                      {isUltimateLocked && <p>角色達到 Lv.10 後解鎖</p>}
-                      <div className="skill-level">
-                        <Meter value={(skill.level / skill.max) * 100} />
-                        <span>
-                          Lv.{skill.level} / {skill.max}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      className="btn btn-ghost"
-                      disabled={
-                        skillPoints < skill.cost ||
-                        skill.level >= skill.max ||
-                        isUltimateLocked
-                      }
-                      onClick={() => {
-                        setSkillPoints((v) => v - skill.cost);
-                        setSkills((old) =>
-                          old.map((s, idx) =>
-                            idx === i ? { ...s, level: s.level + 1 } : s,
-                          ),
-                        );
-                        pushLog(
-                          "技能",
-                          `${skill.name}提升至 Lv.${skill.level + 1}`,
-                        );
-                        toast.success(`${skill.name}升級`, {
-                          description: "技能效果已提升",
-                        });
-                      }}
-                    >
-                      {isUltimateLocked
-                        ? "Lv.10 解鎖"
-                        : skill.level === 0
-                          ? "解鎖"
-                          : "升級"} · {skill.cost} 點
-                    </button>
-                  </Panel>
-                    );
-                  })()
-                ))}
-              </div>
-              <Panel className="build-note">
-                <div>
-                  <BookOpen />
-                  <span>
-                    <b>
-                      推薦流派：
-                      {playerClass === "戰士"
-                        ? "鮮血處決"
-                        : playerClass === "遊俠"
-                          ? "疾風暴擊"
-                          : "霜火回響"}
-                    </b>
-                    <small>
-                      只有直接增加生命、攻擊、防禦等面板數值的技能會反映在戰力；傷害與觸發型技能不計入戰力。
-                    </small>
-                  </span>
-                </div>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() =>
-                    toast.info("推薦配點", {
-                      description:
-                        "先提升主動與被動技能；角色達到 Lv.10 後再解鎖奧義。",
-                    })
-                  }
-                >
-                  查看配點
-                </button>
-              </Panel>
+                sub="專精配置"
+              />
+              <SkillReworkPanel
+                characterClass={playerClass}
+                characterLevel={level}
+                build={skillReworkBuild}
+                onUpgrade={(name) => { void runSkillAction({ kind: "upgrade", name }); }}
+                onEquip={(slot, name) => { void runSkillAction({ kind: "equip", slot, name }); }}
+                ascensions={skillAscensions}
+                onSelectAscension={(tier, name) => { void runSkillAction({ kind: "select_ascension", tier, name }); }}
+                onConfirmAscensions={() => { void runSkillAction({ kind: "confirm_ascensions" }); }}
+                busy={skillActionBusy}
+              />
             </div>
           )}
 
@@ -8160,6 +8412,15 @@ function Game({
               onSelectTitle={setSelectedTitle}
               onSelectAppearance={setSelectedAppearance}
               onBuy={buyShopItem}
+              shopPurchaseBusy={shopPurchaseBusy || !saveReady || sessionSuperseded}
+              onPaidSkillReset={async () => {
+                if (await runSkillAction({ kind: "paid_reset" })) {
+                  pushLog("收益", "商城技能重置，消耗 300 元寶");
+                  toast.success("新版技能點已重置", { description: "消耗 300 元寶；昇華選擇保留" });
+                }
+              }}
+              skillResetBusy={skillActionBusy || !saveReady || sessionSuperseded}
+              skillResetAvailable={Object.values(skillReworkBuild.ranks).some((rank) => rank > 0)}
             />
           )}
           {tab === "日誌" && <Logs logs={logs} />}
@@ -8203,56 +8464,6 @@ function PageTitle({
       </div>
       {children}
     </div>
-  );
-}
-
-function SkillGrowthTable({
-  skills,
-}: {
-  skills: { name: string; level: number; max: number }[];
-}) {
-  return (
-    <Panel className="skill-growth">
-      <div className="section-head">
-        <div>
-          <p className="eyebrow">LEVEL COMPARISON</p>
-          <h3>技能升級數值表</h3>
-        </div>
-        <span>升級前可比較技能效果</span>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>技能</TableHead>
-            <TableHead>主要效果</TableHead>
-            <TableHead>目前等級</TableHead>
-            <TableHead>下一級</TableHead>
-            <TableHead>滿級</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {skills.map((skill) => {
-            const info = skillValue(skill.name, skill.level);
-            return (
-              <TableRow key={skill.name}>
-                <TableCell>
-                  <b>{skill.name}</b>
-                  <small>
-                    Lv.{skill.level}/{skill.max}
-                  </small>
-                </TableCell>
-                <TableCell>{info.metric}</TableCell>
-                <TableCell>{info.current}</TableCell>
-                <TableCell className="next-value">
-                  {skill.level >= skill.max ? "已滿級" : info.next}
-                </TableCell>
-                <TableCell>{info.value(skill.max)}</TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </Panel>
   );
 }
 
@@ -8517,6 +8728,10 @@ function Shop({
   onSelectTitle,
   onSelectAppearance,
   onBuy,
+  onPaidSkillReset,
+  skillResetBusy,
+  skillResetAvailable,
+  shopPurchaseBusy,
 }: {
   yuanbao: number;
   gold: number;
@@ -8528,9 +8743,15 @@ function Shop({
   onSelectTitle: (id: TitleId) => void;
   onSelectAppearance: (id: AppearanceId) => void;
   onBuy: (item: "reforge" | "gamble" | "title-ash" | "title-abyss" | "appearance-ember" | "appearance-arcane" | "appearance-abyss" | "gold-reforge" | "gold-enhance") => void;
+  onPaidSkillReset: () => Promise<void>;
+  skillResetBusy: boolean;
+  skillResetAvailable: boolean;
+  shopPurchaseBusy: boolean;
 }) {
   const [currency, setCurrency] = useState<"yuanbao" | "gold">("yuanbao");
   const [yuanbaoPage, setYuanbaoPage] = useState<1 | 2>(1);
+  const [confirmSkillReset, setConfirmSkillReset] = useState(false);
+  const resetPrice = balanceConfig.economy.costs.skillReworkResetYuanbao;
   return (
     <div className="page-section">
       <PageTitle title="暗黑商城" sub="使用金幣或元寶兌換冒險資源。" />
@@ -8550,16 +8771,27 @@ function Shop({
         </div>
       ) : yuanbaoPage === 2 ? (
         <div className="shop-grid">
-          <Panel className="shop-card"><h3>灰燼征服者</h3><p>外型｜稱號：征服灰燼墓園。</p><button className="btn btn-primary" disabled={ownedTitles.includes("ash-conqueror")} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : "80 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵倖存者</h3><p>外型｜稱號：從時墟深淵生還。</p><button className="btn btn-primary" disabled={ownedTitles.includes("abyss-survivor")} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外型｜六格去背熔岩骨翼，展翼時彈射火星。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "120 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>奧術星翼</h3><p>外型｜六格去背紫色符文能量羽翼。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外型｜六格去背黑紅破碎深淵蝠翼。</p><button className="btn btn-primary" disabled={ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "300 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼征服者</h3><p>外型｜稱號：征服灰燼墓園。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("ash-conqueror")} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : "80 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵倖存者</h3><p>外型｜稱號：從時墟深淵生還。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("abyss-survivor")} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外型｜六格去背熔岩骨翼，展翼時彈射火星。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "120 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>奧術星翼</h3><p>外型｜六格去背紫色符文能量羽翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外型｜六格去背黑紅破碎深淵蝠翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "300 元寶解鎖"}</button></Panel>
         </div>
       ) : (
         <div className="shop-grid">
-          <Panel className="shop-card"><h3>洗鍊石 ×12</h3><p>資源補給｜補充裝備洗鍊所需的稀有資源。</p><button className="btn btn-primary" onClick={() => onBuy("reforge")}>10 元寶購買</button></Panel>
+          <Panel className="shop-card"><h3>洗鍊石 ×12</h3><p>資源補給｜補充裝備洗鍊所需的稀有資源。</p><button className="btn btn-primary" disabled={shopPurchaseBusy} onClick={() => onBuy("reforge")}>10 元寶購買</button></Panel>
           <Panel className="shop-card"><h3>賭狗禮包</h3><p>資源補給｜已攻略最高地圖的隨機部位裝備。</p><small>史詩 40%・洗鍊石 ×10 30%・傳奇 20%・神話 10%</small><button className="btn btn-primary" onClick={() => onBuy("gamble")}>10 元寶開啟</button></Panel>
+          <Panel className="shop-card">
+            <h3>新版技能重置</h3><p>重置已分配的新版技能點與出戰槽；昇華選擇保留。</p>
+            {confirmSkillReset ? <div className="cosmetic-actions">
+              <button className="btn btn-primary" disabled={skillResetBusy || yuanbao < resetPrice || !skillResetAvailable}
+                onClick={async () => { setConfirmSkillReset(false); await onPaidSkillReset(); }}>確認消耗 {resetPrice} 元寶</button>
+              <button className="btn btn-ghost" disabled={skillResetBusy} onClick={() => setConfirmSkillReset(false)}>取消</button>
+            </div> : <button className="btn btn-primary" disabled={skillResetBusy || yuanbao < resetPrice || !skillResetAvailable}
+              onClick={() => setConfirmSkillReset(true)}>{resetPrice} 元寶重置</button>}
+            {yuanbao < resetPrice && <small>元寶不足</small>}
+            {!skillResetAvailable && <small>尚未分配新版技能點</small>}
+          </Panel>
         </div>
       )}
       <Panel className="shop-card cosmetic-loadout"><h3>目前裝備</h3><p>稱號：{TITLE_OPTIONS[selectedTitle].name}　外觀：{APPEARANCE_OPTIONS[selectedAppearance].name}</p><div className="cosmetic-actions"><select value={selectedTitle} onChange={(event) => onSelectTitle(event.target.value as TitleId)}>{ownedTitles.map((id) => <option key={id} value={id}>{TITLE_OPTIONS[id].name}</option>)}</select><select value={selectedAppearance} onChange={(event) => onSelectAppearance(event.target.value as AppearanceId)}>{ownedAppearances.map((id) => <option key={id} value={id}>{APPEARANCE_OPTIONS[id].name}</option>)}</select></div><small>金幣 {gold.toLocaleString()} · 元寶 {yuanbao.toLocaleString()}</small></Panel>

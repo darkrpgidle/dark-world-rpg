@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     if (!reason) return Response.json({ error: "suspension_reason_required" }, { status: 400 });
     const isTemporary = body.mode === "temporary";
     const until = isTemporary ? new Date(body.until ?? "") : null;
-    if (isTemporary && (!Number.isFinite(until?.getTime()) || until.getTime() <= Date.now() + 5 * 60_000 || until.getTime() > Date.now() + 365 * 24 * 60 * 60_000))
+    if (isTemporary && (!until || !Number.isFinite(until.getTime()) || until.getTime() <= Date.now() + 5 * 60_000 || until.getTime() > Date.now() + 365 * 24 * 60 * 60_000))
       return Response.json({ error: "invalid_suspension_until" }, { status: 400 });
     const suspendedAt = new Date().toISOString();
     const suspendedUntil = until?.toISOString() ?? null;

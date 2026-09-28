@@ -8,7 +8,7 @@
 |---|---|
 | `app/balance-config.ts` | 成長、地圖、怪物、戰鬥、裝備的可調數值 |
 | `app/balance.ts` | 命中／閃避、傷害、防禦、掉落評級、強化成本公式 |
-| `app/game-data.ts` | 職業、地圖、怪物圖、個人／世界首領、技能清單 |
+| `app/game-data.ts` | 職業、地圖、怪物圖、個人／世界首領；舊技能名稱供存檔相容 |
 | `app/page.tsx` | 遊戲主流程、戰鬥排程、技能結算、裝備、輪迴與主要 UI |
 | `app/mythic-data.ts` | 神話與特殊傳奇裝備資料、技能聯動效果 |
 | `db/schema.ts` | 帳號、session、存檔、快照、死亡事件與 GM 紀錄資料表 |
@@ -20,7 +20,7 @@
 |---|---|---|
 | Balance | `COMBAT.md`, `EQUIPMENT.md`, `MONSTERS.md` | `app/balance-config.ts`; `app/balance.ts` → `towerCombatValues`, `hitChanceFromRatings`, `dropPowerRange` |
 | Combat | `COMBAT.md` | `app/page.tsx` → `Game`, `calculateCharacterStats`, `calculateCombatPower`; `app/balance.ts` → `towerCombatValues` |
-| Skills | `SKILLS.md` | `app/game-data.ts` → `skillsByClass`; `app/page.tsx` → `skillValue`, `skillProcChance`, `skillMultiplier`, `calculateSkillEffects` |
+| Skills | `SKILL_REWORK-2.md` | `app/skill-rework.ts` → 新版技能資料；`app/skill-rework-panel.tsx` → 新版技能畫面；`app/skill-live-combat.ts` → 技能事件；舊技能結算相容層仍在 `app/page.tsx` |
 | VFX | `VFX.md` | `app/skill-effect-canvas.tsx`; `app/mythic-skill-vfx.tsx`; `app/*-vfx.tsx`; `app/globals.css`; `public/vfx/` |
 | Equipment | `EQUIPMENT.md` | `app/page.tsx` → `createCatalogItem`, `equipmentBaseStats`, `equipmentCombatRating`, `rollAffixes`; `app/gem-system.ts`; `app/mythic-data.ts`; `public/equipment/`, `public/gems/` |
 | Maps／Monsters | `MONSTERS.md` | `app/game-data.ts` → `maps`, `monsterImages`; `app/page.tsx` → `monsterMaximumHealth`, `effectiveMonsterMaximumHealth`, `createDrop` |

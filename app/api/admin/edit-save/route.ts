@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { accounts, gameSaves, gmActionLogs, saveSnapshots, sessions } from "../../../../db/schema";
 import { currentAccount } from "../../auth-utils";
+import { preserveLegacyRebirthCount } from "../../../legacy-rebirth-storage";
 
 const slots = ["武器", "頭盔", "胸甲", "手套", "鞋子", "項鍊", "戒指", "腰帶", "護腕", "披風"] as const;
 const allowedClasses = new Set(["戰士", "遊俠", "法師"]);
@@ -111,11 +112,12 @@ export async function POST(request: Request) {
   if (!target || target.isGm || target.id === gm.id) return Response.json({ error: "protected_account" }, { status: 403 });
   const [current] = await db.select().from(gameSaves).where(eq(gameSaves.accountId, accountId)).limit(1);
   const oldSave = current ? JSON.parse(current.payload) as Record<string, unknown> : null;
-  const incoming = { ...(oldSave ?? baseSave(accountId)), ...body.save, accountId } as Record<string, unknown>;
-  incoming.level = number(incoming.level, 1, 1, 100);
+  const incoming = preserveLegacyRebirthCount({ ...(oldSave ?? baseSave(accountId)), ...body.save, accountId }, oldSave);
+  const level = number(incoming.level, 1, 1, 100);
+  incoming.level = level;
   incoming.rebirthCount = number(incoming.rebirthCount, 0, 0, 20);
   syncRebirthTalents(incoming);
-  incoming.exp = incoming.level >= 100 ? 0 : number(incoming.exp, 0, 0, 1_000_000_000);
+  incoming.exp = level >= 100 ? 0 : number(incoming.exp, 0, 0, 1_000_000_000);
   for (const key of ["gold", "yuanbao", "enhanceStones", "reforgeStones", "bossTickets", "worldAttempts", "skillPoints"]) incoming[key] = number(incoming[key], 0);
   incoming.playerName = String(incoming.playerName ?? oldSave?.playerName ?? target.username).slice(0, 40);
   incoming.playerClass = allowedClasses.has(String(incoming.playerClass)) ? incoming.playerClass : "戰士";
