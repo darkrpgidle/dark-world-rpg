@@ -36,8 +36,10 @@ test("all 24 active skills and ultimates have a reachable trigger path", () => {
       if (automatic) continue;
       assert.ok(SKILL_CHARGE_RULES[characterClass][name] || definition.category === "ultimate",
         `missing trigger rule: ${characterClass} ${name}`);
-      const slots = definition.category === "ultimate" ? [null, null, null] : [name, null, null];
-      const build = { ranks: { [name]: 5 }, activeSlots: slots };
+      const overloadSupport = characterClass === "法師" && name === "奧術超載";
+      const slots = definition.category === "ultimate" ? [null, null, null]
+        : overloadSupport ? ["霜火新星", "奧術超載", null] : [name, null, null];
+      const build = { ranks: { [name]: 5, ...(overloadSupport ? { 霜火新星: 5 } : {}) }, activeSlots: slots };
       const battle = syncLiveCombat(null, `verify:${characterClass}:${name}`, "target",
         build, characterClass, 100, createSkillAscensions());
       let triggered = false;
