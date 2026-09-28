@@ -66,7 +66,7 @@ test("bleeding and armor-broken target effects use the target state before this 
   for (let i = 2; i < 4; i++) combat = turn(combat, { now: i * 100 }).combat;
   const cast = turn(combat, { skill: "裂地斬", now: 400, hp: 39 });
   assert.equal(cast.bonusDamagePercent, 6 + 5 + 8 + 3 * 2);
-  assert.equal(cast.baseDamagePercent, 150);
+  assert.equal(cast.baseDamagePercent, 165);
   assert.equal(cast.combat.passives.bloodTraceStacks, 3);
   combat = cast.combat;
   combat.session.enemy = {};
