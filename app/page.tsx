@@ -723,7 +723,7 @@ const advancedCombatBlessings: Blessing[] = [
   { id: "stat-attack", name: "狂戰意志", tag: "進階・攻擊", description: "本輪攻擊 +15%。", kind: "combat" },
   { id: "stat-speed", name: "疾行刻印", tag: "進階・攻速", description: "本輪攻擊速度 +15%。", kind: "combat" },
   { id: "stat-crit", name: "狂怒時刻", tag: "進階・暴擊", description: "本輪暴擊 +12%。", kind: "combat" },
-  { id: "stat-hit", name: "洞察之眼", tag: "進階・命中", description: "本輪命中 +10%。", kind: "combat" },
+  { id: "stat-hit", name: "洞察之眼", tag: "進階・命中", description: "本輪命中值 +10。", kind: "combat" },
   { id: "stat-skill", name: "奧術增幅", tag: "進階・技能", description: "本輪技能傷害 +18%。", kind: "combat" },
 ];
 const advancedSupportBlessings: Blessing[] = [
@@ -997,8 +997,8 @@ function skillValue(name: string, level: number) {
       value: (n) => `5 段／${Math.round(500 * windVolleyDamageMultiplier(n))}%基礎`,
     },
     獵手本能: {
-      metric: "暴擊率／閃避率／暴擊追加",
-      value: (n) => `${2 + n}%／${2 + n}%／${Math.min(30, 6 + n)}%（追加 1 次攻擊）`,
+      metric: "暴擊率／閃避值／暴擊追加",
+      value: (n) => `${2 + n}%／+${2 + n}／${Math.min(30, 6 + n)}%（追加 1 次攻擊）`,
     },
     致命標記: { metric: "前 5 下逐次追加／第 6 下爆炸", value: (n) => `每下追加 +${deadlyMarkBonusPct(n)}%／${Math.round(deadlyMarkExplosionMultiplier(n) * 100)}%` },
     霜火新星: { metric: "傷害／灼燒", value: (n) => `${140 + n * 20}%／${1.5 + n * 0.5}%最大生命` },
@@ -1522,7 +1522,7 @@ function rollAffix(roll: AffixRoll) {
     "防禦%": "防禦力",
     攻速: "攻擊速度",
   };
-  return `${labels[roll.name] ?? roll.name} +${value}${roll.percent ? "%" : ""}`;
+  return `${labels[roll.name] ?? roll.name} +${value}${roll.percent && roll.name !== "命中" && roll.name !== "閃避" ? "%" : ""}`;
 }
 
 function affixName(affix: string) {
@@ -1549,7 +1549,7 @@ function displayAffix(affix: string) {
     "防禦%": "防禦力",
     攻速: "攻擊速度",
   };
-  return `${labels[name] ?? name} +${value}${affix.includes("%") || name === "攻速" || name.endsWith("%") ? "%" : ""}`;
+  return `${labels[name] ?? name} +${value}${name !== "命中" && name !== "閃避" && (affix.includes("%") || name === "攻速" || name.endsWith("%")) ? "%" : ""}`;
 }
 
 function amplifiedAffix(item: Item, affix: string, index: number) {
@@ -1588,7 +1588,7 @@ function affixRange(item: Item, affix: string) {
 function affixRangeLabel(item: Item, affix: string) {
   const range = affixRange(item, affix);
   if (!range) return "專屬詞綴";
-  const suffix = range.percent ? "%" : "";
+  const suffix = range.percent && range.name !== "命中" && range.name !== "閃避" ? "%" : "";
   return `${item.quality}範圍 ${range.minimum}～${range.maximum}${suffix}`;
 }
 
@@ -6333,7 +6333,7 @@ function Game({
                     className={targetedAffix === index ? "active" : ""}
                     onClick={() => setTargetedAffix(index)}
                   >
-                    <span>{affix}</span>
+                    <span>{displayAffix(affix)}</span>
                     <small>
                       {reforgeMode !== "target"
                         ? affixRangeLabel(currentItem, affix)
