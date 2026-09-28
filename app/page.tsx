@@ -2605,11 +2605,12 @@ function Game({
               ? `攻擊 +${activeSetAttackBonusPct}%`
               : "尚未形成套裝共鳴";
   const monsterEvasionRating =
-    evasionRules.monsterEvasionBase + mapId * evasionRules.monsterEvasionPerMap;
-  const mapEvasionBonus = balanceConfig.combat.evasionModel.monsterEvasionBonusByMap[mapId] ?? 0;
+    evasionRules.monsterEvasionBase +
+    mapId * evasionRules.monsterEvasionPerMap +
+    (evasionRules.monsterEvasionBonusByMap[mapId] ?? 0);
   const effectiveHit = Math.max(
     evasionRules.minimumHitChance,
-    hitChanceFromRatings(characterStats.hit, monsterEvasionRating) - mapEvasionBonus,
+    hitChanceFromRatings(characterStats.hit, monsterEvasionRating) - currentSuppression.hitBonus,
   );
   const unclaimedMail = mails.filter((mail) => !mail.claimed).length;
   const enhancementTargetLevel = Math.min(
@@ -7697,8 +7698,8 @@ function Game({
                         ["防禦", characterStats.defense.toLocaleString()],
                         ["每秒攻擊", `${(characterStats.speed / 100).toFixed(2)} 次`],
                         [
-                          "閃避",
-                          `${Math.min(DODGE_CAP, characterStats.dodge)}%${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
+                          "閃避值",
+                          `${Math.min(DODGE_CAP, characterStats.dodge)}${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
                         ],
                         ["暴擊", `${Math.min(100, characterStats.crit)}%`],
                         ["暴擊傷害", `+${characterStats.critDamage}%`],
@@ -7722,10 +7723,17 @@ function Game({
                         </span>
                       ))}
                       <span className="hit-value">
-                        <small>面板命中</small>
-                        <b>{characterStats.hit}%</b>
+                        <small>命中值</small>
+                        <b>{characterStats.hit}</b>
                         <em>
-                          怪物閃避評等 {monsterEvasionRating} → 實際命中 {effectiveHit}%
+                          對目前怪物：實際命中 {effectiveHit.toFixed(1)}%
+                        </em>
+                      </span>
+                      <span className="hit-value">
+                        <small>實際閃避</small>
+                        <b>{effectiveDodge.toFixed(1)}%</b>
+                        <em>
+                          對目前怪物命中值 {monsterAccuracyRating}，閃避值換算為 {playerEvasionRating} 評等
                         </em>
                       </span>
                     </div>
