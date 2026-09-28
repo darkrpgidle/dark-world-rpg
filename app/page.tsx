@@ -4331,7 +4331,7 @@ function Game({
             lowHealthDamage: characterStats.lowHealthDamage,
             lowHealthReduction: characterStats.lowHealthReduction,
             lowHealth: playerHp <= 35,
-            roll: Math.random(),
+            roll: hitRoll / 100,
             monsterName: currentEnemyBaseName,
             playerDefense: characterStats.defense,
             playerAttack: offensiveAttack,
