@@ -133,9 +133,7 @@ import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cut
 import { advanceLiveCombatEvents, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
 import { settleCombatHealth } from "./skill-health-settlement";
 import { createBossDamageLedger, settleBossDamageEvent } from "./skill-boss-damage";
-import { warriorPassiveDefenses } from "./skill-warrior-passives";
-import { rangerPassiveStats } from "./skill-ranger-passives";
-import { magePassiveStats } from "./skill-mage-passives";
+import { skillPassivePanelStats } from "./skill-passive-panel";
 import { createCombatVictoryGuard } from "./skill-combat-victory";
 import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import type { SkillSaveAction } from "./skill-save-policy";
@@ -2534,10 +2532,9 @@ function Game({
   const activeSetCount = equippedSetPieceCount(equippedGear);
   const activeSetAttackMultiplier = equippedSetAttackMultiplier(equippedGear);
   const activeSetAttackBonusPct = Math.round((activeSetAttackMultiplier - 1) * 100);
-  const skillHealthBonus = playerClass === "戰士"
-    ? warriorPassiveDefenses(skillReworkBuild, playerHp).maxHealthBonusPercent
-    : playerClass === "法師" ? magePassiveStats(skillReworkBuild).maxHealthBonusPercent : 0;
-  const rangerBaseStats = playerClass === "遊俠" ? rangerPassiveStats(skillReworkBuild) : null;
+  const skillPassiveStats = skillPassivePanelStats(skillReworkBuild, playerClass, playerHp);
+  const skillHealthBonus = skillPassiveStats.maxHealthBonusPercent;
+  const rangerBaseStats = playerClass === "遊俠" ? skillPassiveStats : null;
   const characterStats = {
     ...baseCharacterStats,
     hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1) * (1 + skillHealthBonus / 100)),
@@ -2572,6 +2569,8 @@ function Game({
     characterStats.speed * (1 + ((rangerBaseStats?.attackSpeedBonusPercent ?? 0) +
       (liveCombatRef.current ? liveCombatSpeedBonus(liveCombatRef.current) : 0)) / 100) +
     (hasBlessing("rapid") ? (blessingUpgraded("rapid") ? 35 : 20) : 0);
+  const displayedDodgeChance = Math.min(DODGE_CAP,
+    Math.max(0, characterStats.dodge + (rangerBaseStats?.dodgeChancePoints ?? 0)));
   const currentWaveBoss = wave === MAP_FLOORS;
   const currentWaveGuardian = wave % 10 === 0 && !currentWaveBoss;
   const currentWaveElite = wave % 5 === 0 && !currentWaveGuardian && !currentWaveBoss;
@@ -6304,7 +6303,7 @@ function Game({
     { label: "戰力", value: combatPower.toLocaleString() },
     { label: "攻擊", value: characterStats.attack.toLocaleString() },
     { label: "防禦", value: characterStats.defense.toLocaleString() },
-    { label: "每秒攻擊", value: `${(characterStats.speed / 100).toFixed(2)} 次` },
+    { label: "每秒攻擊", value: `${(combatAttackSpeed / 100).toFixed(2)} 次` },
   ];
 
   return (
@@ -8082,11 +8081,17 @@ function Game({
                         ["生命", characterStats.hp.toLocaleString()],
                         ["攻擊", characterStats.attack.toLocaleString()],
                         ["防禦", characterStats.defense.toLocaleString()],
-                        ["每秒攻擊", `${(characterStats.speed / 100).toFixed(2)} 次`],
+                        ["每秒攻擊", `${(combatAttackSpeed / 100).toFixed(2)} 次`],
                         [
                           "閃避",
-                          `${Math.min(DODGE_CAP, characterStats.dodge)}%${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
+                          `${displayedDodgeChance}%${characterStats.dodge + (rangerBaseStats?.dodgeChancePoints ?? 0) > DODGE_CAP ? "（上限）" : ""}`,
                         ],
+                        ...(playerClass === "戰士" && skillPassiveStats.blockChancePoints > 0
+                          ? [["格擋率", `${skillPassiveStats.blockChancePoints}%`]] : []),
+                        ...(playerClass === "戰士" && skillPassiveStats.lowHealthDamageReductionPercent > 0
+                          ? [["低血額外減傷", `+${skillPassiveStats.lowHealthDamageReductionPercent}%`]] : []),
+                        ...(playerClass === "法師" && skillPassiveStats.initialShieldBonusPercent > 0
+                          ? [["護盾強度", `+${skillPassiveStats.initialShieldBonusPercent}%`]] : []),
                         ["暴擊", `${Math.min(100, characterStats.crit)}%`],
                         ["暴擊傷害", `+${characterStats.critDamage}%`],
                         ["吸血", `${Math.min(100, characterStats.lifesteal)}%`],
