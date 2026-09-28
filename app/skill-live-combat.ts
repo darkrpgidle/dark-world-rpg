@@ -30,7 +30,7 @@ export type LiveCombatBattle = {
 export type LiveCombatAction = {
   name: string | null; hits: PrimaryAttackEvent["hits"];
   damagePercent: number; defenseIgnore: number; lifestealPercent: number;
-  statuses: string[]; ticks: number[]; critical: boolean;
+  statuses: string[]; ticks: LiveDotDamageEvent[]; critical: boolean;
 };
 type AttackOptions = { now: number; healthPercent: number; attack: number;
   hitChance: number; criticalChance: number; criticalDamage: number; roll?: () => number;
@@ -103,10 +103,16 @@ export function liveCombatMaxHealthBonus(battle: LiveCombatBattle): number {
   return 0;
 }
 
-export function advanceLiveCombat(battle: LiveCombatBattle, now: number): number[] {
+export type LiveDotDamageEvent = { kind: "bleed" | "burn"; damage: number };
+
+export function advanceLiveCombatEvents(battle: LiveCombatBattle, now: number): LiveDotDamageEvent[] {
   const next = advanceCombatSession(battle.combat.session, now);
   battle.combat = { ...battle.combat, session: next.session } as LiveCombatBattle["combat"];
-  return next.ticks.map((tick) => liveTickDamage(battle, tick));
+  return next.ticks.map((tick) => ({ kind: tick.kind, damage: liveTickDamage(battle, tick) }));
+}
+
+export function advanceLiveCombat(battle: LiveCombatBattle, now: number): number[] {
+  return advanceLiveCombatEvents(battle, now).map((event) => event.damage);
 }
 
 function liveTickDamage(battle: LiveCombatBattle, tick: DebuffTick): number {
@@ -265,7 +271,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
   }
   // Settle ticks due before this cast refreshes a status. They belong to the
   // previous attack snapshot, even when the refreshed status has the same kind.
-  const dueTickDamage = ticks.map((tick) => liveTickDamage(battle, tick));
+  const dueTickDamage = ticks.map((tick) => ({ kind: tick.kind, damage: liveTickDamage(battle, tick) }));
   for (const kind of statuses) if (kind === "bleed" || kind === "burn")
     battle.dotAttack[kind] = options.attack;
   return { name, hits, damagePercent, defenseIgnore, lifestealPercent,

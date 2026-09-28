@@ -1331,6 +1331,10 @@ body {
   text-shadow: 0 0 9px #148b51, 0 2px 5px #000;
 }
 .set-elemental-hit b { font-size: 20px; }
+.dot-damage-float { z-index: 7; }
+.dot-damage-hit,
+.dot-damage-hit small { color: #ff765f; text-shadow: 0 0 8px rgba(255, 51, 36, .72); }
+.dot-damage-hit b { font-size: 17px; }
 .volley-elemental-float .set-elemental-hit { animation-delay: calc(495ms + var(--hit-index) * 110ms); }
 .combo-hit.critical-hit {
   color: #ffd15c;

@@ -130,7 +130,7 @@ import { SkillEffectCanvas } from "./skill-effect-canvas";
 import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoints, type SkillBuild } from "./skill-rework";
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
-import { advanceLiveCombat, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
+import { advanceLiveCombatEvents, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
 import { settleCombatHealth } from "./skill-health-settlement";
 import { createBossDamageLedger, settleBossDamageEvent } from "./skill-boss-damage";
 import { warriorPassiveDefenses } from "./skill-warrior-passives";
@@ -2175,6 +2175,9 @@ function Game({
     hits: { damage: number; label: string }[];
     volley: boolean;
   }[]>([]);
+  const [dotDamageGroups, setDotDamageGroups] = useState<{
+    key: number; kind: "bleed" | "burn"; damage: number;
+  }[]>([]);
   const [enemyHitFeedback, setEnemyHitFeedback] = useState<{
     damage: number;
     dodged: boolean;
@@ -4218,9 +4221,18 @@ function Game({
       () => {
         if (towerDeathPendingRef.current) return;
         if (towerVictoryGuardRef.current.has(targetKey)) return;
-        const tickDamage = liveCombatRef.current
-          ? advanceLiveCombat(liveCombatRef.current, Date.now()).reduce((sum, damage) => sum + damage, 0) : 0;
+        const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
+        const tickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
         if (tickDamage > 0) {
+          const dotKey = Date.now();
+          const byKind = new Map<"bleed" | "burn", number>();
+          for (const event of dotTicks) {
+            if (event.damage > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + Math.round(event.damage));
+          }
+          const dotGroups = [...byKind].map(([kind, damage], index) => ({ key: dotKey + index, kind, damage }));
+          setDotDamageGroups((current) => [...current, ...dotGroups]);
+          window.setTimeout(() => setDotDamageGroups((current) =>
+            current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
           const tickTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
           const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName);
           setEnemyHp((health) => {
@@ -4459,6 +4471,7 @@ function Game({
             hitChance: effectiveHit, criticalChance: characterStats.crit,
             criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
           }) : null;
+          const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
           let triggered: Skill | null = null;
           let triggeredMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
           let triggeredDefenseIgnore = liveAction?.defenseIgnore ?? (defenseBreakRemaining > 0 ? 35 : 0);
@@ -4709,6 +4722,7 @@ function Game({
             currentWaveBoss || currentWaveGuardian || currentWaveElite
               ? 1 + characterStats.bossDamage / 100
               : 1;
+          if (liveAction?.damagePercent === 0) combatValues.playerDamage = 0;
           const baseHpDamage = Math.round(
             combatValues.playerDamage *
               windCriticalMultiplier *
@@ -4718,7 +4732,7 @@ function Game({
             ? Math.round(combatValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100) : 0;
           const setResonanceDamage = setTriggered
             ? Math.round(combatValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100) : 0;
-          let hpDamage = baseHpDamage + setElementalDamage + setResonanceDamage;
+          let hpDamage = baseHpDamage + setElementalDamage + setResonanceDamage + actionDotDamage;
           if (fissureDetonationThisAttack) hpDamage += Math.round(combatValues.playerDamage);
           if (activeAttackPerks?.ironWallBonus) hpDamage += activeAttackPerks.ironWallBonus;
           if (bloodRoarFinalAttack) hpDamage += Math.round(combatValues.playerDamage * 2.5);
@@ -4778,7 +4792,7 @@ function Game({
             }, 750);
           }
           const hitRoll = Math.random() * 100;
-          if (liveAction && liveAction.damagePercent <= 0) {
+          if (liveAction && liveAction.damagePercent <= 0 && actionDotDamage <= 0) {
             setLastDamage(0);
             setBattleHits([]);
             setCausePrompt(liveAction.name ? `${liveAction.name}已施放` : "攻擊落空");
@@ -4829,7 +4843,7 @@ function Game({
             const finalHpDamage = settleCutoverAction(cutoverRoute, {
               battleId: cutoverRoute.battleId,
               sequence: currentAction,
-              legacyDamage: Math.round(hpDamage * finalMultiplier),
+              legacyDamage: Math.round((hpDamage - actionDotDamage) * finalMultiplier) + Math.round(actionDotDamage),
             }).damage;
             const enemyMaximumHealth = effectiveMonsterMaximumHealth(
               mapId,
@@ -4844,12 +4858,22 @@ function Game({
               Math.round(healthSettlement.actualDamage),
             );
             let mainDisplayedDamage = Math.min(totalDisplayedDamage,
-              Math.round((hpDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
+              Math.round((hpDamage - actionDotDamage - setElementalDamage - setResonanceDamage) * finalMultiplier));
             const elementalDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage,
               Math.round(setElementalDamage * finalMultiplier));
             const resonanceDisplayed = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed,
               Math.round(setResonanceDamage * finalMultiplier));
-            mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed;
+            const dotDisplayedDamage = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed,
+              Math.round(actionDotDamage));
+            mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed - dotDisplayedDamage;
+            const visibleDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
+            let dotRemaining = dotDisplayedDamage;
+            const dotGroupKey = next * 10;
+            for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
+              const damage = Math.min(dotRemaining, Math.max(0, Math.round(event.damage)));
+              dotRemaining -= damage;
+              if (damage > 0) visibleDotGroups.push({ key: dotGroupKey + index, kind: event.kind, damage });
+            }
             const baseHitDamage = Math.floor(mainDisplayedDamage / attacks);
             const remainder = Math.max(0, mainDisplayedDamage - baseHitDamage * attacks);
             const hitDamages = windVolleyTriggered
@@ -4871,6 +4895,11 @@ function Game({
                 ...(elementalDisplayed > 0 ? [{ damage: elementalDisplayed, label: "元素" }] : []),
                 ...(resonanceDisplayed > 0 ? [{ damage: resonanceDisplayed, label: "元素爆發" }] : []),
               ];
+              if (visibleDotGroups.length) {
+                setDotDamageGroups((current) => [...current, ...visibleDotGroups]);
+                window.setTimeout(() => setDotDamageGroups((current) =>
+                  current.filter((event) => event.key < dotGroupKey || event.key >= dotGroupKey + visibleDotGroups.length)), 1_200);
+              }
               if (elementalHits.length) {
                 setSetElementalHits((current) => [...current, { key: next, hits: elementalHits, volley: windVolleyTriggered }]);
                 window.setTimeout(() => setSetElementalHits((current) => current.filter((hit) => hit.key !== next)),
@@ -5741,10 +5770,26 @@ function Game({
     const timer = setInterval(
       () => {
         if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
-        const liveTickDamage = liveCombatRef.current
-          ? advanceLiveCombat(liveCombatRef.current, Date.now()).reduce((sum, damage) => sum + damage, 0) : 0;
+        const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
+        const liveTickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
         if (liveTickDamage > 0) {
           const settled = settleBossHit(liveTickDamage, "burn");
+          let visibleDotDamage = settled.actualDamage;
+          const dotKey = Date.now();
+          const byKind = new Map<"bleed" | "burn", number>();
+          for (const event of dotTicks) {
+            const applied = Math.min(visibleDotDamage, Math.max(0, Math.round(event.damage)));
+            visibleDotDamage -= applied;
+            if (applied > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + applied);
+          }
+          const dotGroups = [...byKind].map(([kind, damage], index) => ({
+            key: dotKey + index, kind, damage,
+          }));
+          if (dotGroups.length) {
+            setDotDamageGroups((current) => [...current, ...dotGroups]);
+            window.setTimeout(() => setDotDamageGroups((current) =>
+              current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
+          }
           if (activeBossBattle.mode === "world" && settled.actualDamage > 0) {
             setWorldDamage((value) => value + settled.actualDamage);
             setWorldRoundDamage((value) => value + settled.actualDamage);
@@ -5798,6 +5843,7 @@ function Game({
           criticalChance: characterStats.crit,
           criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
         }) : null;
+        const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
         let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
         if (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner")
             && bossEnemyHpRef.current < 25) bossSkillMultiplier *= 2;
@@ -6020,7 +6066,7 @@ function Game({
         const bossResonanceDamage = playerActs && setResonanceTriggered
           ? bossValues.playerDamage * SET_RESONANCE_DAMAGE_PCT / 100 : 0;
         const calculatedPlayerDamage = playerActs
-          ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage : 0;
+          ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage + actionDotDamage : 0;
         const bossHealthSettlement = playerActs
           ? settleBossHit(calculatedPlayerDamage, "attack")
           : settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, 0);
@@ -6033,7 +6079,16 @@ function Game({
           : 0;
         const shownBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
         const shownBossElemental = Math.min(playerDamage - shownBossMain, bossElementalDamage);
-        const shownBossResonance = Math.max(0, playerDamage - shownBossMain - shownBossElemental);
+        const shownBossResonance = Math.min(playerDamage - shownBossMain - shownBossElemental, bossResonanceDamage);
+        const shownBossDot = Math.min(playerDamage - shownBossMain - shownBossElemental - shownBossResonance, actionDotDamage);
+        const bossDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
+        let bossDotRemaining = shownBossDot;
+        const bossDotKey = Date.now() * 10;
+        for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
+          const damage = Math.min(bossDotRemaining, Math.max(0, Math.round(event.damage)));
+          bossDotRemaining -= damage;
+          if (damage > 0) bossDotGroups.push({ key: bossDotKey + index, kind: event.kind, damage });
+        }
         if (activeBossBattle.mode === "world" && playerActs) {
           setWorldDamage((value) => value + playerDamage);
           setWorldRoundDamage((value) => value + playerDamage);
@@ -6086,6 +6141,11 @@ function Game({
               ...(shownBossElemental > 0 ? [{ damage: shownBossElemental, label: "元素" }] : []),
               ...(shownBossResonance > 0 ? [{ damage: shownBossResonance, label: "元素爆發" }] : []),
             ];
+            if (bossDotGroups.length) {
+              setDotDamageGroups((current) => [...current, ...bossDotGroups]);
+              window.setTimeout(() => setDotDamageGroups((current) =>
+                current.filter((event) => event.key < bossDotKey || event.key >= bossDotKey + bossDotGroups.length)), 1_200);
+            }
             if (elementalHits.length)
               setSetElementalHits((current) => [...current, { key: groupKey, hits: elementalHits, volley: false }]);
             window.setTimeout(() => {
@@ -7205,6 +7265,14 @@ function Game({
                             <b>-{hit.damage.toLocaleString()}</b>
                           </div>
                         ))}
+                      </div>
+                    ))}
+                    {dotDamageGroups.map((event) => (
+                      <div key={`dot-damage-${event.key}`} className={`damage-float dot-damage-float ${activeBossBattle ? "boss-damage-float" : "player-damage-float"}`}>
+                        <div className="combo-hit dot-damage-hit">
+                          <small>{event.kind === "bleed" ? "流血" : "灼燒"}</small>
+                          <b>-{event.damage.toLocaleString()}</b>
+                        </div>
                       </div>
                     ))}
                     {setElementalHits.map((group) => (

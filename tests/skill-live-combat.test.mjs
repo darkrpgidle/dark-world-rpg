@@ -7,7 +7,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 } });
 
-const { syncLiveCombat, resolveLiveCombatAttack, advanceLiveCombat, resolveLiveEnemyAttack } =
+const { syncLiveCombat, resolveLiveCombatAttack, advanceLiveCombat, advanceLiveCombatEvents, resolveLiveEnemyAttack } =
   await import("../app/skill-live-combat.ts");
 const { createSkillAscensions } = await import("../app/skill-ascensions.ts");
 const { settleCombatHealth } = await import("../app/skill-health-settlement.ts");
@@ -21,6 +21,80 @@ const sets = {
 const ultimate = new Set(["泰坦斷界斬", "蒼穹箭雨", "星界寂滅"]);
 const opts = { now: 1000, healthPercent: 90, attack: 100, hitChance: 100,
   criticalChance: 0, criticalDamage: 50, roll: () => 0.25 };
+
+const { SKILL_REWORK_CATALOG } = await import("../app/skill-rework.ts");
+const { SKILL_CHARGE_RULES } = await import("../app/skill-combat-queue.ts");
+
+test("all 24 active skills and ultimates have a reachable trigger path", () => {
+  let verified = 0;
+  for (const [characterClass, catalog] of Object.entries(SKILL_REWORK_CATALOG)) {
+    for (const definition of catalog.filter((skill) => skill.kind === "active")) {
+      const name = definition.name;
+      const automatic = (characterClass === "戰士" && ["不屈戰意", "鮮血怒吼"].includes(name))
+        || (characterClass === "遊俠" && name === "幻影步")
+        || (characterClass === "法師" && name === "魔力護盾");
+      if (automatic) continue;
+      assert.ok(SKILL_CHARGE_RULES[characterClass][name] || definition.category === "ultimate",
+        `missing trigger rule: ${characterClass} ${name}`);
+      const slots = definition.category === "ultimate" ? [null, null, null] : [name, null, null];
+      const build = { ranks: { [name]: 5 }, activeSlots: slots };
+      const battle = syncLiveCombat(null, `verify:${characterClass}:${name}`, "target",
+        build, characterClass, 100, createSkillAscensions());
+      let triggered = false;
+      for (let action = 0; action < 80; action++) {
+        const result = resolveLiveCombatAttack(battle, {
+          ...opts, now: 10_000 + action * 100, roll: () => 0,
+        });
+        if (result.name === name) {
+          triggered = true;
+          assert.ok(result.hits.some((segment) => segment.hit), `${name} had no successful hit`);
+          if (!["血戰烙印", "狂戰姿態", "獵殺標記", "風行領域", "元素蝕印", "奧術超載"].includes(name))
+            assert.ok(result.damagePercent > 0, `${name} triggered with no damage`);
+          break;
+        }
+      }
+      assert.ok(triggered, `${characterClass} ${name} did not trigger`);
+      verified++;
+    }
+  }
+  assert.equal(verified, 20);
+});
+
+test("automatic active defenses and low-health roar activate from their real combat events", () => {
+  const warrior = syncLiveCombat(null, "verify-warrior-auto", "enemy", {
+    ranks: { 鮮血怒吼: 5 }, activeSlots: ["鮮血怒吼", null, null],
+  }, "戰士", 100, createSkillAscensions());
+  resolveLiveCombatAttack(warrior, { ...opts, healthPercent: 39, roll: () => 0 });
+  assert.equal(warrior.combat.buffs.bloodRoarUsed, true);
+  assert.ok(warrior.combat.buffs.bloodRoarRemaining > 0);
+
+  for (const [characterClass, name] of [["戰士", "不屈戰意"], ["遊俠", "幻影步"], ["法師", "魔力護盾"]]) {
+    const battle = syncLiveCombat(null, `verify-defense:${name}`, "enemy", {
+      ranks: { [name]: 5 }, activeSlots: [name, null, null],
+    }, characterClass, 100, createSkillAscensions());
+    let protectedHit = false;
+    let specialStateObserved = false;
+    for (let index = 0; index < 12; index++) {
+      const result = resolveLiveEnemyAttack(battle, {
+        healthPercent: 30, maxHealth: 100, damage: 60, roll: () => 0,
+      });
+      protectedHit ||= result.damage < 60 || result.blocked || result.dodged;
+      specialStateObserved ||= name === "不屈戰意"
+        ? battle.combat.defense.activeForAttack
+        : name === "幻影步"
+          ? battle.combat.defense.phantomActiveForAttack
+          : battle.combat.shieldActivatedThisBattle;
+    }
+    assert.ok(protectedHit, `${name} did not protect its owner`);
+    assert.ok(specialStateObserved, `${name} state never activated`);
+    if (name === "不屈戰意") assert.ok(battle.combat.defense.receivedAttacks < 12);
+    if (name === "幻影步") assert.ok(battle.combat.defense.receivedAttacks < 12);
+    if (name === "魔力護盾") {
+      assert.equal(battle.combat.shieldActivatedThisBattle, true);
+      assert.ok(battle.combat.shield.initialValue > 0);
+    }
+  }
+});
 
 for (const [characterClass, names] of Object.entries(sets)) {
   test(`${characterClass} all direct, status, mechanic, and ultimate skills execute from a live queue`, () => {
@@ -52,11 +126,37 @@ test("bleed and burn tick on the existing target, then clear on normal kill", ()
     { ...opts, now: 1000 + i * 100, roll: () => 0 });
   assert.equal(cast.name, "血刃斬");
   assert.ok(cast.statuses.includes("bleed"));
-  assert.ok(advanceLiveCombat(battle, 2300).some((damage) => damage > 0));
+  const events = advanceLiveCombatEvents(battle, 2300);
+  assert.ok(events.some((event) => event.kind === "bleed" && event.damage > 0));
+  assert.ok(events.every((event) => event.kind === "bleed" || event.kind === "burn"));
   syncLiveCombat(battle, "tower-1", "enemy-2", battle.build, "戰士", 100, createSkillAscensions());
   assert.deepEqual(advanceLiveCombat(battle, 4000), []);
 });
 
+
+test("bleed and burn tick events visibly carry separate damage and reduce target HP", () => {
+  for (const [characterClass, name, expectedKind] of [
+    ["戰士", "血刃斬", "bleed"], ["法師", "霜火新星", "burn"],
+  ]) {
+    const battle = syncLiveCombat(null, `dot-hp:${name}`, "enemy", {
+      ranks: { [name]: 5 }, activeSlots: [name, null, null],
+    }, characterClass, 100, createSkillAscensions());
+    let lastActionAt = opts.now;
+    let applied = null;
+    for (let index = 0; index < 20; index++) {
+      lastActionAt = opts.now + index * 100;
+      applied = resolveLiveCombatAttack(battle, { ...opts, now: lastActionAt, roll: () => 0 });
+      if (applied.statuses.includes(expectedKind)) break;
+    }
+    assert.ok(applied?.statuses.includes(expectedKind), `${name} did not apply ${expectedKind}`);
+    const events = advanceLiveCombatEvents(battle, lastActionAt + 3_100);
+    const relevant = events.filter((event) => event.kind === expectedKind);
+    assert.ok(relevant.length > 0, `${expectedKind} produced no tick events`);
+    assert.ok(relevant.every((event) => event.damage > 0));
+    const settlement = settleCombatHealth(100, 100, relevant.reduce((sum, event) => sum + event.damage, 0));
+    assert.ok(settlement.actualDamage > 0, `${expectedKind} did not lower HP`);
+  }
+});
 
 test("a passive bleed refresh settles its due tick with the earlier attack snapshot", () => {
   const battle = syncLiveCombat(null, "tower-snapshot", "enemy-1", {
@@ -69,7 +169,7 @@ test("a passive bleed refresh settles its due tick with the earlier attack snaps
     { ...opts, now: 2000, attack: 200, roll: () => 0 });
   assert.equal(refresh.name, null);
   assert.ok(refresh.statuses.includes("bleed"));
-  assert.deepEqual(refresh.ticks, [20]);
+  assert.deepEqual(refresh.ticks, [{ kind: "bleed", damage: 20 }]);
   assert.equal(battle.dotAttack.bleed, 200);
   assert.deepEqual(advanceLiveCombat(battle, 3000), [80]);
 });
