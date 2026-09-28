@@ -2171,8 +2171,10 @@ function Game({
   const [playerHitFeedback, setPlayerHitFeedback] = useState<{
     damage: number;
     dodged: boolean;
+    blocked?: boolean;
     key: number;
   } | null>(null);
+  const [missFeedback, setMissFeedback] = useState<number | null>(null);
   const [combatStatuses, setCombatStatuses] = useState<CombatStatus[]>([]);
   const showCombatStatus = (status: CombatStatus) => {
     setCombatStatuses((current) => [
@@ -4003,7 +4005,7 @@ function Game({
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
                 }
                 setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                setEnemyHitFeedback({ damage: 0, dodged: true, key: next });
+                setEnemyHitFeedback(null);
                 setCausePrompt(`實際閃避 ${effectiveDodge}% → 完全避開反擊`);
                 return playerHealth;
               }
@@ -4015,8 +4017,8 @@ function Game({
                   queueSkillVisual({ name: "鋼鐵壁壘", key: next });
                   showCombatStatus({ name: `絕對防禦 +${combatPerksRef.current.ironWallBonus}`, target: "player", remaining: 1, unit: "次", tone: "gold" });
                 }
-                setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                setEnemyHitFeedback({ damage: 0, dodged: true, key: next });
+                setPlayerHitFeedback({ damage: 0, dodged: false, blocked: true, key: next });
+                setEnemyHitFeedback(null);
                 setCausePrompt("鋼鐵壁壘觸發 → 完全格擋");
                 return playerHealth;
               }
@@ -4423,6 +4425,7 @@ function Game({
           }
           const hitRoll = Math.random() * 100;
           if (hitRoll > effectiveHit) {
+            setMissFeedback(next);
             setLastDamage(0);
             setBattleHits([]);
             setCausePrompt(
@@ -4430,6 +4433,7 @@ function Game({
             );
             return next;
           }
+          setMissFeedback(null);
           const attackDebugParts = [
             effectName ? `特效：${effectName}` : "特效：普通攻擊",
             `命中：${effectiveHit.toFixed(0)}%`,
@@ -4753,7 +4757,7 @@ function Game({
                   showCombatStatus({ name: "疾影 +12%攻速", target: "player", remaining: 3, unit: "次", tone: "green" });
                 }
                 setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                setEnemyHitFeedback({ damage: 0, dodged: true, key: next });
+                setEnemyHitFeedback(null);
                 setCausePrompt(`實際閃避 ${effectiveDodge}% → 完全避開反擊`);
                 return playerHealth;
               }
@@ -4765,8 +4769,8 @@ function Game({
                   queueSkillVisual({ name: "鋼鐵壁壘", key: next });
                   showCombatStatus({ name: `絕對防禦 +${combatPerksRef.current.ironWallBonus}`, target: "player", remaining: 1, unit: "次", tone: "gold" });
                 }
-                setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                setEnemyHitFeedback({ damage: 0, dodged: true, key: next });
+                setPlayerHitFeedback({ damage: 0, dodged: false, blocked: true, key: next });
+                setEnemyHitFeedback(null);
                 setCausePrompt("鋼鐵壁壘觸發 → 完全格擋");
                 return playerHealth;
               }
@@ -5688,8 +5692,10 @@ function Game({
         if (playerActs && setResonanceTriggered) {
           queueSkillVisual({ name: "套裝共鳴", key: next + 1 });
         }
-        if (playerActs)
+        if (playerActs) {
           setEnemyHitFeedback({ damage: playerDamage, dodged: playerDamage <= 0, key: next });
+          setMissFeedback(playerDamage <= 0 ? next : null);
+        }
         if (bossActs && !abyssSpecialReady)
           setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
         if (playerActs) {
@@ -6901,12 +6907,17 @@ function Game({
                         ))}
                       </div>
                     ))}
-                    {activeBossBattle && playerHitFeedback && (
+                    {playerHitFeedback && (activeBossBattle || playerHitFeedback.dodged || playerHitFeedback.blocked) && (
                       <div
                         key={`player-hit-${playerHitFeedback.key}`}
-                        className={`player-hit-float ${playerHitFeedback.dodged ? "dodged" : ""}`}
+                        className={`player-hit-float ${playerHitFeedback.dodged || playerHitFeedback.blocked ? "dodged" : ""}`}
                       >
-                        {playerHitFeedback.dodged ? "閃避!" : `-${playerHitFeedback.damage}`}
+                        {playerHitFeedback.blocked ? "格擋！" : playerHitFeedback.dodged ? "閃避！" : `-${playerHitFeedback.damage}`}
+                      </div>
+                    )}
+                    {missFeedback !== null && (
+                      <div key={`miss-${missFeedback}`} className="damage-float player-damage-float missed-float">
+                        未命中！
                       </div>
                     )}
                     {!activeBossBattle && enemyHitFeedback && (
