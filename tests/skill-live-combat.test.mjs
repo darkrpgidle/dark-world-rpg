@@ -49,7 +49,8 @@ test("all 24 active skills and ultimates have a reachable trigger path", () => {
         });
         if (result.name === name) {
           triggered = true;
-          assert.ok(result.hits.some((segment) => segment.hit), `${name} had no successful hit`);
+          if (name === "奧術超載") assert.notEqual(battle.combat.overload.phase, "idle");
+          else assert.ok(result.hits.some((segment) => segment.hit), `${name} had no successful hit`);
           if (!["血戰烙印", "狂戰姿態", "獵殺標記", "風行領域", "元素蝕印", "奧術超載"].includes(name))
             assert.ok(result.damagePercent > 0, `${name} triggered with no damage`);
           break;
