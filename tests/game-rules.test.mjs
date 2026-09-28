@@ -807,10 +807,10 @@ test("uses three distinct ten-floor power bands without cluttering map cards", (
 
 test("caps dodge at forty percent and applies map accuracy", () => {
   assert.equal(balanceConfig.progression.dodgeCap, 40);
-  assert.equal(balanceConfig.combat.evasionModel.accuracyMultiplier, 1.25);
-  assert.equal(balanceConfig.combat.evasionModel.evasionMultiplier, 0.3);
-  assert.equal(hitChanceFromRatings(100, 1000), 31.25);
-  assert.equal(evadeChanceFromRatings(100, 1000), 68.75);
+  assert.equal(balanceConfig.combat.evasionModel.accuracyMultiplier, 1);
+  assert.equal(balanceConfig.combat.evasionModel.evasionMultiplier, 0.12);
+  assert.ok(Math.abs(hitChanceFromRatings(100, 1000) - 100 / 2.2) < 1e-9);
+  assert.ok(Math.abs(evadeChanceFromRatings(100, 1000) - (100 - 100 / 2.2)) < 1e-9);
   assert.match(page, /hitChanceFromRatings\(characterStats\.hit, monsterEvasionRating\)/);
   assert.match(page, /evadeChanceFromRatings\(monsterAccuracyRating, playerEvasionRating\)/);
   assert.match(page, /Math\.min\(DODGE_CAP, Math\.max\(0, characterStats\.dodge\)\)/);
