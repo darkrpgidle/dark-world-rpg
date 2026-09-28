@@ -30,7 +30,7 @@ test("ground split uses its exact rank and arms shock only for the next action",
   assert.deepEqual(combat.session.charge.ready, ["裂地斬"]);
   combat.session.enemy.armorBreak = { kind: "armorBreak", expiresAt: 5000, stacks: 1, strength: 15 };
   const cast = turn(combat, "裂地斬", 400, { ascended: new Set(["裂地斬"]) });
-  assert.equal(cast.baseDamagePercent, 150);
+  assert.equal(cast.baseDamagePercent, 165);
   assert.deepEqual(cast.extraDamagePercents, []);
   assert.deepEqual(cast.statusApplications, [{ kind: "armorBreak", strength: 15 }]);
   assert.equal(cast.combat.buffs.groundShockPending, true);

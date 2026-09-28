@@ -65,7 +65,7 @@ test("bleeding and armor-broken target effects use the target state before this 
   combat = second.combat;
   for (let i = 2; i < 4; i++) combat = turn(combat, { now: i * 100 }).combat;
   const cast = turn(combat, { skill: "裂地斬", now: 400, hp: 39 });
-  assert.equal(cast.bonusDamagePercent, 6 + 4 + 8 + 3 * 2);
+  assert.equal(cast.bonusDamagePercent, 6 + 5 + 8 + 3 * 2);
   assert.equal(cast.baseDamagePercent, 150);
   assert.equal(cast.combat.passives.bloodTraceStacks, 3);
   combat = cast.combat;
@@ -97,12 +97,12 @@ test("burst bonus is conditional; a pending next-attack proc expires on a miss",
     kind: "skill", category: "burst", hit: true, targetBleeding: false, targetArmorBroken: true,
     healthPercent: 100, isUltimate: false, ascendedBleed: false, roll: () => 1,
   });
-  assert.equal(burst.damageBonusPercent, 12);
+  assert.equal(burst.damageBonusPercent, 13);
   const clean = resolveWarriorPassiveAttack(combat.passives, combat.build, {
     kind: "skill", category: "burst", hit: true, targetBleeding: false, targetArmorBroken: false,
     healthPercent: 100, isUltimate: false, ascendedBleed: false, roll: () => 1,
   });
-  assert.equal(clean.damageBonusPercent, 4);
+  assert.equal(clean.damageBonusPercent, 5);
   const pending = recordWarriorBlock(combat.passives, combat.build);
   const missed = turn({ ...combat, passives: pending }, { hits: [{ hit: false }] });
   assert.deepEqual(missed.passiveDamageProcs, []);

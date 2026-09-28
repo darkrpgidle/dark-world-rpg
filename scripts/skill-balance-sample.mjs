@@ -16,10 +16,11 @@ const { settleCombatHealth } = await import("../app/skill-health-settlement.ts")
 const { createBossDamageLedger, settleBossDamageEvent } = await import("../app/skill-boss-damage.ts");
 
 const slots = ["武器", "頭盔", "胸甲", "手套", "鞋子", "項鍊", "戒指", "腰帶", "護腕", "披風"];
+// Use the same offensive affixes for each class to isolate skill tuning.
 const combatAffixes = {
-  戰士: ["攻擊%", "生命%", "防禦%", "暴擊", "暴擊傷害"],
+  戰士: ["攻擊%", "暴擊", "暴擊傷害", "攻速", "命中"],
   遊俠: ["攻擊%", "暴擊", "暴擊傷害", "攻速", "命中"],
-  法師: ["攻擊%", "暴擊", "暴擊傷害", "技能傷害", "生命%"],
+  法師: ["攻擊%", "暴擊", "暴擊傷害", "攻速", "命中"],
 };
 const layouts = {
   戰士: ["血刃斬", "裂地斬", "狂戰姿態", "重刃專精", "碎甲猛擊",

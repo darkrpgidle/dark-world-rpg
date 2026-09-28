@@ -12,7 +12,7 @@ const { beginSkillBattleCutover, settleCutoverAction } = await import("../app/sk
 const { settleCombatHealth } = await import("../app/skill-health-settlement.ts");
 
 for (const [characterClass, name, multiplier, defenseIgnore, burnChance] of [
-  ["戰士", "裂地斬", 1.5, 15, 0],
+  ["戰士", "裂地斬", 1.65, 15, 0],
   ["遊俠", "穿雲箭", 1.5, 20, 0],
   ["法師", "霜火新星", 1.55, 0, 20],
 ]) {
