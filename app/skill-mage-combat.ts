@@ -86,7 +86,7 @@ export type MageTurnResult = {
     percent: number;
     afterOriginalSegment: number;
   }[];
-  // Ultimate has a total multiplier, but its individual segments are unknown.
+  // The ultimate keeps its total multiplier alongside six beams and the final explosion.
   totalDamagePercent: number;
   conditionalDamageBonusPercent: number;
   voidAscensionDamageBonusPercent: number;
@@ -127,7 +127,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   } else if (input.skill === "奧術超載") {
     if (input.hits.length !== 0) return null;
   } else if (input.skill === "星界寂滅") {
-    if (input.hits.length === 0) return null;
+    if (input.hits.length !== MAGE_ACTIVE_RULES.星界寂滅.beamCount + 1) return null;
   } else if (input.hits.length !== 1) {
     return null;
   }
@@ -242,6 +242,15 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const damageSegmentPercents = input.skill === "奧術飛彈"
     ? Array.from({ length: MAGE_ACTIVE_RULES.奧術飛彈.missiles },
       () => mageSkillRankValue(MAGE_ACTIVE_RULES.奧術飛彈.damagePerMissile, rank))
+    : input.skill === "星界寂滅"
+      ? [
+          ...Array.from({ length: MAGE_ACTIVE_RULES.星界寂滅.beamCount },
+            () => mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank)
+              * MAGE_ACTIVE_RULES.星界寂滅.beamDamageSharePercent / 100
+              / MAGE_ACTIVE_RULES.星界寂滅.beamCount),
+          mageSkillRankValue(MAGE_ACTIVE_RULES.星界寂滅.totalDamage, rank)
+            * MAGE_ACTIVE_RULES.星界寂滅.finalExplosionDamageSharePercent / 100,
+        ]
     : input.skill === "霜火新星" || input.skill === "隕星術" || input.skill === "虛空崩解"
       ? [mageSkillRankValue(MAGE_ACTIVE_RULES[input.skill].damage, rank)]
       : input.skill === "normal" ? [100] : [];

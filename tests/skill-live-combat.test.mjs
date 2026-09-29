@@ -230,3 +230,58 @@ test("direct skill damage reaches the shared HP and victory calculation once in 
     }
   }
 });
+
+test("every arrow and missile rolls hit or evasion independently", () => {
+  const cases = [
+    ["遊俠", "疾風連射", [true, false, true, false, true]],
+    ["遊俠", "蒼穹箭雨", [true, false, true, false, true, false, true, false, true]],
+    ["法師", "奧術飛彈", [true, false, true]],
+    ["法師", "星界寂滅", [true, false, true, false, true, false, true]],
+  ];
+  for (const [characterClass, name, pattern] of cases) {
+    const cast = (outcomes) => {
+      const battle = syncLiveCombat(null, `segment-hit:${name}`, "enemy", {
+        ranks: { [name]: 1 },
+        activeSlots: ultimate.has(name) ? [null, null, null] : [name, null, null],
+      }, characterClass, 100, createSkillAscensions());
+      battle.combat.session.charge.ready = [name];
+      if (ultimate.has(name)) battle.combat.session.charge.ultimateEnergy = 100;
+      const rolls = outcomes.flatMap((hit) => hit ? [0.1, 0.9] : [0.9]);
+      let index = 0;
+      const result = resolveLiveCombatAttack(battle, {
+        ...opts, hitChance: 50, roll: () => rolls[index++] ?? 0.9,
+      });
+      assert.equal(result.name, name);
+      assert.deepEqual(result.hits.map((segment) => segment.hit), outcomes, name);
+      assert.equal(result.hits.length, outcomes.length, name);
+      return result.damagePercent;
+    };
+    const mixed = cast(pattern);
+    const full = cast(pattern.map(() => true));
+    const missed = cast(pattern.map(() => false));
+    assert.ok(mixed > 0 && mixed < full, `${name} must count only connected segments`);
+    assert.equal(missed, 0, `${name} must deal no damage when every segment is evaded`);
+  }
+});
+
+test("astral collapse empowers only a landed final shockwave", () => {
+  const cast = (outcomes) => {
+    const battle = syncLiveCombat(null, "astral-ascended", "enemy", {
+      ranks: { 星界寂滅: 1 }, activeSlots: [null, null, null],
+    }, "法師", 100, createSkillAscensions());
+    battle.ascended = new Set(["星界寂滅"]);
+    battle.combat.session.charge.ready = ["星界寂滅"];
+    battle.combat.session.charge.ultimateEnergy = 100;
+    const rolls = outcomes.flatMap((hit) => hit ? [0.1, 0.9] : [0.9]);
+    let index = 0;
+    return resolveLiveCombatAttack(battle, {
+      ...opts, hitChance: 50, roll: () => rolls[index++] ?? 0.9,
+    });
+  };
+  const mixed = cast([true, false, true, false, true, false, true]);
+  assert.deepEqual(mixed.hits.map((segment) => segment.hit),
+    [true, false, true, false, true, false, true]);
+  assert.ok(Math.abs(mixed.damagePercent - (3 * 28 + 252 * 1.24)) < 1e-9);
+  const missedExplosion = cast([true, true, true, true, true, true, false]);
+  assert.ok(Math.abs(missedExplosion.damagePercent - 168) < 1e-9);
+});

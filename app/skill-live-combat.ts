@@ -15,6 +15,7 @@ import { rangerPassiveStats } from "./skill-ranger-passives";
 import { RANGER_ACTIVE_RULES, RANGER_PASSIVE_RULES, rangerSkillRankValue } from "./skill-ranger-rules";
 import { warriorPassiveDefenses } from "./skill-warrior-passives";
 import { magePassiveStats } from "./skill-mage-passives";
+import { MAGE_ACTIVE_RULES } from "./skill-mage-rules";
 import { restoreSkillBuild, SKILL_REWORK_CATALOG, type SkillBuild, type SkillClass } from "./skill-rework";
 import type { PrimaryAttackEvent } from "./skill-combat-queue";
 
@@ -121,7 +122,8 @@ function liveTickDamage(battle: LiveCombatBattle, tick: DebuffTick): number {
 
 function segmentCount(name: string | null): number {
   return name === "疾風連射" ? 5 : name === "蒼穹箭雨" ? 9
-    : name === "奧術飛彈" ? 3 : name === "奧術超載" ? 0 : 1;
+    : name === "奧術飛彈" ? 3 : name === "星界寂滅" ? MAGE_ACTIVE_RULES.星界寂滅.beamCount + 1
+    : name === "奧術超載" ? 0 : 1;
 }
 
 export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: AttackOptions): LiveCombatAction {
@@ -233,6 +235,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       hits, now: options.now,
       ascended: battle.ascended as ReadonlySet<Exclude<Parameters<typeof resolveMageTurn>[1]["skill"], "normal">>,
       roll: random, equippedItems: options.equippedItems,
+      finalExplosionConfirmed: name === "星界寂滅",
     });
     if (!result) throw new Error("Mage action and charge queue disagree");
     battle.combat = result.combat;
@@ -240,8 +243,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       && hasMythic("skill-mage-akasha-pages");
     const replayReady = akashaEquipped && battle.akashaReady && Boolean(name)
       && hits.some((part) => part.hit) && result.damageSegmentPercents.length > 0;
-    const segments = result.damageSegmentPercents.length ? result.damageSegmentPercents
-      : name === "星界寂滅" ? [result.totalDamagePercent] : [];
+    const segments = result.damageSegmentPercents;
     const bonus = result.conditionalDamageBonusPercent + result.voidAscensionDamageBonusPercent +
       result.skillEfficiencyBonusPercent - result.skillDamagePenaltyPercent +
       result.passiveDirectDamageBonusPercent + result.equipmentSkillDamageBonusPercent +

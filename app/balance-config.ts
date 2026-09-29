@@ -26,7 +26,7 @@ export const balanceConfig = {
         隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [25, 30, 35, 40, 50], emberExplosionDamage: 120 },
         奧術超載: { successfulActiveCastsRequired: 6, followingSuccessfulActiveCasts: 6, skillEfficiencyBonus: [10, 14, 18, 22, 26], exhaustionPenalty: 15, stableExhaustionPenalty: 5, stabilityStacksRequired: 6 },
         虛空崩解: { damage: [250, 275, 300, 330, 365], damageBonusVsStatus: [20, 25, 30, 35, 40], damagePerDistinctStatus: 18, maxDistinctStatuses: 3 },
-        星界寂滅: { totalDamage: [420, 475, 530, 590, 660], maxCollapseStacks: 6, finalExplosionDamagePerStack: 8 },
+        星界寂滅: { totalDamage: [420, 475, 530, 590, 660], beamCount: 6, beamDamageSharePercent: 40, finalExplosionDamageSharePercent: 60, maxCollapseStacks: 6, finalExplosionDamagePerStack: 8 },
       },
       passive: {
         奧術感知: { activeDirectDamageBonus: [3, 5, 7, 9, 12] },
