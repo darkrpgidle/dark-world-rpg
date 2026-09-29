@@ -1723,6 +1723,56 @@ body {
     );
   gap: 14px;
 }
+.inventory-layout > .panel {
+  animation: inventory-panel-open .42s both cubic-bezier(.2, .75, .25, 1);
+}
+.inventory-layout > .bag-panel { animation-delay: 70ms; }
+.inventory-layout > .item-detail { animation-delay: 130ms; }
+.inventory-layout > .character-values-panel { animation-delay: 170ms; }
+.inventory-layout .inventory-character {
+  animation: inventory-character-reveal .6s both ease-out;
+}
+.inventory-layout .item-grid > * {
+  animation: inventory-item-enter .3s both ease-out;
+  animation-delay: var(--item-delay, 140ms);
+}
+.inventory-layout .item-detail-reveal {
+  animation: inventory-detail-reveal .26s both ease-out;
+}
+.inventory-layout .bag-panel {
+  background:
+    radial-gradient(ellipse at 50% 72%, #98703b12, transparent 65%),
+    repeating-linear-gradient(0deg, transparent 0 55px, #c6974210 56px),
+    repeating-linear-gradient(90deg, transparent 0 55px, #c6974210 56px),
+    linear-gradient(145deg, #1b1e1f, #111415);
+}
+@keyframes inventory-panel-open {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes inventory-character-reveal {
+  from { opacity: 0; transform: translateY(12px); filter: brightness(.4) drop-shadow(0 0 2px #000); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes inventory-item-enter {
+  from { opacity: 0; transform: scale(.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes inventory-detail-reveal {
+  from { opacity: .4; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inventory-layout > .panel,
+  .inventory-layout .inventory-character,
+  .inventory-layout .item-grid > *,
+  .inventory-layout .item-detail-reveal,
+  .paperdoll::before,
+  .paperdoll-equip-feedback,
+  .equip-slot-flash {
+    animation: none !important;
+  }
+}
 .bag-tool-row {
   display: flex;
   align-items: center;
@@ -1822,6 +1872,26 @@ body {
   background: radial-gradient(ellipse, #a4772818 0%, transparent 68%);
   pointer-events: none;
   z-index: 0;
+  animation: inventory-aura-breathe 5s ease-in-out infinite;
+}
+.paperdoll-equip-feedback {
+  position: absolute;
+  z-index: 1;
+  inset: 12% 20%;
+  border-radius: 50%;
+  border: 1px solid #eec78180;
+  box-shadow: 0 0 28px #db9e4b50, inset 0 0 30px #db9e4b35;
+  pointer-events: none;
+  animation: inventory-equip-aura .6s ease-out forwards;
+}
+@keyframes inventory-equip-aura {
+  0% { opacity: 0; transform: scale(.72); }
+  30% { opacity: .75; }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+@keyframes inventory-aura-breathe {
+  0%, 100% { opacity: .5; transform: scale(.94); }
+  50% { opacity: 1; transform: scale(1.05); }
 }
 .character-display {
   grid-column: 2;
@@ -1861,6 +1931,19 @@ body {
   gap: 4px;
   font-size: 11px;
   box-shadow: inset 0 0 9px #fff04, 0 2px 7px #0009;
+}
+.equip-slot-flash {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid #f8d58b;
+  box-shadow: 0 0 18px #e8ae5fbb, inset 0 0 14px #f6d39380;
+  pointer-events: none;
+  animation: inventory-equip-flash .6s ease-out forwards;
+}
+@keyframes inventory-equip-flash {
+  0% { opacity: 0; transform: scale(.8); }
+  28% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.3); }
 }
 .gear-slot small {
   font-size: 8px;
@@ -2037,6 +2120,16 @@ body {
   overflow: hidden;
   padding: 0;
   color: var(--q);
+  transition: border-color .18s, box-shadow .18s, background .18s;
+}
+.item-grid button:hover:not(.selected),
+.item-grid button:focus-visible:not(.selected) {
+  border-color: var(--q);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--q) 30%, transparent);
+}
+.item-grid button:hover .bag-equipment-art,
+.item-grid button:focus-visible .bag-equipment-art {
+  transform: translate(-50%, -50%) scale(1.07);
 }
 .item-grid button:after {
   content: "";
@@ -2104,6 +2197,7 @@ body {
   height: 78%;
   transform: translate(-50%, -50%);
   filter: drop-shadow(0 0 5px color-mix(in srgb, var(--q) 45%, transparent));
+  transition: transform .18s ease-out;
 }
 .item-grid small {
   position: absolute;

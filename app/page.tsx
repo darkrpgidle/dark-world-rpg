@@ -2191,6 +2191,12 @@ function Game({
   const [bagSort, setBagSort] = useState<"戰力" | "品質" | "強化" | "最新">("戰力");
   const [mobileItemDetailOpen, setMobileItemDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(0);
+  const [equipFeedback, setEquipFeedback] = useState<{ slot: string; id: number } | null>(null);
+  useEffect(() => {
+    if (!equipFeedback) return;
+    const timeout = window.setTimeout(() => setEquipFeedback(null), 620);
+    return () => window.clearTimeout(timeout);
+  }, [equipFeedback]);
   const [activeLoadout, setActiveLoadout] = useState<1 | 2>(1);
   const [loadouts, setLoadouts] = useState<Record<1 | 2, number[]>>({
     1: [],
@@ -5244,6 +5250,7 @@ function Game({
 
   const toggleEquip = () => {
     if (!currentItem) return;
+    setEquipFeedback({ slot: currentItem.slot, id: Date.now() });
     const isEquipped = equipped.includes(currentItem.id);
     const actualDifference = powerDifferenceForItem(currentItem);
     if (isEquipped) {
@@ -7712,6 +7719,7 @@ function Game({
                     <span>兩套可共用裝備</span>
                   </div>
                   <div className="paperdoll">
+                    {equipFeedback && <span key={equipFeedback.id} className="paperdoll-equip-feedback" aria-hidden="true" />}
                     <div className="character-display">
                       <CharacterAppearanceVfx id={selectedAppearance} />
                       <img
@@ -7751,6 +7759,9 @@ function Game({
                             >
                               <small className="slot-name">{slot}</small>
                               {it && <><EquipmentIcon item={it} className="paperdoll-art" /><i className="set-badge">✦</i></>}
+                              {it && equipFeedback?.slot === slot && (
+                                <span key={equipFeedback.id} className="equip-slot-flash" aria-hidden="true" />
+                              )}
                               <span
                                 className="gear-enhance"
                                 style={{
@@ -7824,7 +7835,7 @@ function Game({
                     </label>
                   </div>
                   <div className="item-grid" key={bagRenderKey}>
-                      {visibleBagItems.map((it) => {
+                      {visibleBagItems.map((it, order) => {
                         const i = items.indexOf(it);
                         const worn = items.find(
                           (item) =>
@@ -7847,6 +7858,7 @@ function Game({
                                   {
                                     "--q": qualityColors[it.quality],
                                     "--set-color": itemSetAccent(it),
+                                    "--item-delay": `${140 + Math.min(order, 8) * 35}ms`,
                                   } as React.CSSProperties
                                 }
                                 aria-label={`${it.name}，裝備評級 ${equipmentDisplayRating(it)}`}
@@ -7886,7 +7898,7 @@ function Game({
                 {mobileItemDetailOpen && <button className="mobile-detail-backdrop" aria-label="關閉裝備詳情" onClick={() => setMobileItemDetailOpen(false)} />}
                 <Panel className={`item-detail ${mobileItemDetailOpen ? "mobile-open" : ""}`}>
                   {currentItem ? (
-                    <>
+                    <div className="item-detail-reveal" key={currentItem.id}>
                       <button className="mobile-detail-close" aria-label="關閉裝備詳情" onClick={() => setMobileItemDetailOpen(false)}>×</button>
                       <div
                         className={`item-icon ${currentItem.set ? "set-item" : ""}`}
@@ -8022,7 +8034,7 @@ function Game({
                         <Shield size={14} />{" "}
                         穿脫、技能、強化與洗鍊會立即更新角色戰力。
                       </p>
-                    </>
+                    </div>
                   ) : (
                     <div className="empty-bag">
                       <PackageOpen />
