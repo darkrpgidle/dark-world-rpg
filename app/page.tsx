@@ -7312,6 +7312,17 @@ function Game({
                                 : "返回爬塔"}
                             </button>
                           )}
+                          {bossOutcome &&
+                            activeBossBattle.mode === "world" &&
+                            bossOutcome !== "win" &&
+                            worldAttempts > 0 && (
+                              <button
+                                className="btn btn-ghost"
+                                onClick={leaveBossBattle}
+                              >
+                                退出世界首領
+                              </button>
+                            )}
                           {!bossOutcome && (
                             <button
                               className="btn btn-ghost"

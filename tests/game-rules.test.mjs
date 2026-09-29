@@ -444,6 +444,10 @@ test("world boss deals one damage per hit at 1.25 attacks per second", () => {
   assert.match(page, /const executionDamage = 999_999/);
 });
 
+test("offers an exit after a finished world boss attempt when retry remains available", () => {
+  assert.match(page, /bossOutcome &&\s*activeBossBattle\.mode === "world" &&\s*bossOutcome !== "win" &&\s*worldAttempts > 0 &&\s*\(\s*<button[\s\S]*?onClick=\{leaveBossBattle\}[\s\S]*?退出世界首領/);
+});
+
 test("keeps equipment attack from being multiplied a second time", () => {
   const towerCall = page.slice(
     page.indexOf("const combatValues = towerCombatValues({"),
