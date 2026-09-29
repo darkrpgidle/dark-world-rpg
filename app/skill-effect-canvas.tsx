@@ -33,6 +33,7 @@ const EFFECT_DURATION: Record<string, number> = {
   霜火新星: 1250,
   魔力護盾: 1150,
   隕星術: 1300,
+  星界寂滅: 1600,
   套裝共鳴: 1100,
 };
 
@@ -427,6 +428,39 @@ function drawEffect(
   const enemyScale = enemyH / 270;
   const fade = Math.max(0, 1 - progress);
 
+  if (name === "星界寂滅") {
+    const riftX = right + enemyW * 0.34;
+    const riftRadius = enemyH * (0.22 + Math.min(1, progress * 3) * 0.16);
+    ring(ctx, riftX, centerY, riftRadius, "#a778ff", fade * 0.8, Math.max(3, enemyW * 0.035));
+    ring(ctx, riftX, centerY, riftRadius * 0.76, "#6fa4ff", fade * 0.7, 3);
+    for (let beam = 0; beam < 6; beam++) {
+      const strikeAt = 0.08 + beam * 0.105;
+      const age = progress - strikeAt;
+      if (age < 0 || age > 0.18) continue;
+      const alpha = 1 - age / 0.18;
+      const angle = -1.15 + beam * 0.46;
+      const sourceX = riftX + Math.cos(angle) * riftRadius;
+      const sourceY = centerY + Math.sin(angle) * riftRadius * 1.8;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      glowLine(ctx, sourceX, sourceY, right, centerY, "#a783ff", Math.max(4, enemyW * 0.09), 24);
+      glowLine(ctx, sourceX, sourceY, right, centerY, "#f8f1ff", Math.max(2, enemyW * 0.025), 14);
+      ctx.restore();
+      ring(ctx, right, centerY, enemyW * (0.12 + age * 1.2), "#b5a0ff", alpha * 0.65, 3);
+    }
+    if (progress >= 0.7) {
+      const collapse = Math.min(1, (progress - 0.7) / 0.1);
+      ring(ctx, right, centerY, enemyH * (0.25 - collapse * 0.17), "#7444d4", 1 - collapse * 0.35, 5);
+    }
+    if (progress >= 0.8) {
+      const impact = Math.min(1, (progress - 0.8) / 0.2);
+      shockwave(ctx, right, centerY, enemyH * (0.14 + impact * 0.68), "#cba6ff", 1 - impact);
+      ring(ctx, right, centerY, enemyH * (0.1 + impact * 0.53), "#f9f5ff", 1 - impact, 7);
+      burst(ctx, sparks, right, centerY, impact, enemyScale);
+      if (impact < 0.35) flash(ctx, width, height, (0.35 - impact) * 0.6, "#e3ceff");
+    }
+  }
+
   if (name === "套裝共鳴") {
     const impact = easeOut(Math.min(1, progress * 1.35));
     const radius = enemyH * (0.12 + impact * 0.58);
@@ -634,6 +668,8 @@ export function SkillEffectCanvas({
         ? ["#78f79b", "#d9ffd5", "#45aa65"]
         : effect === "魔力護盾"
           ? ["#72dcff", "#d8fbff", "#477dff"]
+          : effect === "星界寂滅"
+            ? ["#b49aff", "#f7efff", "#738fff"]
           : ["#ff753e", "#ffe29a", "#6ddfff"];
     const sparks = makeSparks(seed, reducedMotion ? 10 : 42, palette, 150);
     const assetSources = effect === "鮮血怒吼強化斬擊"
