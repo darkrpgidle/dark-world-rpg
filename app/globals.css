@@ -1649,58 +1649,198 @@ body {
   gap: 14px;
 }
 .map-card {
-  min-height: 190px;
+  min-height: 330px;
   border: 1px solid #343a3a;
-  background: #151819;
+  background: linear-gradient(155deg, #1a1d1d, #101313 72%);
   text-align: left;
   padding: 0;
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: 0.18s;
+  display: grid;
+  grid-template-rows: 116px 1fr;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
 }
 .map-card:hover:not(:disabled),
 .map-card.current {
   border-color: #a67c3d;
   transform: translateY(-2px);
+  box-shadow: 0 10px 28px #0007, 0 0 18px color-mix(in srgb, var(--tone) 28%, transparent);
 }
-.map-card:disabled {
-  filter: grayscale(1);
-}
+.map-card:disabled { cursor: not-allowed; }
 .map-art {
-  height: 86px;
+  height: 100%;
   background:
-    linear-gradient(90deg, #0008, transparent),
     radial-gradient(circle at 72% 42%, var(--tone), #0e1111);
   position: relative;
-  display: flex;
+  display: grid;
+  align-items: start;
+  padding: 10px;
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid color-mix(in srgb, var(--tone) 52%, #303535);
+}
+.map-art img {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+  filter: brightness(.72) saturate(.86);
+  transition: transform .5s ease, filter .25s;
+}
+.map-card:hover:not(:disabled) .map-art img { transform: scale(1.045); filter: brightness(.84) saturate(1); }
+.map-card:disabled .map-art img { filter: grayscale(1) brightness(.32); }
+.map-art::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, #070909b8 0%, #090b0b35 70%), linear-gradient(0deg, #0d1010d9 0%, transparent 58%);
+  pointer-events: none;
+}
+.map-art-status {
+  display: inline-flex;
   align-items: center;
-  padding: 18px;
+  gap: 4px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  border: 1px solid #d6b67455;
+  background: #0a0c0cbd;
+  color: #e7c985;
+  padding: 4px 7px;
+  font-size: 9px;
+  letter-spacing: .06em;
+  backdrop-filter: blur(4px);
 }
-.map-art span {
-  color: #c3af88;
-}
+.map-art-status svg { width: 12px; height: 12px; }
+.map-card:disabled .map-art-status { color: #a2a5a3; border-color: #b6bdba35; }
+.map-card.current .map-art-status { color: #f0d388; border-color: #e2b95a99; }
+.map-card:not(:disabled):not(.current) .map-art-status { color: #b8c9bb; border-color: #83b08d66; }
 .map-art em {
   position: absolute;
-  right: 14px;
-  font: 700 38px serif;
-  color: #ffffff12;
+  right: 12px;
+  bottom: 1px;
+  z-index: 1;
+  font: 700 42px serif;
+  color: #ffffff30;
+  text-shadow: 0 2px 8px #000a;
+  font-style: normal;
+  line-height: 1;
+  pointer-events: none;
 }
-.map-card > div:nth-child(2) {
-  padding: 13px 15px;
+.map-card-content { padding: 12px 13px 13px; min-width: 0; }
+.map-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
-.map-card small {
-  color: #777;
-  font-size: 9px;
+.map-card-heading > div { min-width: 0; }
+.map-region-label {
+  color: #9b9d97 !important;
+  font: 700 9px monospace;
+  letter-spacing: .09em;
 }
 .map-card h3 {
-  margin: 3px 0 5px;
+  margin: 3px 0 0;
   font-family: serif;
+  font-size: 19px;
+  line-height: 1.25;
+  color: #e6e0d4;
 }
-.map-card p {
-  color: #777;
+.map-card-heading .power-state { flex: 0 0 auto; margin-top: 4px; font-size: 8px; }
+.map-monster-line {
+  color: #989b97 !important;
+  font-size: 10px !important;
+  margin: 7px 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-card .map-power-row {
+  margin: 0 0 9px;
+  min-height: 18px;
+}
+.map-route-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  color: #a1a49f;
   font-size: 10px;
-  margin: 0 0 10px;
+}
+.map-route-head b { color: #e3c47a; font: 800 12px monospace; }
+.map-route-head b small { color: #777d78; font: inherit; font-size: 10px; }
+.map-floor-track {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  height: 9px;
+  margin-bottom: 7px;
+}
+.map-floor-track i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: #4b514e;
+  transition: background .2s, height .2s;
+}
+.map-floor-track i.cleared { background: #a28d62; }
+.map-floor-track i.elite { height: 6px; background: #9d623f; }
+.map-floor-track i.guardian { height: 7px; background: #53837c; }
+.map-floor-track i.boss { height: 9px; background: #a44b4b; }
+.map-floor-track i.elite.cleared { background: #e0a263; }
+.map-floor-track i.guardian.cleared { background: #88d1bf; }
+.map-floor-track i.boss.cleared { background: #f47d70; box-shadow: 0 0 8px #f47d7080; }
+.map-milestone-legend {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #8c928e;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.map-milestone-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.map-milestone-legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9d623f;
+}
+.map-milestone-legend i.guardian { background: #72a99d; }
+.map-milestone-legend i.boss { background: #d76660; }
+.map-card-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid #ffffff12;
+  color: #a9a28f;
+  font-size: 9px;
+}
+.map-card-rewards span:last-child { color: #869b91; }
+.map-card:focus-visible { outline: 2px solid #e4bf73; outline-offset: 2px; }
+@media (max-width: 760px) {
+  .map-card { min-height: 220px; grid-template-columns: 104px minmax(0, 1fr); grid-template-rows: 1fr; }
+  .map-art { min-height: 100%; border-right: 1px solid color-mix(in srgb, var(--tone) 52%, #303535); border-bottom: 0; padding: 8px 6px; }
+  .map-art-status { max-width: 100%; padding: 4px 5px; font-size: 8px; gap: 3px; }
+  .map-art em { right: 7px; bottom: 7px; font-size: 34px; }
+  .map-card-content { padding: 10px 9px; }
+  .map-card h3 { font-size: 16px; }
+  .map-card-heading { gap: 4px; }
+  .map-card-heading .power-state { max-width: 80px; white-space: normal; text-align: center; font-size: 7px; padding: 3px 4px; }
+  .map-monster-line { font-size: 9px !important; margin: 5px 0 !important; }
+  .map-card .map-power-row { margin-bottom: 6px; }
+  .map-card .map-power-row > span { font-size: 8px; }
+  .map-milestone-legend { gap: 5px; font-size: 8px; }
+  .map-milestone-legend span { gap: 3px; }
+  .map-card-rewards { gap: 4px 7px; margin-top: 7px; padding-top: 6px; font-size: 8px; }
 }
 .set-label {
   color: #bf9350 !important;

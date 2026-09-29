@@ -7630,6 +7630,9 @@ function Game({
                     MAP_FLOORS,
                     mapBestFloors[map.id] ?? (map.id === 1 ? 1 : 0),
                   );
+                  const reachedFloors = mapId === map.id
+                    ? Math.max(localProgress, Math.min(wave, MAP_FLOORS))
+                    : localProgress;
                   const powerState = locked
                     ? { label: "尚未解鎖", tone: "locked" }
                     : combatPower < map.power[0]
@@ -7653,36 +7656,53 @@ function Game({
                       }}
                     >
                       <div className="map-art">
-                        <span>{locked ? <LockKeyhole /> : <MapIcon />}</span>
+                        <img src={map.sceneImage} alt="" loading="lazy" />
+                        <span className="map-art-status">
+                          {locked ? <><LockKeyhole /> 尚未解鎖</> : mapId === map.id ? "正在遠征" : reachedFloors >= MAP_FLOORS ? "區域已征服" : "可前往"}
+                        </span>
                         <em>0{map.id}</em>
                       </div>
-                      <div>
-                        <small>
-                          最佳進度 {localProgress}／30 · 5/15/25F 精英 ·
-                          10/20F 守關 · 30F 首領
-                        </small>
-                        <h3>{map.name}</h3>
-                        <p>{map.monsters.slice(0, 3).join("・")}</p>
+                      <div className="map-card-content">
+                        <div className="map-card-heading">
+                          <div>
+                            <small className="map-region-label">REGION 0{map.id} · 建議等級 Lv.{map.level}</small>
+                            <h3>{map.name}</h3>
+                          </div>
+                          <b className={`power-state ${powerState.tone}`}>
+                            {powerState.label}
+                          </b>
+                        </div>
+                        <p className="map-monster-line">遭遇：{map.monsters.slice(0, 3).join("・")}</p>
                         <div className="map-power-row">
                           <span>
                             建議戰力 {map.power[0].toLocaleString()}～
                             {map.power[1].toLocaleString()}
                           </span>
-                          <b className={`power-state ${powerState.tone}`}>
-                            {powerState.label}
-                          </b>
                         </div>
-                        <span className="map-exp-label">
-                          普通怪經驗 {map.exp[0]}～{map.exp[1]} · 首領 ×12
-                        </span>
-                        <span className="map-exp-label">
-                          場景普通裝備 · 品質上限：傳奇
-                        </span>
-                        <span className="set-label">套裝系列：{map.set}</span>
+                        <div className="map-route-head">
+                          <span>{mapId === map.id ? "遠征進度" : "最佳進度"}</span>
+                          <b>{reachedFloors}<small> / {MAP_FLOORS}</small></b>
+                        </div>
+                        <div className="map-floor-track" role="img" aria-label={`${map.name}進度 ${reachedFloors}／${MAP_FLOORS} 層；精英在 5、15、25 層，守關者在 10、20 層，首領在 30 層`}>
+                          {Array.from({ length: MAP_FLOORS }, (_, index) => {
+                            const floor = index + 1;
+                            const kind = floor === 30 ? "boss" : [10, 20].includes(floor) ? "guardian" : [5, 15, 25].includes(floor) ? "elite" : "";
+                            const name = kind === "boss" ? "首領" : kind === "guardian" ? "守關者" : kind === "elite" ? "精英" : "普通層";
+                            return <i key={`${map.id}-${floor}`} className={`${floor <= reachedFloors ? "cleared" : ""} ${kind}`} title={`第 ${floor} 層・${name}`} />;
+                          })}
+                        </div>
+                        <div className="map-milestone-legend">
+                          <span><i className="elite" />精英 5・15・25</span>
+                          <span><i className="guardian" />守關 10・20</span>
+                          <span><i className="boss" />首領 30</span>
+                        </div>
+                        <span className="sr-only">5/15/25F 精英 · 10/20F 守關 · 30F 首領</span>
+                        <div className="map-card-rewards">
+                          <span>EXP {map.exp[0]}～{map.exp[1]}</span>
+                          <span>套裝・{map.set}</span>
+                          <span>場景普通裝備 · 品質上限：傳奇</span>
+                        </div>
                       </div>
-                      {mapId === map.id && (
-                        <b className="current-tag">掛機中 · 第 {wave} 層</b>
-                      )}
                     </button>
                   );
                 })}

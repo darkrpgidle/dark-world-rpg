@@ -9,15 +9,15 @@ export const classes = [
 ];
 
 const mapPresentation = [
-  { id: 1, name: "灰燼墓園", level: 1, tone: "#4f5b55", set: "守夜旅者", gearPrefix: "灰燼", monsters: ["腐骨鼠", "遊魂", "墓地守衛", "食屍鬼", "墓園騎士"] },
-  { id: 2, name: "骸骨荒原", level: 12, tone: "#6a5745", set: "骸骨獵魂", gearPrefix: "荒骨", monsters: ["骨弓手", "骸骨犬", "荒原亡兵", "咒骸", "白骨巨獸"] },
-  { id: 3, name: "黑鐵礦坑", level: 24, tone: "#475158", set: "黑鐵礦脈", gearPrefix: "黑鐵", monsters: ["礦穴蝠", "鐵殼蟲", "墮落礦工", "岩魔", "黑鐵監工"] },
-  { id: 4, name: "毒霧沼澤", level: 36, tone: "#40533f", set: "毒蛇秘儀", gearPrefix: "瘴毒", monsters: ["毒囊蛛", "泥沼屍", "瘴氣妖", "蛇人祭司", "腐沼巨鱷"] },
-  { id: 5, name: "永夜密林", level: 50, tone: "#243d35", set: "暮林獵影", gearPrefix: "暮林", monsters: ["影狼", "血鴉", "黑木精", "墮落獵人", "永夜樹妖"] },
-  { id: 6, name: "惡魔城塞", level: 64, tone: "#5a2f32", set: "惡魔征服", gearPrefix: "獄火", monsters: ["小惡魔", "獄火犬", "魅魔", "惡魔衛士", "城塞領主"] },
-  { id: 7, name: "星界廢墟", level: 76, tone: "#37345e", set: "星界飛升", gearPrefix: "星墜", monsters: ["星塵獸", "虛空眼", "失落法師", "星界守衛", "墜星巨像"] },
-  { id: 8, name: "霜火王座", level: 88, tone: "#315064", set: "霜火天命", gearPrefix: "霜焰", monsters: ["霜魂", "熔火靈", "寒焰騎士", "冰晶龍", "霜火君王"] },
-  { id: 9, name: "時墟深淵", level: 96, tone: "#4e315f", set: "時墟輪迴", gearPrefix: "時蝕", monsters: ["時蝕蟲", "裂隙幽影", "逆時行者", "輪迴衛士", "時墟主宰"] },
+  { id: 1, name: "灰燼墓園", level: 1, tone: "#4f5b55", sceneImage: "/maps/ash-graveyard.webp", set: "守夜旅者", gearPrefix: "灰燼", monsters: ["腐骨鼠", "遊魂", "墓地守衛", "食屍鬼", "墓園騎士"] },
+  { id: 2, name: "骸骨荒原", level: 12, tone: "#6a5745", sceneImage: "/maps/bone-wastes.webp", set: "骸骨獵魂", gearPrefix: "荒骨", monsters: ["骨弓手", "骸骨犬", "荒原亡兵", "咒骸", "白骨巨獸"] },
+  { id: 3, name: "黑鐵礦坑", level: 24, tone: "#475158", sceneImage: "/maps/black-iron-mine.webp", set: "黑鐵礦脈", gearPrefix: "黑鐵", monsters: ["礦穴蝠", "鐵殼蟲", "墮落礦工", "岩魔", "黑鐵監工"] },
+  { id: 4, name: "毒霧沼澤", level: 36, tone: "#40533f", sceneImage: "/maps/toxic-mire.webp", set: "毒蛇秘儀", gearPrefix: "瘴毒", monsters: ["毒囊蛛", "泥沼屍", "瘴氣妖", "蛇人祭司", "腐沼巨鱷"] },
+  { id: 5, name: "永夜密林", level: 50, tone: "#243d35", sceneImage: "/maps/evernight-forest.webp", set: "暮林獵影", gearPrefix: "暮林", monsters: ["影狼", "血鴉", "黑木精", "墮落獵人", "永夜樹妖"] },
+  { id: 6, name: "惡魔城塞", level: 64, tone: "#5a2f32", sceneImage: "/maps/demon-fortress.webp", set: "惡魔征服", gearPrefix: "獄火", monsters: ["小惡魔", "獄火犬", "魅魔", "惡魔衛士", "城塞領主"] },
+  { id: 7, name: "星界廢墟", level: 76, tone: "#37345e", sceneImage: "/maps/astral-ruins.webp", set: "星界飛升", gearPrefix: "星墜", monsters: ["星塵獸", "虛空眼", "失落法師", "星界守衛", "墜星巨像"] },
+  { id: 8, name: "霜火王座", level: 88, tone: "#315064", sceneImage: "/maps/frostfire-throne.webp", set: "霜火天命", gearPrefix: "霜焰", monsters: ["霜魂", "熔火靈", "寒焰騎士", "冰晶龍", "霜火君王"] },
+  { id: 9, name: "時墟深淵", level: 96, tone: "#4e315f", sceneImage: "/maps/timeworn-abyss.webp", set: "時墟輪迴", gearPrefix: "時蝕", monsters: ["時蝕蟲", "裂隙幽影", "逆時行者", "輪迴衛士", "時墟主宰"] },
 ] as const;
 
 export const maps = mapPresentation.map((map, index) => ({ ...map, ...balanceConfig.maps[index] }));
