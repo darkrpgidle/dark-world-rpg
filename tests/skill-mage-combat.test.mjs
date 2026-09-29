@@ -28,6 +28,7 @@ function turn(combat, skill, now, hits = [{ hit: true }], options = {}) {
   return resolveMageTurn(combat, {
     skill, now, hits, ascended: options.ascended ?? new Set(), roll: options.roll ?? (() => 1),
     equippedItems: options.equippedItems,
+    finalExplosionConfirmed: skill === "星界寂滅",
   });
 }
 
@@ -205,17 +206,29 @@ test("missile has three independent outcomes, but critical energy and overload c
   assert.deepEqual(missiles.statusApplications, []);
 });
 
-test("ultimate exposes only its total multiplier and handles an arbitrary original-hit array once", () => {
-  let combat = normalUntilReady(mage(["星界寂滅"], []), 13);
+test("astral ultimate has six 40%-share beams and one 60%-share explosion", () => {
+  const combat = normalUntilReady(mage(["星界寂滅"], []), 13);
   assert.deepEqual(combat.session.charge.ready, ["星界寂滅"]);
   assert.equal(turn(combat, "normal", 1300), null);
-  const result = turn(combat, "星界寂滅", 1300,
-    [{ hit: true, critical: true }, { hit: true, critical: true }, { hit: false }]);
+  const hits = [
+    { hit: true, critical: true }, { hit: false }, { hit: true },
+    { hit: false }, { hit: true }, { hit: false }, { hit: true },
+  ];
+  const result = turn(combat, "星界寂滅", 1300, hits, {
+    ascended: new Set(["星界寂滅"]),
+  });
   assert.equal(result.totalDamagePercent, 420);
-  assert.deepEqual(result.damageSegmentPercents, []);
+  assert.deepEqual(result.damageSegmentPercents, [28, 28, 28, 28, 28, 28, 252]);
+  assert.equal(result.ultimateCollapseStacks, 3);
+  assert.equal(result.finalExplosionDamageBonusPercent, 24);
   assert.equal(result.combat.session.charge.ultimateEnergy, 3);
   assert.deepEqual(result.combat.session.charge.ready, []);
-  assert.equal(turn(combat, "星界寂滅", 1300, []), null);
+  const finalMiss = turn(combat, "星界寂滅", 1300, [
+    ...Array.from({ length: 6 }, () => ({ hit: true })), { hit: false },
+  ], { ascended: new Set(["星界寂滅"]) });
+  assert.equal(finalMiss.ultimateCollapseStacks, 6);
+  assert.equal(finalMiss.finalExplosionDamageBonusPercent, 0);
+  assert.equal(turn(combat, "星界寂滅", 1300, hits.slice(0, 6)), null);
 });
 
 test("six successful original skill casts unlock overload; activation affects only later casts", () => {
