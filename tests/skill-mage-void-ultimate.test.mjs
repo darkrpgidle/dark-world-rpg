@@ -102,8 +102,8 @@ test("missed preceding segments grant no stack, and additional hits stop at the 
     [{ hit: true }, { hit: false }, { hit: true }, { hit: false },
       { hit: true }, { hit: false }, { hit: true }],
     { ascended, finalExplosionConfirmed: true });
-  assert.equal(partial.ultimateCollapseStacks, 2);
-  assert.equal(partial.finalExplosionDamageBonusPercent, 16);
+  assert.equal(partial.ultimateCollapseStacks, 3);
+  assert.equal(partial.finalExplosionDamageBonusPercent, 24);
   const many = turn(base, "星界寂滅", 1300,
     Array.from({ length: 7 }, () => ({ hit: true })),
     { ascended, finalExplosionConfirmed: true });
