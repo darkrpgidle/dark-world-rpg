@@ -86,7 +86,7 @@ test("six preceding hits grant six collapse stacks, applying 48% only to confirm
   const result = turn(base, "星界寂滅", 1300, hits,
     { ascended: new Set(["星界寂滅"]), finalExplosionConfirmed: true });
   assert.equal(result.totalDamagePercent, 660);
-  assert.deepEqual(result.damageSegmentPercents, []); // no invented per-segment multipliers
+  assert.deepEqual(result.damageSegmentPercents, [44, 44, 44, 44, 44, 44, 396]);
   assert.equal(result.ultimateCollapseStacks, 6);
   assert.equal(result.finalExplosionDamageBonusPercent, 48);
   assert.deepEqual(result.passiveDamageProcs, [{ id: "星界回爆", percent: 90 }]);
@@ -99,12 +99,13 @@ test("missed preceding segments grant no stack, and additional hits stop at the 
   const base = charge(mage({ 星界寂滅: 1 }), 13);
   const ascended = new Set(["星界寂滅"]);
   const partial = turn(base, "星界寂滅", 1300,
-    [{ hit: true }, { hit: false }, { hit: true }, { hit: false }, { hit: true }],
+    [{ hit: true }, { hit: false }, { hit: true }, { hit: false },
+      { hit: true }, { hit: false }, { hit: true }],
     { ascended, finalExplosionConfirmed: true });
   assert.equal(partial.ultimateCollapseStacks, 2);
   assert.equal(partial.finalExplosionDamageBonusPercent, 16);
   const many = turn(base, "星界寂滅", 1300,
-    Array.from({ length: 10 }, () => ({ hit: true })),
+    Array.from({ length: 7 }, () => ({ hit: true })),
     { ascended, finalExplosionConfirmed: true });
   assert.equal(many.ultimateCollapseStacks, 6);
   assert.equal(many.finalExplosionDamageBonusPercent, 48);
@@ -124,7 +125,7 @@ test("a missed final explosion gives no bonus or final-hit proc even if earlier 
 
 test("an unconfirmed final segment or absent ascension cannot borrow a beam hit as the explosion", () => {
   const base = charge(mage({ 星界寂滅: 1, 星界回爆: 5 }), 13);
-  const hits = [{ hit: true }, { hit: true }, { hit: true }];
+  const hits = Array.from({ length: 7 }, () => ({ hit: true }));
   const ascended = new Set(["星界寂滅"]);
   const unconfirmed = turn(base, "星界寂滅", 1300, hits, { ascended });
   assert.equal(unconfirmed.ultimateCollapseStacks, 0);
@@ -140,7 +141,8 @@ test("an unconfirmed final segment or absent ascension cannot borrow a beam hit 
 test("the final segment itself grants no stack, and every ultimate rank preserves its defined total", () => {
   for (const [index, total] of [420, 475, 530, 590, 660].entries()) {
     const base = charge(mage({ 星界寂滅: index + 1 }), 13);
-    const result = turn(base, "星界寂滅", 1300, [{ hit: true }],
+    const result = turn(base, "星界寂滅", 1300,
+      [...Array.from({ length: 6 }, () => ({ hit: false })), { hit: true }],
       { ascended: new Set(["星界寂滅"]), finalExplosionConfirmed: true });
     assert.equal(result.totalDamagePercent, total);
     assert.equal(result.ultimateCollapseStacks, 0);
