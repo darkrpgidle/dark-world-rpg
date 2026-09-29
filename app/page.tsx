@@ -4577,6 +4577,9 @@ function Game({
               (hasPerk("skill-ranger-thousand-feathers") ? 1.2 : 1);
             setBattleHits([]);
           }
+          // The live skill adapter already rolls hit and critical for every original segment.
+          // Legacy random combo segments must not multiply the same skill damage again.
+          if (liveAction) attacks = 1;
           const arcaneEchoTriggered = Boolean(
             triggered &&
               hasPerk("skill-mage-akasha-pages") &&
