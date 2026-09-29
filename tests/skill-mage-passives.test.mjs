@@ -155,11 +155,12 @@ test("final explosion echo requires an explicit final hit; two passive procs sha
     { 餘燼回響: 5, 星界回爆: 5, 奧術循環: 5 });
   combat = withStatus(combat, "burn", 0);
   combat = charge(combat, 13);
-  const hits = [{ hit: true }, { hit: true }, { hit: true }];
+  const hits = Array.from({ length: 7 }, () => ({ hit: true }));
   assert.deepEqual(turn(combat, "星界寂滅", 1300, hits, { roll: () => 0 }).passiveDamageProcs,
     [{ id: "餘燼回響", percent: 65 }]);
   assert.deepEqual(turn(combat, "星界寂滅", 1300,
-    [{ hit: true }, { hit: false }], { roll: () => 0, finalExplosionConfirmed: true }).passiveDamageProcs,
+    [...hits.slice(0, 6), { hit: false }],
+    { roll: () => 0, finalExplosionConfirmed: true }).passiveDamageProcs,
     [{ id: "餘燼回響", percent: 65 }]);
   const cast = turn(combat, "星界寂滅", 1300, hits,
     { roll: () => 0, finalExplosionConfirmed: true });
