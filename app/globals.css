@@ -1301,12 +1301,9 @@ body {
   line-height: 1;
   opacity: 0;
   animation: combo-damage 1.2s ease-out forwards;
-  animation-delay: calc(var(--hit-index) * 110ms);
+  animation-delay: var(--hit-delay, calc(var(--hit-index, 0) * 110ms));
   text-shadow: 0 2px 5px #000;
-  transform: translateX(calc((var(--hit-index) - (var(--hit-count) - 1) / 2) * 18px));
-}
-.combo-hit.volley-hit {
-  animation-delay: calc(495ms + (var(--hit-index) * 250ms));
+  transform: translateX(calc((var(--hit-index, 0) - (var(--hit-count, 1) - 1) / 2) * 18px));
 }
 .combo-hit b {
   display: block;
@@ -1361,10 +1358,10 @@ body {
   animation: critical-punch 0.48s cubic-bezier(.2,.9,.25,1.35) both;
 }
 @keyframes combo-damage {
-  0% { opacity: 0; transform: translateX(calc((var(--hit-index) - (var(--hit-count) - 1) / 2) * 18px)) translateY(12px) scale(.7); }
+  0% { opacity: 0; transform: translateX(calc((var(--hit-index, 0) - (var(--hit-count, 1) - 1) / 2) * 18px)) translateY(12px) scale(.7); }
   12% { opacity: 1; }
   72% { opacity: 1; }
-  100% { opacity: 0; transform: translateX(calc((var(--hit-index) - (var(--hit-count) - 1) / 2) * 18px)) translateY(-38px) scale(1); }
+  100% { opacity: 0; transform: translateX(calc((var(--hit-index, 0) - (var(--hit-count, 1) - 1) / 2) * 18px)) translateY(-38px) scale(1); }
 }
 @keyframes critical-punch {
   0% { transform: scale(.55) rotate(-4deg); }
@@ -5662,13 +5659,6 @@ body {
 /* Combat feedback is independent from the next attack.  Each hit owns its
    own 1.2s fade, while the status row is taken out of the HP layout on small
    screens so it can never push a health bar or a number off-canvas. */
-.boss-damage-float {
-  animation: none;
-  pointer-events: none;
-}
-.combo-hit.volley-hit {
-  animation-delay: 0ms;
-}
 .ranger-deadly-mark-frame {
   animation: none;
   backface-visibility: hidden;
@@ -5998,7 +5988,6 @@ body {
   }
   .damage-float,
   .player-damage-float,
-  .boss-damage-float,
   .enemy-damage-float,
   .player-hit-float {
     left: 50%;
@@ -6008,8 +5997,7 @@ body {
     transform-origin: top center;
   }
   .damage-float,
-  .player-damage-float,
-  .boss-damage-float {
+  .player-damage-float {
     width: min(58%, 190px);
     top: 13%;
   }
@@ -6027,9 +6015,6 @@ body {
   }
   .combo-hit small {
     font-size: 9px;
-  }
-  .volley-damage-float {
-    top: 10%;
   }
   .set-elemental-float {
     left: 68%;

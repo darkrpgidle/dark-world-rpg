@@ -1372,6 +1372,7 @@ function personalBossCombatValues({
       );
   return {
     playerDamage,
+    critical: isCritical,
     counterDamage,
     bossAttackSpeed: profile.speed * 100,
     playerHitChance,
@@ -2002,11 +2003,6 @@ function Game({
     key: number;
     shotCount: number;
   }[]>([]);
-  const [rangerWindVolleyDamage, setRangerWindVolleyDamage] = useState<{
-    key: number;
-    hits: { damage: number; critical: boolean }[];
-    visible: number;
-  }[]>([]);
   const [deadlyMarkEffect, setDeadlyMarkEffect] = useState<{
     key: number;
     detonationKey: number | null;
@@ -2116,7 +2112,7 @@ function Game({
   >([]);
   const [battleHitGroups, setBattleHitGroups] = useState<{
     key: number;
-    hits: { damage: number; critical: boolean }[];
+    hits: { damage: number; critical: boolean; delayMs?: number }[];
   }[]>([]);
   const [setElementalHits, setSetElementalHits] = useState<{
     key: number;
@@ -2249,7 +2245,6 @@ function Game({
   bossPlayerHpRef.current = bossPlayerHp;
   const [lastBossDamage, setLastBossDamage] = useState(0);
   const [lastBossCounterDamage, setLastBossCounterDamage] = useState(0);
-  const [bossDamageGroups, setBossDamageGroups] = useState<{ key: number; damage: number }[]>([]);
   const [bossOutcome, setBossOutcome] = useState<"win" | "loss" | "timeout" | null>(null);
   const [abyssBossEffect, setAbyssBossEffect] = useState<{ key: number } | null>(null);
   const [abyssImpactPulse, setAbyssImpactPulse] = useState(false);
@@ -4863,23 +4858,20 @@ function Game({
                   windVolleyTriggered ? 1_800 : 1_200);
               }
               if (windVolleyTriggered) {
-                setRangerWindVolleyDamage((current) => [
-                  ...current.filter((volley) => volley.key !== next),
+                const groupKey = next;
+                setBattleHitGroups((current) => [
+                  ...current,
                   {
-                    key: next,
-                    hits: hitDamages.map((damage, index) => ({ damage, critical: windVolleyCriticals[index] ?? false })),
-                    visible: 0,
+                    key: groupKey,
+                    hits: hitDamages.map((damage, index) => ({
+                      damage,
+                      critical: windVolleyCriticals[index] ?? false,
+                      delayMs: 495 + index * 250,
+                    })),
                   },
                 ]);
-                windVolleyCriticals.forEach((_, index) => {
-                  window.setTimeout(() => {
-                    setRangerWindVolleyDamage((current) => current.map((volley) =>
-                      volley.key === next ? { ...volley, visible: Math.max(volley.visible, index + 1) } : volley,
-                    ));
-                  }, 495 + index * 250);
-                });
                 window.setTimeout(() => {
-                  setRangerWindVolleyDamage((current) => current.filter((volley) => volley.key !== next));
+                  setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey));
                 }, 495 + (windVolleyCriticals.length - 1) * 250 + 1_200);
               } else {
                 const groupKey = next;
@@ -5564,7 +5556,6 @@ function Game({
     setBossPlayerHp(100);
     setLastBossDamage(0);
     setLastBossCounterDamage(0);
-    setBossDamageGroups([]);
     abyssBossSequenceRef.current += 1;
     bossCinematicLockRef.current = false;
     bossRoundEndedRef.current = false;
@@ -5770,9 +5761,9 @@ function Game({
             setWorldRoundDamage((value) => value + burnSettlement.actualDamage);
             setLastBossDamage(burnSettlement.actualDamage);
             const burnKey = Date.now();
-            setBossDamageGroups((current) => [...current, { key: burnKey, damage: burnSettlement.actualDamage }]);
+            setBattleHitGroups((current) => [...current, { key: burnKey, hits: [{ damage: burnSettlement.actualDamage, critical: false }] }]);
             window.setTimeout(() => {
-              setBossDamageGroups((current) => current.filter((group) => group.key !== burnKey));
+              setBattleHitGroups((current) => current.filter((group) => group.key !== burnKey));
             }, 1_200);
           }
           if (burnSettlement.defeated) return;
@@ -6088,7 +6079,7 @@ function Game({
           const publishBossDamage = () => {
             setLastBossDamage(playerDamage);
             const groupKey = Date.now();
-            setBossDamageGroups((current) => [...current, { key: groupKey, damage: shownBossMain }]);
+            if (shownBossMain > 0) setBattleHitGroups((current) => [...current, { key: groupKey, hits: [{ damage: shownBossMain, critical: liveAction?.critical ?? bossValues.critical }] }]);
             const elementalHits = [
               ...(shownBossElemental > 0 ? [{ damage: shownBossElemental, label: "元素" }] : []),
               ...(shownBossResonance > 0 ? [{ damage: shownBossResonance, label: "元素爆發" }] : []),
@@ -6101,7 +6092,7 @@ function Game({
             if (elementalHits.length)
               setSetElementalHits((current) => [...current, { key: groupKey, hits: elementalHits, volley: false }]);
             window.setTimeout(() => {
-              setBossDamageGroups((current) => current.filter((group) => group.key !== groupKey));
+              setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey));
               setSetElementalHits((current) => current.filter((group) => group.key !== groupKey));
             }, 1_200);
           };
@@ -7119,63 +7110,32 @@ function Game({
                         variant={effect.variant}
                       />
                     ))}
-                    {(activeBossBattle
-                      ? bossDamageGroups.length > 0
-                      : battleHitGroups.length > 0 || rangerWindVolleyDamage.length > 0) && (
+                    {battleHitGroups.length > 0 && (
                       <div
-                        className={`damage-float ${activeBossBattle ? "boss-damage-float" : "player-damage-float"} ${skillEffect?.name === "隕星術" ? "meteor-damage-float" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-damage-float" : ""}`}
+                        className={`damage-float player-damage-float ${skillEffect?.name === "隕星術" ? "meteor-damage-float" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-damage-float" : ""}`}
                       >
-                        {activeBossBattle ? (
-                          bossDamageGroups.map((group) => (
-                            <div key={`boss-damage-sequence-${group.key}`} className="damage-sequence">
-                              <div className="combo-hit boss-combo-hit">
-                                <b>首領 -{group.damage}</b>
+                        {battleHitGroups.map((group) => (
+                          <div key={`damage-sequence-${group.key}`} className="damage-sequence">
+                            {group.hits.filter((hit) => hit.damage > 0).map((hit, index) => (
+                              <div
+                                key={`${group.key}-${index}`}
+                                className={`combo-hit ${hit.critical ? "critical-hit" : ""}`}
+                                style={{
+                                  "--hit-index": index,
+                                  "--hit-count": group.hits.length,
+                                  "--hit-delay": `${hit.delayMs ?? index * 110}ms`,
+                                } as React.CSSProperties}
+                              >
+                                {hit.critical && index === 0 && <small>暴擊!</small>}
+                                <b>-{hit.damage.toLocaleString()}</b>
                               </div>
-                            </div>
-                          ))
-                        ) : battleHitGroups.length > 0 ? (
-                          battleHitGroups.map((group) => (
-                            <div key={`damage-sequence-${group.key}`} className="damage-sequence">
-                              {group.hits.filter((hit) => hit.damage > 0).map((hit, index) => (
-                                <div
-                                  key={`${group.key}-${index}`}
-                                  className={`combo-hit ${hit.critical ? "critical-hit" : ""}`}
-                                  style={{
-                                    "--hit-index": index,
-                                    "--hit-count": group.hits.length,
-                                  } as React.CSSProperties}
-                                >
-                                  {hit.critical && index === 0 && <small>暴擊!</small>}
-                                  <b>-{hit.damage.toLocaleString()}</b>
-                                </div>
-                              ))}
-                            </div>
-                          ))
-                        ) : null}
-                      </div>
-                    )}
-                    {!activeBossBattle && rangerWindVolleyDamage.map((volley) => (
-                      <div
-                        key={`volley-damage-${volley.key}`}
-                        className="damage-float player-damage-float volley-damage-float"
-                      >
-                        {volley.hits.slice(0, volley.visible).map((hit, index) => hit.damage > 0 && (
-                          <div
-                            key={`${volley.key}-${index}`}
-                            className={`combo-hit volley-hit ${hit.critical ? "critical-hit" : ""}`}
-                            style={{
-                              "--hit-index": index,
-                              "--hit-count": volley.hits.length,
-                            } as React.CSSProperties}
-                          >
-                            {hit.critical && index === 0 && <small>暴擊!</small>}
-                            <b>-{hit.damage.toLocaleString()}</b>
+                            ))}
                           </div>
                         ))}
                       </div>
-                    ))}
+                    )}
                     {dotDamageGroups.map((event) => (
-                      <div key={`dot-damage-${event.key}`} className={`damage-float dot-damage-float ${activeBossBattle ? "boss-damage-float" : "player-damage-float"}`}>
+                      <div key={`dot-damage-${event.key}`} className="damage-float player-damage-float dot-damage-float">
                         <div className="combo-hit dot-damage-hit">
                           <small>{event.kind === "bleed" ? "流血" : "灼燒"}</small>
                           <b>-{event.damage.toLocaleString()}</b>

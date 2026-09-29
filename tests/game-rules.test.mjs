@@ -523,10 +523,18 @@ test("uses the confirmed monster drop quality distribution", () => {
   assert.doesNotMatch(battleDropBody, /roll > 0\.18/);
 });
 
-test("displays player and monster damage as matching raw numbers", () => {
-  assert.match(page, /bossDamageGroups\.map/);
-  assert.match(page, /<b>首領 -\{group\.damage\}<\/b>/);
-  assert.match(page, /`-\$\{enemyHitFeedback\.damage\}`/);
+test("displays player and monster damage through one shared raw-number model", () => {
+  const sharedDamageFloat = page.slice(
+    page.indexOf("{battleHitGroups.length > 0 && ("),
+    page.indexOf("{dotDamageGroups.map"),
+  );
+  assert.match(sharedDamageFloat, /damage-float player-damage-float/);
+  assert.match(sharedDamageFloat, /battleHitGroups\.map/);
+  assert.doesNotMatch(sharedDamageFloat, /activeBossBattle|boss-damage-float/);
+  assert.match(page, /hits: \[\{ damage: shownBossMain, critical: liveAction\?\.critical \?\? bossValues\.critical \}\]/);
+  assert.match(page, /critical: isCritical,/);
+  assert.doesNotMatch(page, /bossDamageGroups|rangerWindVolleyDamage|boss-combo-hit|volley-damage-float/);
+  assert.match(page, /enemyHitFeedback\.damage/);
   assert.match(page, /對首領造成 \$\{playerDamage\} 傷害/);
   assert.doesNotMatch(page, /首領 -\{lastBossDamage\}%/);
   assert.doesNotMatch(page, /enemyHitFeedback\.damage\}%/);
@@ -541,7 +549,6 @@ test("keeps skill cards and battle information unambiguous", () => {
   assert.match(skillConstellationSource, /getContext\("webgl"/);
   assert.doesNotMatch(page, /目前戰鬥使用的技能/);
   assert.match(page, /遠征祝福不會在首領戰生效/);
-  assert.match(page, /首領 -\{group\.damage\}/);
   assert.match(page, /enemyHitFeedback\.damage/);
   assert.match(page, /離線掛機收益/);
   assert.match(page, /本次遠征戰利品/);
