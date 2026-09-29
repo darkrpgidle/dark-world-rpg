@@ -433,6 +433,17 @@ test("softens the tenth-floor attack checkpoints on every map", () => {
   assert.ok(boss30.progressionDamageFloor > normal10.progressionDamageFloor);
 });
 
+test("world boss deals one damage per hit at 1.25 attacks per second", () => {
+  assert.deepEqual(balanceConfig.combat.worldBoss, {
+    damagePerHit: 1,
+    attacksPerSecond: 1.25,
+  });
+  assert.equal(100000 / (balanceConfig.combat.worldBoss.attacksPerSecond * 100), 800);
+  assert.match(page, /const bossActs = bossClock >= bossInterval/);
+  assert.match(page, /activeBossBattle\.mode === "world"\s*\?\s*balanceConfig\.combat\.worldBoss\.damagePerHit/);
+  assert.match(page, /const executionDamage = 999_999/);
+});
+
 test("keeps equipment attack from being multiplied a second time", () => {
   const towerCall = page.slice(
     page.indexOf("const combatValues = towerCombatValues({"),
@@ -738,7 +749,7 @@ test("shows the same damage that is removed from the monster's real hp", () => {
   assert.equal(healthFromPercent(0.00001, 1394), 1);
   assert.match(page, /monsterProfile\(currentEnemyBaseName\)/);
   assert.match(page, /monsterName: currentEnemyBaseName/);
-  assert.match(page, /monsterProfile\(bossMonsterName\)/);
+  assert.match(page, /monsterName: bossMonsterName/);
   assert.deepEqual(settleCombatHealth(40, 17050, 1023), {
     actualDamage: 1023, percentDamage: 6, remainingPercent: 34, defeated: false,
   });
@@ -766,7 +777,7 @@ test("stops tower combat on the lethal frame", () => {
   assert.doesNotMatch(page, /finishRun\("death", wave\), 120/);
   assert.match(page, /if \(savedPlayerHp <= 0\)/);
   assert.equal((page.match(/settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/g) ?? []).length, 2);
-  assert.equal((page.match(/settleCombatHealth\(hp, characterStats\.hp, bossDamage\)/g) ?? []).length, 2);
+  assert.equal((page.match(/settleCombatHealth\(hp, characterStats\.hp, bossDamage\)/g) ?? []).length, 1);
   assert.equal(settleCombatHealth(0.00001, 1394, 1).remainingPercent, 0);
 });
 

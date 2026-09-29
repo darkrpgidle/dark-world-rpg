@@ -2295,7 +2295,6 @@ function Game({
   const bossMarkedRemainingRef = useRef(0);
   const bossMarkExplosionPendingRef = useRef(false);
   const worldBossBurnRef = useRef({ until: 0, nextAt: 0, damagePerSecond: 0 });
-  const abyssBossAttackCountRef = useRef(0);
   const abyssBossSequenceRef = useRef(0);
   const bossCinematicLockRef = useRef(false);
   const bossRoundEndedRef = useRef(false);
@@ -5566,7 +5565,6 @@ function Game({
     setLastBossDamage(0);
     setLastBossCounterDamage(0);
     setBossDamageGroups([]);
-    abyssBossAttackCountRef.current = 0;
     abyssBossSequenceRef.current += 1;
     bossCinematicLockRef.current = false;
     bossRoundEndedRef.current = false;
@@ -5645,9 +5643,9 @@ function Game({
     const bossMonsterName = baseMonsterName(activeBossBattle.name);
     // 個人首領採固定節奏，避免沿用各怪物原始攻速而造成首領間的壓力落差。
     // 殘影：每秒 1 次；真身：每秒 1.25 次（每 0.8 秒一次）。
-    const bossAttackSpeed = activeBossBattle.mode === "personal"
-      ? (activeBossBattle.name.endsWith("・真身") ? 125 : 100)
-      : monsterProfile(bossMonsterName).speed * 100;
+    const bossAttackSpeed = activeBossBattle.mode === "world"
+      ? balanceConfig.combat.worldBoss.attacksPerSecond * 100
+      : activeBossBattle.name.endsWith("・真身") ? 125 : 100;
     let playerClock = 0;
     let bossClock = 0;
     let bossSkillCooldown = 0;
@@ -5782,14 +5780,10 @@ function Game({
         const playerInterval = 100000 / Math.max(1, combatAttackSpeed);
         const bossInterval = 100000 / bossAttackSpeed;
         const playerActs = playerClock >= playerInterval;
-        // 世界首領只保留倒數結束時的專屬必殺技，不進行普通攻擊或反擊。
-        const bossActs = activeBossBattle.mode !== "world" && bossClock >= bossInterval;
+        const bossActs = bossClock >= bossInterval;
         if (!playerActs && !bossActs) return;
         if (playerActs) playerClock %= playerInterval;
-        if (bossActs) {
-          bossClock %= bossInterval;
-          abyssBossAttackCountRef.current += 1;
-        }
+        if (bossActs) bossClock %= bossInterval;
         const next = Date.now();
         setBattlePulse((value) => value + 1);
         setEnemyHitFeedback(null);
@@ -6052,13 +6046,10 @@ function Game({
           setWorldDamage((value) => value + playerDamage);
           setWorldRoundDamage((value) => value + playerDamage);
         }
-        const abyssSpecialReady =
-          bossActs &&
-          activeBossBattle.mode === "world" &&
-          activeBossBattle.name === "深淵王" &&
-          abyssBossAttackCountRef.current % 6 === 0;
         const calculatedBossDamage = bossActs
-          ? Math.round(bossValues.counterDamage * (abyssSpecialReady ? 1.6 : 1))
+          ? activeBossBattle.mode === "world"
+            ? balanceConfig.combat.worldBoss.damagePerHit
+            : Math.round(bossValues.counterDamage)
           : 0;
         let bossDamage = Math.min(
           healthFromPercent(bossPlayerHpRef.current, characterStats.hp),
@@ -6091,7 +6082,7 @@ function Game({
           setEnemyHitFeedback({ damage: playerDamage, dodged: playerDamage <= 0, key: next });
           setMissFeedback(playerDamage <= 0 ? next : null);
         }
-        if (bossActs && !abyssSpecialReady)
+        if (bossActs)
           setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
         if (playerActs) {
           const publishBossDamage = () => {
@@ -6136,49 +6127,7 @@ function Game({
             bossPlayerHpRef.current = nextHealth;
             return nextHealth;
           });
-        const abyssSpecialTriggered = abyssSpecialReady && !bossRoundEndedRef.current;
-        if (bossActs && !abyssSpecialTriggered)
-          setLastBossCounterDamage(bossRoundEndedRef.current ? 0 : bossDamage);
-        if (abyssSpecialTriggered) {
-          const sequence = ++abyssBossSequenceRef.current;
-          bossCinematicLockRef.current = true;
-          setAbyssBossEffect({ key: next });
-          setCausePrompt("深淵王撕開界縫——萬觸葬界正在收束");
-          window.setTimeout(() => {
-            if (abyssBossSequenceRef.current !== sequence) return;
-            setAbyssImpactPulse(true);
-            window.setTimeout(() => setAbyssImpactPulse(false), 520);
-            setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
-            setLastBossCounterDamage(bossDamage);
-            setBossPlayerHp((hp) => {
-              const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
-              if (healthSettlement.defeated) {
-                if (bossRoundEndedRef.current) return hp;
-                bossRoundEndedRef.current = true;
-                worldBossDeadlineRef.current = null;
-                setBossOutcome("loss");
-                setBattleReport([
-                  "深淵裂縫從四方張開，萬觸同時收束。",
-                  `萬觸葬界造成 ${bossDamage.toLocaleString()} 傷害。`,
-                  "本次造成的累積傷害已列入今日世界排行。",
-                ]);
-                pushLog("首領", `挑戰 ${activeBossBattle.name} 失敗`);
-                bossPlayerHpRef.current = 0;
-                return 0;
-              }
-              const nextHp = healthSettlement.remainingPercent;
-              bossPlayerHpRef.current = nextHp;
-              return nextHp;
-            });
-            setCausePrompt(`萬觸葬界命中 → 造成 ${bossDamage.toLocaleString()} 傷害`);
-          }, 1_030);
-          window.setTimeout(() => {
-            if (abyssBossSequenceRef.current !== sequence) return;
-            bossCinematicLockRef.current = false;
-            setAbyssBossEffect(null);
-          }, 2_200);
-        }
-        if (bossActs && !abyssSpecialTriggered) setBossPlayerHp((hp) => {
+        if (bossActs) setBossPlayerHp((hp) => {
           if (bossRoundEndedRef.current) return hp;
           const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
           if (healthSettlement.defeated) {
@@ -6202,9 +6151,7 @@ function Game({
           return nextHp;
         });
         setCausePrompt(
-          abyssSpecialTriggered
-            ? "深淵王撕開界縫——萬觸葬界正在收束"
-            : playerActs && playerDamage > 0
+          playerActs && playerDamage > 0
             ? `玩家攻擊 → 對首領造成 ${playerDamage} 傷害${bossActs ? `・首領反擊 ${bossDamage} 傷害` : ""}`
             : playerActs
               ? `玩家攻擊落空${bossActs ? `・首領反擊 ${bossDamage} 傷害` : ""}`
@@ -6245,7 +6192,6 @@ function Game({
   const leaveBossBattle = () => {
     resetCombatPerks();
     abyssBossSequenceRef.current += 1;
-    abyssBossAttackCountRef.current = 0;
     bossCinematicLockRef.current = false;
     bossRoundEndedRef.current = true;
     worldBossDeadlineRef.current = null;

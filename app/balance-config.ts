@@ -202,6 +202,8 @@ export const balanceConfig = {
     // 新版裝備最多 5 條詞綴，降低高階敵人倍率，避免戰鬥詞綴削減後難度失控。
     tierDefense: { normal: 1, elite: 1.18, guardian: 1.38, boss: 1.62 },
     tierAttack: { normal: 1, elite: 1.15, guardian: 1.5, boss: 1.72 },
+    // 世界首領每次普通攻擊固定造成 1 點傷害，攻擊頻率獨立設定。
+    worldBoss: { damagePerHit: 1, attacksPerSecond: 1.25 },
     // 後段地圖對玩家造成的總傷害減免，地圖 1 為 0%，地圖 9 為 9%。
     monsterDamageReductionByMap: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     // 玩家戰力低於當前樓層需求時，依戰力比施加境界壓制。
