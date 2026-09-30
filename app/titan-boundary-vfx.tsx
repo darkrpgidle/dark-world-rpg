@@ -40,12 +40,15 @@ function createProgram(gl: WebGLRenderingContext) {
     uniform float u_opacity;
     varying vec2 v_uv;
     void main() {
-      vec2 uv = vec2((u_frame.x + v_uv.x) / 4.0, (u_frame.y + v_uv.y) / 2.0);
+      vec2 cellOrigin = vec2(u_frame.x / 4.0, u_frame.y / 2.0);
+      vec2 cellSize = vec2(0.25, 0.5);
       vec2 warp = vec2(
         sin(u_time * 10.0 + v_uv.y * 18.0),
         cos(u_time * 8.0 + v_uv.x * 15.0)
       ) * (0.0015 + u_impact * 0.003);
-      vec4 base = texture2D(u_sheet, uv + warp);
+      vec2 localUv = clamp(v_uv + warp, u_texel * 0.5 / cellSize, vec2(1.0) - u_texel * 0.5 / cellSize);
+      vec2 uv = cellOrigin + localUv * cellSize;
+      vec4 base = texture2D(u_sheet, uv);
       vec2 stepUv = u_texel * 1.35;
       float halo = max(max(texture2D(u_sheet, uv + vec2(stepUv.x, 0.0)).a,
                            texture2D(u_sheet, uv - vec2(stepUv.x, 0.0)).a),
@@ -87,7 +90,7 @@ function frameBounds(frameIndex: number, playerX: number, playerY: number, enemy
   const moving = frameIndex === 2;
   const followThrough = frameIndex === 5 || frameIndex === 6;
   const centerX = moving
-    ? playerX + (enemyX - playerX) * Math.min(1, Math.max(0, (progress - 0.25) / 0.2))
+    ? playerX + (enemyX - playerX) * Math.min(1, Math.max(0, (progress - 0.25) / 0.125))
     : frameIndex < 2
       ? playerX
       : followThrough
