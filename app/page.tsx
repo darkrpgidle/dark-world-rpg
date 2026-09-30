@@ -120,6 +120,7 @@ import {
   type SocketedGem,
 } from "./gem-system";
 import { SkillEffectCanvas } from "./skill-effect-canvas";
+import { TitanBoundaryVfx } from "./titan-boundary-vfx";
 import { SkillReworkPanel } from "./skill-rework-panel";
 import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoints, type SkillBuild } from "./skill-rework";
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
@@ -7088,7 +7089,9 @@ function Game({
                     {abyssBossEffect && activeBossBattle?.name === "深淵王" && (
                       <DeepAbyssBossVfx effectKey={abyssBossEffect.key} />
                     )}
-                    {skillVisualEffects.map((effect) => (
+                    {skillVisualEffects.map((effect) => normalizeCombatEffectName(effect.name) === "泰坦斷界斬" ? (
+                      <TitanBoundaryVfx key={`${effect.name}-${effect.key}`} effectKey={effect.key} />
+                    ) : (
                       <SkillEffectCanvas key={`${effect.name}-${effect.key}`} name={effect.name} effectKey={effect.key} />
                     ))}
                     {groundSplitEffect && (
