@@ -4120,6 +4120,17 @@ body {
   pointer-events: none;
   overflow: hidden;
 }
+
+.battle-stage:has(.titan-boundary-vfx-canvas) { overflow: visible; }
+.titan-boundary-vfx-canvas {
+  position: absolute;
+  inset: -10% -12%;
+  width: 124%;
+  height: 120%;
+  z-index: 7;
+  pointer-events: none;
+}
+
 .skill-effect-canvas {
   position: absolute;
   inset: 0;
