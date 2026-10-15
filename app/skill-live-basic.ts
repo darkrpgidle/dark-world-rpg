@@ -50,3 +50,4 @@ export function finishLiveBasicAttack(battle: LiveBasicBattle, cast: LiveBasicCa
     kind: cast ? "skill" : "normal", hits: [{ hit, critical: hit && critical }],
   });
 }
+

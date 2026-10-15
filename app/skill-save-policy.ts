@@ -1,5 +1,6 @@
+import {finalizePendingRebirth} from "./rebirth-save";
 import {
-  createSkillBuild, earnedSkillPoints, equipActiveSkill, restoreSkillBuild, upgradeSkill,
+  createSkillBuild, equipActiveSkill, restoreSkillBuild, upgradeSkill,
   type SkillBuild, type SkillClass,
 } from "./skill-rework";
 import {
@@ -8,6 +9,7 @@ import {
 } from "./skill-ascensions";
 import { preserveLegacyRebirthCount } from "./legacy-rebirth-storage";
 import { balanceConfig } from "./balance-config";
+import { MAX_REBIRTHS, clampRebirthCount } from "./rebirth-config";
 
 export const SKILL_REWORK_SAVE_VERSION = 2;
 const MAX_RECENT_SKILL_ACTION_IDS = 256;
@@ -61,15 +63,15 @@ export function preserveServerSkillSave(
   });
   if (!canonical) return null;
   if (server && incoming.playerClass !== server.playerClass) return null;
-  return preserveLegacyRebirthCount({ ...incoming, ...canonical,
-    // Legacy point purchases must never reactivate after the new skill page goes live.
-    skills: Array.isArray(incoming.skills) ? incoming.skills.map((skill) =>
-      skill && typeof skill === "object" ? { ...skill, level: 0 } : skill) : [],
-    skillPoints: earnedSkillPoints(Number(incoming.level ?? server?.level)),
+  const next = preserveLegacyRebirthCount({ ...incoming, ...canonical,
+    rebirthCount: clampRebirthCount(incoming.rebirthCount),
     _paidSkillResetActionIds: server && Array.isArray(server._paidSkillResetActionIds)
       ? server._paidSkillResetActionIds : [],
     _skillActionIds: server && Array.isArray(server._skillActionIds) ? server._skillActionIds : [],
   }, server);
+  delete next.skills;
+  delete next.skillPoints;
+  return next;
 }
 
 export function applySkillSaveAction(
@@ -114,27 +116,29 @@ export function applySkillSaveAction(
     }
     case "begin_rebirth": {
       const floors = save.mapBestFloors as Record<string, unknown> | undefined;
-      if (Number(floors?.[9]) < 30 || typeof save.rebirthCount !== "number" || !Number.isInteger(save.rebirthCount) ||
-          Number(save.rebirthCount) < 0 || Number(save.rebirthCount) >= 20) return null;
+      if (!Number.isSafeInteger(floors?.[9]) || Number(floors?.[9]) < 30 || typeof save.rebirthCount !== "number" || !Number.isInteger(save.rebirthCount) ||
+          Number(save.rebirthCount) < 0 || Number(save.rebirthCount) >= MAX_REBIRTHS) return null;
       if (save._lastSkillRebirthLegacyCount === save.rebirthCount) return null;
       const next = beginSkillRebirth(ascensions, characterClass, level);
       if (next) {
         build = next.build;
         ascensions = next.ascensions;
-      } else if (level === 100 && ascensions.rebirthCount === 5 && !ascensions.selectionOpen) {
-        // The legacy game still permits rebirths 6–20 until the new restart.
-        build = createSkillBuild();
       } else return null;
       break;
     }
     default:
       return null;
   }
-  return { ...save, skillReworkVersion: SKILL_REWORK_SAVE_VERSION, skillReworkBuild: build,
-    skills: Array.isArray(save.skills) ? save.skills.map((skill) =>
-      skill && typeof skill === "object" ? { ...skill, level: 0 } : skill) : [],
-    skillPoints: earnedSkillPoints(level), skillAscensions: ascensions,
+  const next: Record<string, unknown> = { ...save, skillReworkVersion: SKILL_REWORK_SAVE_VERSION, skillReworkBuild: build,
+    skillAscensions: ascensions,
     ...(action.kind === "begin_rebirth" ? { _lastSkillRebirthLegacyCount: save.rebirthCount } : {}) };
+  delete next.skills;
+  delete next.skillPoints;
+  if(action.kind === "begin_rebirth"){
+    const reborn=finalizePendingRebirth(next);
+    return reborn===next?null:reborn;
+  }
+  return next;
 }
 
 

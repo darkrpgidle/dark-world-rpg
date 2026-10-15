@@ -1,12 +1,12 @@
 // Mage rework, stage 18: ranked data and isolated overload/exhaustion rules.
-// No live combat wiring. Activation charge remains owned by skill-combat-queue.
+// Shared by live tower and boss combat; activation charge belongs to the queue.
 import { balanceConfig } from "./balance-config";
 
 const mage = balanceConfig.skillRework.mage;
 
 export const MAGE_ACTIVE_RULES = {
   霜火新星: { category: "basic", ...mage.active.霜火新星, ascension: "極炎霜爆" },
-  奧術飛彈: { category: "basic", ...mage.active.奧術飛彈, ascension: "星環共鳴" },
+  閃電鏈: { category: "basic", ...mage.active.閃電鏈, ascension: "雷環共鳴" },
   魔力護盾: { category: "defense", ...mage.active.魔力護盾, ascension: "星界屏障" },
   元素蝕印: { category: "status", ...mage.active.元素蝕印, ascension: "混沌刻印" },
   隕星術: { category: "burst", ...mage.active.隕星術, ascension: "天火墜星" },
@@ -29,7 +29,7 @@ export function mageSkillRankValue(values: readonly number[], rank: number): num
 export type MageOverloadState =
   | { phase: "idle" }
   | { phase: "overloaded"; rank: number; ascended: boolean; remainingSuccessfulCasts: number; stabilityStacks: number }
-  | { phase: "exhausted"; basePenaltyPercent: number };
+  | { phase: "exhausted"; basePenaltyPercent: number; expiresAt?: number };
 
 export type MageOverloadEvent = {
   // One complete cast with original segments only; follow-up damage is separate.
@@ -65,20 +65,20 @@ export function addMageOverloadStability(state: MageOverloadState, stacks: numbe
 
 export function mageExhaustionPenaltyPercent(state: MageOverloadState, controlRank = 0): number {
   const reduction = controlRank === 0 ? 0
-    : mageSkillRankValue(MAGE_PASSIVE_RULES.枯竭控制.exhaustionReductionPoints, controlRank);
-  return state.phase === "exhausted" ? Math.max(0, state.basePenaltyPercent - reduction) : 0;
+    : mageSkillRankValue(MAGE_PASSIVE_RULES.枯竭控制.exhaustionReductionPercent, controlRank);
+  return state.phase === "exhausted" ? Math.max(0, state.basePenaltyPercent * (1 - reduction / 100)) : 0;
 }
 
 export function consumeMageOverload(
-  state: MageOverloadState, event: MageOverloadEvent, controlRank = 0,
+  state: MageOverloadState, event: MageOverloadEvent, controlRank = 0, now = 0,
 ): { state: MageOverloadState; skillEfficiencyBonusPercent: number; skillDamagePenaltyPercent: number } {
   // Effects describe this cast; returned state describes the next cast.
+  state = advanceMageOverload(state, now);
   const penalty = mageExhaustionPenaltyPercent(state, controlRank);
   if (event.kind !== "skill") return { state, skillEfficiencyBonusPercent: 0, skillDamagePenaltyPercent: 0 };
   if (state.phase !== "overloaded") return { state, skillEfficiencyBonusPercent: 0, skillDamagePenaltyPercent: penalty };
 
-  // Keep efficiency distinct from damage, charge and status chance until its
-  // exact meaning is specified. A caller must not apply it to all three.
+  // Overload scales direct skill damage and abnormal effect strength, never charge or proc chance.
   const skillEfficiencyBonusPercent = mageSkillRankValue(MAGE_ACTIVE_RULES.奧術超載.skillEfficiencyBonus, state.rank);
   if (!event.hits.some((segment) => segment.hit)) {
     return { state, skillEfficiencyBonusPercent, skillDamagePenaltyPercent: 0 };
@@ -88,15 +88,18 @@ export function consumeMageOverload(
   const next: MageOverloadState = remainingSuccessfulCasts > 0
     ? { ...state, remainingSuccessfulCasts }
     : {
-      phase: "exhausted",
+      phase: "exhausted", expiresAt: now + balanceConfig.skillRework.abnormalities.exhaustionSeconds * 1000,
       basePenaltyPercent: state.ascended && state.stabilityStacks >= rule.stabilityStacksRequired
         ? rule.stableExhaustionPenalty : rule.exhaustionPenalty,
     };
   return { state: next, skillEfficiencyBonusPercent, skillDamagePenaltyPercent: 0 };
 }
 
-// No invented seconds/actions for exhaustion. Only an explicit caller decision
-// can clear it; the final integration must define when this event is emitted.
+export function advanceMageOverload(state: MageOverloadState, now: number): MageOverloadState {
+  return state.phase === "exhausted" && state.expiresAt !== undefined && now >= state.expiresAt ? createMageOverload() : state;
+}
+// Explicit reset remains available at combat boundaries.
 export function clearMageExhaustion(state: MageOverloadState): MageOverloadState {
   return state.phase === "exhausted" ? createMageOverload() : state;
 }
+

@@ -1,6 +1,8 @@
+import { affectedRows } from "../d1-write-result";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { accounts, sessions } from "../../db/schema";
+import { sessionReplacement } from "../auth-session-plan";
 import { MAINTENANCE_MODE } from "../maintenance";
 
 export const SESSION_COOKIE = "dark_world_session";
@@ -136,14 +138,10 @@ export async function createSession(accountId: string, loginId: string) {
   const token = bytesToBase64(crypto.getRandomValues(new Uint8Array(32)));
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   const db = await getDb();
-  // 一個帳號只保留最新登入環境；新的登入會讓舊視窗的 session 失效。
-  await db.delete(sessions).where(eq(sessions.accountId, accountId));
-  await db.insert(sessions).values({
-    tokenHash: await digest(token),
-    accountId,
-    loginId,
-    expiresAt,
-  });
+  // D1 batches are atomic: concurrent logins cannot interleave delete/insert.
+  const plan=sessionReplacement(accountId,await digest(token),loginId,expiresAt);
+  const results=await db.$client.batch(plan.map(s=>db.$client.prepare(s.sql).bind(...s.bindings)));
+  if(results[1]?.meta?.changes!==1)throw new Error("account_unavailable");
   return { token, expiresAt };
 }
 
@@ -161,7 +159,7 @@ export async function deleteSession(request: Request) {
     eq(sessions.tokenHash, await digest(token)),
     eq(sessions.loginId, loginId),
   ));
-  return (result.rowsAffected ?? 0) === 1;
+  return affectedRows(result) === 1;
 }
 
 export function normalizeUsername(value: string) {

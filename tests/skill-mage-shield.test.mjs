@@ -21,8 +21,8 @@ function mage(ranks, slots = []) {
   for (const [index, name] of slots.entries()) build = equipActiveSkill(build, "法師", 100, index, name);
   return createMageCombat(build, 100);
 }
-function activate(combat, currentHealth = 500, ascended = false, maxHealthBeforeMagePassive = 1000) {
-  return tryActivateMageShield(combat, { currentHealth, maxHealthBeforeMagePassive, ascended });
+function activate(combat, currentHealth = 500, ascended = false, maxHealth = 1000) {
+  return tryActivateMageShield(combat, { currentHealth, maxHealth, ascended });
 }
 function turn(combat, skill, now, hits = [{ hit: true }], equippedItems = []) {
   return resolveMageTurn(combat, { skill, hits, now, ascended: new Set(), roll: () => 1, equippedItems });
@@ -59,17 +59,46 @@ test("all five shield ranks scale from the current effective maximum health", ()
   }
 });
 
-test("astral body then barrier sustain boost one new shield, never an existing shield", () => {
+test("astral body no longer raises maximum health; barrier sustain still boosts active shield", () => {
   const combat = mage({ 魔力護盾: 5, 星界護體: 5, 屏障續航: 5 });
-  const result = activate(combat, 600, false);
-  assert.equal(result.effectiveMaxHealth, 1120);
-  assert.ok(Math.abs(result.initialShieldValue - 313.6) < 1e-10);
+  const result = activate(combat, 500, false);
+  assert.equal(result.effectiveMaxHealth, 1000);
+  assert.equal(result.initialShieldValue, 325);
   assert.equal(result.combat.shield.enhancedCastsRemaining, 0);
   const existing = activate(result.combat, 500, false, 2000);
   assert.equal(existing.activated, false);
   assert.equal(existing.combat.shield.value, result.initialShieldValue);
   assert.equal(existing.combat.shield.initialValue, result.initialShieldValue);
-  assert.equal(existing.effectiveMaxHealth, 2240);
+  assert.equal(existing.effectiveMaxHealth, 2000);
+});
+
+test("astral body rolls after an unshielded hit and its barrier protects later attacks", () => {
+  const combat = mage({ 星界護體: 5 });
+  const first = recordMageIncomingAttack(combat, [40], { maxHealth: 1000, roll: () => 0.049 });
+  assert.equal(first.remainingDamage, 40); // the proc does not absorb the hit that triggered it
+  assert.equal(first.passiveShieldActivated, true);
+  assert.equal(first.combat.shield.value, 100);
+  assert.equal(first.combat.shield.ascended, false);
+
+  const next = recordMageIncomingAttack(first.combat, [150], { maxHealth: 1000, roll: () => 0 });
+  assert.equal(next.absorbedDamage, 100);
+  assert.equal(next.remainingDamage, 50);
+  assert.equal(next.passiveShieldActivated, true); // no re-roll while shielded
+});
+
+test("astral body respects its ranked chance and does not proc on zero damage", () => {
+  const combat = mage({ 星界護體: 1 });
+  let rolls = 0;
+  const missChance = recordMageIncomingAttack(combat, [40], {
+    maxHealth: 1000, roll: () => { rolls++; return 0.05; },
+  });
+  assert.equal(missChance.passiveShieldActivated, false); // strict 3% threshold
+  assert.equal(missChance.combat.shield.value, 0);
+  const noDamage = recordMageIncomingAttack(combat, [0], {
+    maxHealth: 1000, roll: () => { throw Error("zero damage must not roll"); },
+  });
+  assert.equal(noDamage.passiveShieldActivated, false);
+  assert.equal(rolls, 1);
 });
 
 test("multi-segment damage is absorbed once, overflow is returned once, and ascended break grants 15 energy", () => {
@@ -97,14 +126,14 @@ test("multi-segment damage is absorbed once, overflow is returned once, and asce
   assert.equal(again.combat.session.charge.ultimateEnergy, 15);
 });
 
-test("break energy caps at 100, is appended after earlier ready skills and requires ascension and an unlocked ultimate", () => {
+test("break energy caps at 100, prioritizes the ultimate and requires ascension and an unlocked ultimate", () => {
   let combat = mage({ 魔力護盾: 1, 霜火新星: 1, 星界寂滅: 1 }, ["霜火新星"]);
   combat = untilReady(combat, "霜火新星");
   combat = { ...combat, session: { ...combat.session, charge: { ...combat.session.charge, ultimateEnergy: 95 } } };
   const active = activate(combat, 500, true).combat;
   const broken = recordMageIncomingAttack(active, [120]);
   assert.equal(broken.combat.session.charge.ultimateEnergy, 100);
-  assert.deepEqual(broken.combat.session.charge.ready, ["霜火新星", "星界寂滅"]);
+  assert.deepEqual(broken.combat.session.charge.ready, ["星界寂滅", "霜火新星"]);
   assert.equal(combat.session.charge.ultimateEnergy, 95);
   const basic = recordMageIncomingAttack(activate(combat, 500, false).combat, [120]);
   assert.equal(basic.ultimateEnergyGranted, 0);
@@ -138,7 +167,7 @@ test("a status-only active cast spends one shield-enhanced cast without creating
   assert.deepEqual(result.damageSegmentPercents, []);
   assert.equal(result.shieldAscensionDamageBonusPercent, 10);
   assert.equal(result.combat.shield.enhancedCastsRemaining, 2);
-  assert.deepEqual(result.statusApplications, [{ kind: "elementSigil", level: 1, strength: 5 }]);
+  assert.deepEqual(result.statusApplications, [{ kind: "elementSigil", level: 1, strength: 5, effectBonusPercent: 10 }]);
 });
 
 test("shield transfer ends on break but an unused ascended cast still carries its damage bonus", () => {
@@ -146,7 +175,7 @@ test("shield transfer ends on break but an unused ascended cast still carries it
   combat = untilReady(combat, "霜火新星");
   combat = activate(combat, 500, true).combat;
   const shielded = turn(combat, "霜火新星", 400);
-  assert.equal(shielded.passiveDirectDamageBonusPercent, 12);
+  assert.equal(shielded.passiveDirectDamageBonusPercent, 15);
   assert.equal(shielded.shieldAscensionDamageBonusPercent, 10);
   const broken = recordMageIncomingAttack(combat, [200]);
   assert.equal(broken.remainingDamage, 80);
@@ -192,8 +221,8 @@ test("shield activates once per battle even after break and ordinary kills; new 
   assert.equal(combat.shield.value, 0);
   assert.equal(activate(combat, 500).activated, false);
   const nextMonster = transitionMageCombat(combat, "normal-kill");
-  assert.equal(nextMonster.shieldActivatedThisBattle, true);
-  assert.equal(activate(nextMonster, 500).activated, false);
+  assert.equal(nextMonster.shieldActivatedThisBattle, false);
+  assert.equal(activate(nextMonster, 500).activated, true);
   for (const boundary of ["death", "map-change", "boss-start", "pvp-start", "reconnect"]) {
     const fresh = transitionMageCombat(combat, boundary);
     assert.equal(fresh.shieldActivatedThisBattle, false);
@@ -204,14 +233,14 @@ test("shield activates once per battle even after break and ordinary kills; new 
 test("invalid health and damage inputs cannot create shield or grant energy", () => {
   const combat = mage({ 魔力護盾: 1 });
   for (const input of [
-    { currentHealth: -1, maxHealthBeforeMagePassive: 1000 },
-    { currentHealth: 1001, maxHealthBeforeMagePassive: 1000 },
-    { currentHealth: NaN, maxHealthBeforeMagePassive: 1000 },
-    { currentHealth: 500, maxHealthBeforeMagePassive: 0 },
+    { currentHealth: -1, maxHealth: 1000 },
+    { currentHealth: 1001, maxHealth: 1000 },
+    { currentHealth: NaN, maxHealth: 1000 },
+    { currentHealth: 500, maxHealth: 0 },
   ]) {
     assert.throws(() => tryActivateMageShield(combat, { ...input, ascended: false }), RangeError);
   }
-  assert.throws(() => activate(mage({ 魔力護盾: 1, 星界護體: 5 }), 500, false, Number.MAX_VALUE), RangeError);
+  assert.ok(activate(mage({ 魔力護盾: 1 }), 500, false, Number.MAX_VALUE).initialShieldValue > 0);
   for (const bad of [[], [-1], [NaN], [Infinity]]) {
     assert.throws(() => recordMageIncomingAttack(combat, bad), RangeError);
   }

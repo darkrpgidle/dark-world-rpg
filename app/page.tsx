@@ -1,14 +1,25 @@
 "use client";
+import {formatAssessedPower} from "./power-display";
+import {saveJsonWithTimeout} from "./save-request";
+import { firstChapterPower, firstChapterHealth, secondChapterPower, secondChapterHealth } from "./balance";
+import { armorThreshold, armorMitigation, monsterArmorRating, additiveDamageMultiplier } from "./combat-math";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {retainCombatCadence,type CombatCadence} from "./combat-cadence";
+import {advanceIdleStorageClock, reconcileIdleStorageClock, resetIdleStorageClock, type IdleStorageClock} from "./idle-storage-clock";
+import {safeLoadouts} from "./equipment-save-policy";
+import {affixOptions as sharedAffixOptions,rollAffixes as sharedRollAffixes,equipmentBaseStats as sharedEquipmentBaseStats} from "./equipment-affixes";
+
+import { useGmInbox, GmInboxMessages } from "./gm-mail-ui";
+
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Backpack,
-  BookOpen,
   ChevronRight,
   CircleDollarSign,
   Clock3,
   Crown,
   Flame,
+  Heart,
   Gem,
   History,
   LockKeyhole,
@@ -21,6 +32,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Target,
   Skull,
   Sparkles,
   Swords,
@@ -28,8 +40,15 @@ import {
   WandSparkles,
   Zap,
   Trash2,
+  Activity,
+  Droplets,
+  Gauge,
+  ShieldCheck,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import NextImage from "next/image";
+import { WebGLBloodRoarHitVfx } from "./webgl-blood-roar-hit-vfx";
+import { WebGLBloodRoarVfx } from "./webgl-blood-roar-vfx";
 import { BloodRoarBuffVfx } from "./blood-roar-buff-vfx";
 import {
   Dialog,
@@ -38,12 +57,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Popover,
   PopoverContent,
@@ -76,7 +89,6 @@ import {
   navItems,
   personalBosses,
   qualityColors,
-  skillsByClass,
   worldBosses,
   type GameClass,
 } from "./game-data";
@@ -95,16 +107,18 @@ import {
   healthPercentFromDamage,
   hitChanceFromRatings,
   lateGameMonsterScale,
+  monsterRatingsForMap,
   monsterProfile,
   realmSuppression,
   towerCombatValues,
 } from "./balance";
 import { balanceConfig } from "./balance-config";
+import { nextLootId } from "./loot-id";
 import { combatStatusLabel } from "./skill-status-label";
+import { MAX_REBIRTHS, REBIRTH_REWARD_PER_TURN, clampRebirthCount } from "./rebirth-config";
 import {
   addGemStack,
   createEquipmentSockets,
-  drillSocket,
   fuseGemSelection,
   GEM_TIERS,
   gemStackKey,
@@ -120,19 +134,71 @@ import {
   type SocketedGem,
 } from "./gem-system";
 import { SkillEffectCanvas } from "./skill-effect-canvas";
-import { TitanBoundaryVfx } from "./titan-boundary-vfx";
+import { WebGLBloodBrandVfx } from "./webgl-blood-brand-vfx";
+import { WebGLBerserkerStanceVfx } from "./webgl-berserker-stance-vfx";
+import { WebGLArmorSmashVfx } from "./webgl-armor-smash-vfx";
+import { WebGLTitanEchoVfx, WebGLTitanRiftVfx } from "./webgl-titan-rift-vfx";
+import { WebGLBloodBladeVfx } from "./webgl-blood-blade-vfx";
+import { WebGLGroundSplitVfx } from "./webgl-ground-split-vfx";
+import { RangerTailwindArrowVfx } from "./ranger-tailwind-arrow-vfx";
+import { WebGLUnyieldingWillVfx } from "./webgl-unyielding-will-vfx";
 import { SkillReworkPanel } from "./skill-rework-panel";
-import { createSkillBuild, earnedSkillPoints, restoreSkillBuild, spentSkillPoints, type SkillBuild } from "./skill-rework";
+import { SKILL_REWORK_CATALOG, createSkillBuild, restoreSkillBuild, earnedSkillPoints, spentSkillPoints, type SkillBuild } from "./skill-rework";
+import { equippedLegacyRebirthReward, legacyRebirthReward } from "./legacy-rebirth-rewards";
+import { equippedCosmeticBonuses } from "./cosmetic-bonuses";
+import {
+  equippedSetAttackMultiplier as calculateEquippedSetAttackMultiplier,
+  equippedSetCountAtThreshold,
+  equippedSetGroups as groupEquippedSets,
+  equippedSetOfflineMultiplier,
+} from "./set-bonuses";
 import { beginSkillBattleCutover, settleCutoverAction } from "./skill-combat-cutover";
-import { advanceLiveCombatEvents, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle } from "./skill-live-combat";
+import { createSkillDamageLedger } from "./skill-damage-settlement";
+import { refreshCombatStatusCountdowns, type TimedCombatStatus } from "./combat-status-countdown";
+import { advanceLiveCombatEvents, liveEnemyControl, liveCombatSpeedBonus, resolveLiveCombatAttack, resolveLiveEnemyAttack, syncLiveCombat, type LiveCombatBattle, type LiveDotDamageEvent } from "./skill-live-combat";
+import { splitMythicDamage } from "./skill-mythic-display";
+import type { MageCombat } from "./skill-mage-combat";
+import type { WarriorCombat } from "./skill-warrior-combat";
 import { settleCombatHealth } from "./skill-health-settlement";
 import { createBossDamageLedger, settleBossDamageEvent } from "./skill-boss-damage";
-import { skillPassivePanelStats } from "./skill-passive-panel";
+import { warriorPassiveDefenses } from "./skill-warrior-passives";
+import { rangerPassiveStats } from "./skill-ranger-passives";
 import { createCombatVictoryGuard } from "./skill-combat-victory";
 import { createSkillAscensions, restoreSkillAscensions, type SkillAscensionState } from "./skill-ascensions";
 import type { SkillSaveAction } from "./skill-save-policy";
+import { RangerStarbreakSnipeVfx } from "./ranger-starbreak-snipe-vfx";
+import { MageElementSigilVfx } from "./mage-element-sigil-vfx";
+import { emptyElementSigilVisual, updateElementSigilVisual } from "./element-sigil-frames";
+import { MageArcaneOverloadVfx } from "./mage-arcane-overload-vfx";
+import { emptyOverloadVisual, updateOverloadVisual } from "./arcane-overload-frames";
+import { MageManaShieldVfx } from "./mage-mana-shield-vfx";
+import { emptyManaShieldVisual, updateManaShieldVisual, type ManaShieldEvent } from "./mana-shield-frames";
+import { MageAstralAnnihilationVfx } from "./mage-astral-annihilation-vfx";
+import { astralAmounts, type AstralVisual } from "./astral-annihilation-frames";
+import { MageVoidCollapseVfx } from "./mage-void-collapse-vfx";
+import { type VoidVisual } from "./void-collapse-frames";
+import { MageMeteorStrikeVfx } from "./mage-meteor-strike-vfx";
+import { meteorAmounts, type MeteorVisual } from "./meteor-strike-frames";
+import { MageLightningChainVfx } from "./mage-lightning-chain-vfx";
+import { lightningAmounts, type LightningVisual } from "./lightning-chain-frames";
+import { MageFrostfireNovaVfx } from "./mage-frostfire-nova-vfx";
+import type { FrostfireVisual, FrostfireStatusVisual } from "./frostfire-nova-frames";
 import { RangerPiercingArrowVfx } from "./ranger-piercing-arrow-vfx";
+import { RangerWindDomainVfx } from "./ranger-wind-domain-vfx";
+import { windDomainVisualState, type WindDomainVisual } from "./ranger-wind-domain-state";
+import { RangerPhantomStepVfx } from "./ranger-phantom-step-vfx";
+import { RangerHunterMarkVfx, type HunterMarkVisual, type HunterBurstVisual } from "./ranger-hunter-mark-vfx";
+import { phantomStepVisualState, type PhantomStepVisual, type PhantomStepEvent } from "./ranger-phantom-state";
+import type { RangerCombat } from "./skill-ranger-combat";
 import { RangerWindVolleyVfx } from "./ranger-wind-volley-vfx";
+import { CombatDamageLayer } from "./combat-damage-layer";
+import { splitAsyncDamageForDisplay } from "./combat-float-events";
+import type { FloatChannel } from "./combat-float-events";
+import type { CombatFloatEvent } from "./combat-float-events";
+import { presentEnemyDamage, presentWorldBossDamage, enemyDefeatPresentationDelay } from "./combat-health-presentation";
+import { CombatPlaybackGuard } from "./combat-playback-guard";
+import { RangerSkyQueenRainVfx } from "./ranger-sky-queen-rain-vfx";
+import { skyRainDisplayAmounts } from "./sky-queen-rain-timing";
 import { RangerDeadlyMarkVfx } from "./ranger-deadly-mark-vfx";
 import { MythicSkillVfx, type MythicVfxPhase } from "./mythic-skill-vfx";
 import { DeepAbyssBossVfx } from "./deep-abyss-boss-vfx";
@@ -140,17 +206,17 @@ import { amplifyEquipmentStat, epithetDisplayName, equippedEpithetBonuses, getIt
 import { AdminMonitor } from "./admin-panels";
 import { MAINTENANCE_MESSAGE, MAINTENANCE_MODE } from "./maintenance";
 import {
-  ALL_CATALOG_EQUIPMENT,
   GENERAL_MYTHICS,
   SKILL_MYTHICS,
   SPECIAL_LEGENDARIES,
-  catalogBonus,
   catalogStory,
   equippedSkillMythic,
   findEquipmentDefinition,
   hasCatalogItem,
   type EquipmentCatalogDefinition,
 } from "./mythic-data";
+
+import { calculateCharacterStats, calculateAssessedCombatPower, normalizeSceneItem } from "./character-power";
 
 type Stage = "welcome" | "create" | "game";
 const MAIL_CAPACITY = 50;
@@ -224,19 +290,14 @@ type Skill = {
   max: number;
   cost: number;
 };
-type CombatStatus = {
-  name: string;
-  target: "player" | "enemy";
-  remaining: number;
-  unit: "攻擊" | "秒" | "次";
-  tone: "red" | "blue" | "gold" | "green";
-};
+type CombatStatus = TimedCombatStatus;
 type MailMessage = {
-  id: number;
+  id: number | string;
+  expiresAt?: string;
   title: string;
   body: string;
   claimed: boolean;
-  rewards: { gold: number; stones: number; yuanbao?: number; items: Item[]; resourcesClaimed?: boolean };
+  rewards: { gold: number; stones: number; yuanbao?: number; reforgeStones?: number; items: Item[]; resourcesClaimed?: boolean };
 };
 type Blessing = {
   id: string;
@@ -288,31 +349,103 @@ function characterSlug(cls: GameClass) {
 
 function characterFullbodyPath(cls: GameClass, rebirthCount: number, skillActive = false) {
   if (cls === "遊俠" && rebirthCount >= 10) {
-    return `/characters/ranger-rebirth10-${skillActive ? "open" : "closed"}.png`;
+    return `/characters/ranger-rebirth10-${skillActive ? "open" : "closed"}.webp`;
   }
-  return `/characters/${characterSlug(cls)}${rebirthCount > 0 ? "-rebirth" : ""}.png`;
+  return `/characters/${characterSlug(cls)}${rebirthCount > 0 ? "-rebirth" : ""}.webp`;
 }
 
 function characterAvatarPath(cls: GameClass, rebirthCount: number) {
   if (cls === "遊俠" && rebirthCount >= 10) {
-    return "/characters/ranger-rebirth10-avatar.png";
+    return "/characters/ranger-rebirth10-avatar.webp";
   }
-  return `/characters/${characterSlug(cls)}${rebirthCount > 0 ? "-rebirth-avatar" : ""}.png`;
+  return `/characters/${characterSlug(cls)}${rebirthCount > 0 ? "-rebirth-avatar" : ""}.webp`;
 }
 
-type TitleId = "none" | "night-watcher" | "ash-conqueror" | "abyss-survivor";
+function gameEntryImagePaths(cls: GameClass) {
+  return [
+    "/logo-dark-world.webp",
+    `/skills/icons/${characterSlug(cls)}-atlas.webp`,
+    characterAvatarPath(cls, 0),
+    ...maps.map((map) => map.sceneImage),
+  ];
+}
+
+function preloadGameEntryImages(
+  paths: string[],
+  onProgress: (loaded: number, total: number) => void,
+) {
+  const uniquePaths = [...new Set(paths)];
+  let loaded = 0;
+  onProgress(0, uniquePaths.length);
+
+  return Promise.all(
+    uniquePaths.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const image = new Image();
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            loaded += 1;
+            onProgress(loaded, uniquePaths.length);
+            resolve();
+          };
+          const timeout = window.setTimeout(finish, 10_000);
+          image.onload = finish;
+          image.onerror = finish;
+          image.src = src;
+          if (image.complete) queueMicrotask(finish);
+        }),
+    ),
+  );
+}
+
+function GameEntryLoading({ loaded, total }: { loaded: number; total: number }) {
+  const progress = total > 0 ? Math.round((loaded / total) * 100) : 100;
+  return (
+    <main className="game-entry-loading" role="status" aria-live="polite">
+      <div className="game-entry-loading__sigil"><Skull size={30} /></div>
+      <p className="game-entry-loading__eyebrow">DARK WORLD · REALM GATE</p>
+      <h1>暗黑世界</h1>
+      <p className="game-entry-loading__message">正在喚醒戰場圖像</p>
+      <div
+        className="game-entry-loading__track"
+        role="progressbar"
+        aria-label="預載遊戲圖像"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+      >
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="game-entry-loading__meta">
+        <span>{loaded} / {total} 項素材</span>
+        <strong>{progress}%</strong>
+      </div>
+      <p className="game-entry-loading__hint">首次載入後，圖像會由瀏覽器快取</p>
+    </main>
+  );
+}
+
+type TitleId = "none" | "night-watcher" | "ash-conqueror" | "abyss-survivor" | "beta-reincarnator" | "seasoned-reincarnator" | "elite-reincarnator" | "abyss-reincarnator";
 type AppearanceId = "none" | "ember-aura" | "arcane-aura" | "abyss-aura";
 const TITLE_OPTIONS: Record<TitleId, { name: string; color: string; description: string }> = {
   none: { name: "無稱號", color: "#9aa39d", description: "不顯示稱號" },
   "night-watcher": { name: "灰燼守夜人", color: "#d6b36a", description: "灰燼墓園的守望者" },
-  "ash-conqueror": { name: "灰燼征服者", color: "#f08a52", description: "征服灰燼墓園" },
-  "abyss-survivor": { name: "深淵倖存者", color: "#bd83ff", description: "從時墟深淵生還" },
+  "ash-conqueror": { name: "灰燼征服者", color: "#f08a52", description: "裝備時：經驗 +5%" },
+  "abyss-survivor": { name: "深淵倖存者", color: "#bd83ff", description: "裝備時：經驗／攻擊／防禦 +10%" },
+  "beta-reincarnator": { name: "封測轉生者", color: "#9fc4a6", description: "裝備時：經驗／金幣 +10%，攻擊／防禦 +5%（1 轉以上）" },
+  "seasoned-reincarnator": { name: "資深輪迴者", color: "#73cfde", description: "裝備時：經驗／金幣 +15%，攻擊／防禦 +5%，資源掉落 +5%（3 轉以上）" },
+  "elite-reincarnator": { name: "菁英輪迴者", color: "#d3a4ff", description: "裝備時：經驗／金幣 +20%，攻擊／防禦 +10%，資源掉落 +10%（5 轉以上）" },
+  "abyss-reincarnator": { name: "深淵輪迴者", color: "#ff827a", description: "裝備時：經驗／金幣 +30%，攻擊／防禦 +10%，攻速 +12%，資源掉落 +10%（10 轉以上）" },
 };
 const APPEARANCE_OPTIONS: Record<AppearanceId, { name: string; description: string; color: string }> = {
   none: { name: "無特效", description: "不顯示外觀特效", color: "#9aa39d" },
-  "ember-aura": { name: "灰燼熔翼", description: "暗紅熔岩骨翼與火星彈射", color: "#e35d3f" },
-  "arcane-aura": { name: "奧術星翼", description: "紫色符文能量羽翼", color: "#a875ff" },
-  "abyss-aura": { name: "深淵黑翼", description: "黑紅破碎深淵蝠翼", color: "#6d4cff" },
+  "ember-aura": { name: "灰燼熔翼", description: "暗紅熔岩骨翼與火星彈射；裝備時攻擊 +5%", color: "#e35d3f" },
+  "arcane-aura": { name: "奧術星翼", description: "紫色符文能量羽翼；裝備時攻擊／防禦 +10%", color: "#a875ff" },
+  "abyss-aura": { name: "深淵黑翼", description: "黑紅破碎深淵蝠翼；裝備時攻擊 +15%、防禦／命中／迴避 +10%", color: "#6d4cff" },
 };
 function appearanceVfxPath(id: AppearanceId) {
   return id === "ember-aura" ? "ember" : id === "arcane-aura" ? "arcane" : id === "abyss-aura" ? "abyss" : null;
@@ -322,13 +455,12 @@ function CharacterAppearanceVfx({ id, className = "" }: { id: AppearanceId; clas
   const [frame, setFrame] = useState(0);
   useEffect(() => {
     if (!wingSet) return;
-    setFrame(0);
     const timer = window.setInterval(() => setFrame((current) => (current + 1) % 6), 180);
     return () => window.clearInterval(timer);
   }, [wingSet]);
   if (!wingSet) return null;
-  const src = `/vfx/appearance-wings/${wingSet}/frame-${String(frame).padStart(2, "0")}.png`;
-  return <span className={`character-appearance-vfx ${className}`} aria-hidden="true"><img className="character-appearance-frame" src={src} alt="" /></span>;
+  const src = `/vfx/appearance-wings/${wingSet}/frame-${String(frame).padStart(2, "0")}.webp`;
+  return <span className={`character-appearance-vfx ${className}`} aria-hidden="true"><NextImage unoptimized width={512} height={768} loading="eager" className="character-appearance-frame" src={src} alt="" /></span>;
 }
 
 function accountCharacterKey(account: string) {
@@ -358,23 +490,6 @@ function createCharacterId() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function inferClassFromSkills(savedSkills: unknown): GameClass | undefined {
-  if (!Array.isArray(savedSkills)) return undefined;
-  const savedSkillNames = new Set<string>(
-    savedSkills
-      .map((skill) =>
-        typeof skill === "object" && skill && "name" in skill
-          ? String(skill.name)
-          : "",
-      )
-      .filter(Boolean),
-  );
-  return (Object.entries(skillsByClass) as [GameClass, Skill[]][]).find(
-    ([, classSkills]) =>
-      classSkills.some((skill) => savedSkillNames.has(skill.name)),
-  )?.[0];
-}
-
   const navIcons = {
   主控: Swords,
   地圖: MapIcon,
@@ -400,13 +515,6 @@ const dropSlots = [
   "披風",
 ];
 const qualityOrder = ["普通", "良好", "優秀", "史詩", "傳奇", "神話"];
-const MAX_AFFIXES_BY_QUALITY = [0, 1, 2, 3, 4, 5] as const;
-const ALLOWED_AFFIX_NAMES = new Set<EquipmentStatName>([
-  "生命", "生命%", "攻擊", "攻擊%", "防禦", "防禦%", "攻速",
-  "命中", "閃避", "暴擊", "暴擊傷害", "吸血", "傷害減免", "技能傷害",
-  "首領傷害", "首領減傷", "經驗", "金幣", "資源掉落率", "元寶掉率",
-]);
-const MAX_REBIRTHS = 20;
 const rebirthTalentDefs = [
   { id: "combatCritRate", path: "戰鬥", label: "炸裂領悟", description: "暴擊率 +4%／點｜點滿 +20%", max: 5 },
   { id: "combatCritDamage", path: "戰鬥", label: "爆擊烙印", description: "暴擊傷害 +10%／點｜點滿 +50%", max: 5 },
@@ -444,7 +552,6 @@ const equipmentSlotSlugs: Record<string, string> = {
 };
 const EXPERIENCE_MULTIPLIER = balanceConfig.progression.experienceMultiplier;
 const MAP_FLOORS = balanceConfig.progression.mapFloors;
-const DODGE_CAP = balanceConfig.progression.dodgeCap;
 
 type CatalogDropSource =
   | "normal"
@@ -467,7 +574,7 @@ function createCatalogItem(
   const qualityIndex = definition.kind === "special-legendary" ? 4 : 5;
   const powerRange = dropPowerRange(mapId, qualityIndex);
   const item: Item = {
-    id: Date.now() + sequence + Math.floor(Math.random() * 1000),
+    id: nextLootId(sequence),
     name: definition.name,
     slot: definition.slot,
     quality: qualityOrder[qualityIndex],
@@ -600,6 +707,8 @@ function mapExperienceGain(
 }
 
 function recommendedPowerAtFloor(map: (typeof maps)[number], floor: number) {
+  if (map.id === 1) return firstChapterPower(floor);
+  if (map.id === 2) return secondChapterPower(floor);
   if (floor >= MAP_FLOORS) return map.bossPower;
   const boundedFloor = Math.max(1, Math.min(29, floor));
   const interpolate = (start: number, end: number, step: number, steps: number) =>
@@ -651,6 +760,8 @@ function effectiveMonsterMaximumHealth(
   tier: "normal" | "elite" | "guardian" | "boss",
   monsterName?: string,
 ) {
+  if (mapId === 1) return firstChapterHealth(recommendedPower, tier, monsterName);
+  if (mapId === 2) return secondChapterHealth(recommendedPower, tier, monsterName);
   return Math.max(
     balanceConfig.mapFloors.monsterHealth.minimum,
     Math.round(
@@ -777,7 +888,7 @@ function createDrop(
   const isSetItem = Math.random() < 0.3;
   const powerRange = dropPowerRange(mapId, qualityIndex);
   const item: Item = {
-    id: Date.now() + sequence + Math.floor(Math.random() * 1000),
+    id: nextLootId(sequence),
     name: `${isSetItem ? map.set : map.gearPrefix}${slot}`,
     slot,
     quality: qualityOrder[qualityIndex],
@@ -833,42 +944,16 @@ function equipmentIconPath(item: Item) {
   const definition = findEquipmentDefinition(item);
   if (definition) {
     const folder = definition.kind === "special-legendary" ? "legendary" : "mythic";
-    return `/equipment/${folder}/${definition.artKey}.png`;
+    return `/equipment/${folder}/${definition.artKey}.webp`;
   }
   const mapId = equipmentMapId(item);
   const slot = equipmentSlotSlugs[item.slot] ?? "weapon";
-  return `/equipment/map-${mapId}/${slot}.png`;
+  return `/equipment/map-${mapId}/${slot}.webp`;
 }
 
 
 function equipmentBaseStats(item: Item, enhanceLevel = item.enhance): EquipmentStat[] {
-  const mapId = equipmentMapId(item);
-  const scale = balanceConfig.equipment.baseScaleByMap[mapId] ?? 1;
-  const baseBySlot = balanceConfig.equipment.baseStats as Record<string, readonly (readonly [EquipmentStatName, number, number])[]>;
-  const bonus = enhancementBonusPercent(enhanceLevel);
-  const qualityRank = Math.max(0, Math.min(qualityOrder.length - 1, qualityOrder.indexOf(item.quality)));
-  const qualityMultiplier = balanceConfig.equipment.baseQualityMultipliers[qualityRank] ?? 1;
-  return (baseBySlot[item.slot] ?? baseBySlot.武器).map(([name, base, growth]) => {
-    const setMultiplier = item.set ? 1.15 : 1;
-    const rawBase = Math.round((base + mapId * growth) * scale * qualityMultiplier * setMultiplier);
-    const original = amplifyEquipmentStat(item, name, rawBase, "base");
-    return {
-    name,
-    original,
-    // The epithet increases this item's inherent stat; enhancement keeps its original scaling.
-    value: Math.round(rawBase * (1 + bonus / 100)) + (original - rawBase),
-  }; });
-}
-
-const equipmentStatWeights = balanceConfig.equipment.statWeights as Record<EquipmentStatName, number>;
-
-function baseStatPower(stats: EquipmentStat[]) {
-  return Math.round(
-    stats.reduce(
-      (total, stat) => total + stat.value * equipmentStatWeights[stat.name],
-      0,
-    ),
-  );
+  return sharedEquipmentBaseStats(item, enhanceLevel);
 }
 
 function equipmentCombatRating(item: Item) {
@@ -892,11 +977,20 @@ function equipmentCombatRating(item: Item) {
   };
 
   const addStat = (name: EquipmentStatName, value: number, isPercent = false) => {
-    if (name === "生命") isPercent ? (combat.hpPct += value) : (combat.hp += value);
+    if (name === "生命") {
+      if (isPercent) combat.hpPct += value;
+      else combat.hp += value;
+    }
     if (name === "生命%") combat.hpPct += value;
-    if (name === "攻擊") isPercent ? (combat.attackPct += value) : (combat.attack += value);
+    if (name === "攻擊") {
+      if (isPercent) combat.attackPct += value;
+      else combat.attack += value;
+    }
     if (name === "攻擊%") combat.attackPct += value;
-    if (name === "防禦") isPercent ? (combat.defensePct += value) : (combat.defense += value);
+    if (name === "防禦") {
+      if (isPercent) combat.defensePct += value;
+      else combat.defense += value;
+    }
     if (name === "防禦%") combat.defensePct += value;
     if (name === "攻速") combat.speed += value;
     if (name === "命中") combat.hit += value;
@@ -970,10 +1064,12 @@ function gemEffectLabel(definition: ReturnType<typeof getGemDefinition>) {
 
 function EquipmentIcon({ item, className = "" }: { item: Item; className?: string }) {
   return (
-    <img
+    <NextImage unoptimized width={256} height={256}
       className={`equipment-art ${className}`}
       src={equipmentIconPath(item)}
       alt=""
+      loading="lazy"
+      decoding="async"
       draggable={false}
     />
   );
@@ -1042,182 +1138,13 @@ function skillMultiplier(name: string, level: number) {
   }
 }
 
-function calculateSkillEffects(skills: Skill[]) {
-  const result = {
-    hpFlat: 0,
-    attackPct: 0,
-    defensePct: 0,
-    speed: 0,
-    hit: 0,
-    dodge: 0,
-    crit: 0,
-    lifesteal: 0,
-  };
-  for (const skill of skills) {
-    if (skill.level <= 0) continue;
-    if (skill.name === "鋼鐵壁壘") {
-      result.defensePct += 3 + skill.level * 2.5;
-      result.hpFlat += 30 + skill.level * 25;
-    }
-    if (skill.name === "獵手本能") {
-      result.crit += 2 + skill.level;
-      result.dodge += 2 + skill.level;
-    }
-    if (skill.name === "魔力護盾") result.defensePct += 10 + skill.level * 3;
-    if (skill.name === "穿雲箭") result.hit += skill.level * 2;
-    if (skill.name === "疾風連射") result.speed += skill.level * 3;
-  }
-  return result;
-}
-
-function calculateCharacterStats(
-  playerClass: GameClass,
-  level: number,
-  gear: Item[],
-  skills: Skill[],
-) {
-  const base = balanceConfig.character.baseStats[playerClass];
-  const levelGrowth = balanceConfig.character.levelGrowth;
-  const result = {
-    ...base,
-    speed: Number(base.speed),
-    hp: base.hp + (level - 1) * levelGrowth.hp,
-    attack: base.attack + (level - 1) * levelGrowth.attack,
-    defense: base.defense + (level - 1) * levelGrowth.defense,
-    expBonus: 0,
-    goldBonus: 0,
-    bossDamage: 0,
-    damageReduction: 0,
-    skillDamage: 0,
-    comboChance: 0,
-    bossReduction: 0,
-    eliteDamage: 0,
-    lowHealthDamage: 0,
-    lowHealthReduction: 0,
-    resourceDrop: 0,
-    equipmentDrop: 0,
-    enhanceDrop: 0,
-    reforgeDrop: 0,
-    highQualityDrop: 0,
-    yuanbaoDrop: 0,
-    // 暴擊傷害是暴擊時的總加成；基礎 +50% 代表暴擊倍率 ×1.5。
-    critDamage: 50,
-    hpPct: 0,
-    attackPct: 0,
-    defensePct: 0,
-  };
-  for (const item of gear) {
-    for (const stat of equipmentBaseStats(item)) {
-      if (stat.name === "生命") result.hp += stat.value;
-      if (stat.name === "生命%") result.hpPct += stat.value;
-      if (stat.name === "攻擊") result.attack += stat.value;
-      if (stat.name === "攻擊%") result.attackPct += stat.value;
-      if (stat.name === "防禦") result.defense += stat.value;
-      if (stat.name === "防禦%") result.defensePct += stat.value;
-      if (stat.name === "攻速") result.speed += stat.value;
-      if (stat.name === "命中") result.hit += stat.value;
-      if (stat.name === "閃避") result.dodge += stat.value;
-      if (stat.name === "暴擊") result.crit += stat.value;
-      if (stat.name === "暴擊傷害") result.critDamage += stat.value;
-      if (stat.name === "吸血") result.lifesteal += stat.value;
-      if (stat.name === "經驗") result.expBonus += stat.value;
-      if (stat.name === "金幣") result.goldBonus += stat.value;
-      if (stat.name === "首領傷害") result.bossDamage += stat.value;
-      if (stat.name === "傷害減免") result.damageReduction += stat.value;
-      if (stat.name === "技能傷害") result.skillDamage += stat.value;
-      if (stat.name === "首領減傷") result.bossReduction += stat.value;
-      if (stat.name === "資源掉落率") result.resourceDrop += stat.value;
-      if (stat.name === "元寶掉率") result.yuanbaoDrop += stat.value;
-    }
-    for (const [index, affix] of item.affixes.entries()) {
-      const rawValue = Number(affix.match(/\d+/)?.[0] ?? 0);
-      const name = affixName(affix);
-      const value = index === 0 ? amplifyEquipmentStat(item, name, rawValue, "core") : rawValue;
-      if (name === "生命") result.hp += value;
-      if (name === "生命%") result.hpPct += value;
-      if (name === "攻擊") result.attack += value;
-      if (name === "攻擊%") result.attackPct += value;
-      if (name === "防禦") result.defense += value;
-      if (name === "防禦%") result.defensePct += value;
-      if (name === "攻速") result.speed += value;
-      if (affix.startsWith("命中")) result.hit += value;
-      if (affix.startsWith("閃避")) result.dodge += value;
-      if (name === "暴擊傷害") result.critDamage += value;
-      else if (name === "暴擊") result.crit += value;
-      if (affix.startsWith("吸血")) result.lifesteal += value;
-      if (affix.startsWith("經驗")) result.expBonus += value;
-      if (affix.startsWith("金幣")) result.goldBonus += value;
-      if (affix.startsWith("首領傷害")) result.bossDamage += value;
-      if (affix.startsWith("傷害減免")) result.damageReduction += value;
-      if (affix.startsWith("技能傷害")) result.skillDamage += value;
-      if (affix.startsWith("首領減傷")) result.bossReduction += value;
-      if (affix.startsWith("資源掉落率")) result.resourceDrop += value;
-      if (affix.startsWith("元寶掉率")) result.yuanbaoDrop += value;
-    }
-    for (const [name, value] of Object.entries(getSocketStatBonus(item.sockets ?? { socketCount: 0, gems: [] }))) {
-      if (name === "生命") result.hp += value;
-      if (name === "生命%") result.hpPct += value;
-      if (name === "攻擊") result.attack += value;
-      if (name === "攻擊%") result.attackPct += value;
-      if (name === "防禦") result.defense += value;
-      if (name === "防禦%") result.defensePct += value;
-      if (name === "攻速") result.speed += value;
-      if (name === "命中") result.hit += value;
-      if (name === "閃避") result.dodge += value;
-      if (name === "暴擊") result.crit += value;
-      if (name === "吸血") result.lifesteal += value;
-      if (name === "經驗") result.expBonus += value;
-      if (name === "金幣") result.goldBonus += value;
-    }
-  }
-  const skill = calculateSkillEffects(skills);
-  result.hp += skill.hpFlat;
-  result.attack = Math.round(result.attack * (1 + skill.attackPct / 100));
-  result.defense = Math.round(result.defense * (1 + skill.defensePct / 100));
-  result.speed += skill.speed;
-  result.hit += skill.hit;
-  result.dodge += skill.dodge;
-  result.crit += skill.crit;
-  result.lifesteal += skill.lifesteal;
-  const catalog = catalogBonus(gear);
-  const epithetBonus = equippedEpithetBonuses(gear);
-  for (const [key, value] of Object.entries(epithetBonus)) {
-    if (key in result) (result as Record<string, number>)[key] += value;
-  }
-  result.hpPct += catalog.hpPct ?? 0;
-  result.attackPct += catalog.attackPct ?? 0;
-  result.defensePct += catalog.defensePct ?? 0;
-  result.speed += catalog.speed ?? 0;
-  result.speed = Math.round(result.speed * (1 + (catalog.speedPct ?? 0) / 100)) as typeof result.speed;
-  result.hit += catalog.hit ?? 0;
-  result.dodge += catalog.dodge ?? 0;
-  result.crit += catalog.crit ?? 0;
-  result.lifesteal += catalog.lifesteal ?? 0;
-  result.expBonus += catalog.expBonus ?? 0;
-  result.goldBonus += catalog.goldBonus ?? 0;
-  result.bossDamage += catalog.bossDamage ?? 0;
-  result.damageReduction += catalog.damageReduction ?? 0;
-  result.skillDamage += catalog.skillDamage ?? 0;
-  result.resourceDrop += catalog.resourceDrop ?? 0;
-  result.equipmentDrop += catalog.equipmentDrop ?? 0;
-  result.hp = Math.round(result.hp * (1 + result.hpPct / 100));
-  result.attack = Math.round(result.attack * (1 + result.attackPct / 100));
-  result.defense = Math.round(result.defense * (1 + result.defensePct / 100));
-  return result;
-}
 
 function equippedSetPieceCount(gear: Item[]) {
-  return maps.reduce(
-    (maximum, map) => Math.max(maximum, gear.filter((item) => item.set === map.set).length),
-    0,
-  );
+  return groupEquippedSets(gear).reduce((maximum, group) => Math.max(maximum, group.count), 0);
 }
 
 function equippedSetAttackMultiplier(gear: Item[]) {
-  const twoPieceSetCount = maps.filter(
-    (map) => gear.filter((item) => item.set === map.set).length >= 2,
-  ).length;
-  return 1 + twoPieceSetCount * (SET_ATTACK_BONUS - 1);
+  return calculateEquippedSetAttackMultiplier(gear, SET_ATTACK_BONUS - 1);
 }
 
 function calculateCombatPower(
@@ -1226,6 +1153,7 @@ function calculateCombatPower(
   gear: Item[],
   skills: Skill[],
   permanentBonuses: { hp: number; attack: number; defense: number } = { hp: 0, attack: 0, defense: 0 },
+  legacyBonuses: { attack: number; defense: number } = { attack: 0, defense: 0 },
 ) {
   const naked = calculateCharacterStats(playerClass, level, [], []);
   const statSkills = skills.filter((skill) =>
@@ -1233,14 +1161,14 @@ function calculateCombatPower(
   );
   const current = calculateCharacterStats(playerClass, level, gear, statSkills);
   const setAttackMultiplier = equippedSetAttackMultiplier(gear);
-  const permanentAttackMultiplier = (1 + permanentBonuses.attack / 100) * setAttackMultiplier;
+  const permanentAttackMultiplier = (1 + (permanentBonuses.attack + legacyBonuses.attack) / 100) * setAttackMultiplier;
   const statPower =
     (current.hp - naked.hp) * 0.25 +
     (current.attack - naked.attack) * permanentAttackMultiplier * 4 +
-    (current.defense - naked.defense) * 3 +
+    (current.defense - naked.defense) * (1 + legacyBonuses.defense / 100) * 3 +
     (current.speed - naked.speed) * 4 +
     (current.hit - naked.hit) * 5 +
-    (Math.min(DODGE_CAP, current.dodge) - Math.min(DODGE_CAP, naked.dodge)) * 8 +
+    (current.dodge - naked.dodge) * 8 +
     (current.crit - naked.crit) * 8 +
     (current.critDamage - naked.critDamage) * 5 +
     (current.lifesteal - naked.lifesteal) * 10 +
@@ -1263,9 +1191,11 @@ function calculateCombatPower(
   );
 }
 
+
 function personalBossCombatValues({
+  mapId = 1,
+  localFloor = 30,
   attack,
-  speed,
   crit,
   critDamage,
   hit,
@@ -1274,12 +1204,10 @@ function personalBossCombatValues({
   damageReduction,
   dodge,
   skillDamage,
-  comboChance,
   bossReduction,
   lowHealthDamage,
   lowHealthReduction,
   lowHealth,
-  playerLevel,
   bossLevel,
   monsterName,
   roll,
@@ -1294,6 +1222,8 @@ function personalBossCombatValues({
   guaranteedCritical = false,
   critDamageBonus = 0,
 }: {
+  mapId?: number;
+  localFloor?: number;
   attack: number;
   speed: number;
   crit: number;
@@ -1326,18 +1256,17 @@ function personalBossCombatValues({
 }) {
   const profile = monsterProfile(monsterName);
   const evasionRules = balanceConfig.combat.evasionModel;
-  const bossEvasionRating = 20 + bossLevel * evasionRules.bossEvasionPerLevel;
+  const bossEvasionRating = evasionRules.monsterEvasionBase + bossLevel * evasionRules.bossEvasionPerLevel;
   const bossAccuracyRating =
     evasionRules.monsterAccuracyBase + bossLevel * evasionRules.bossAccuracyPerLevel;
   const playerHitChance = hitChanceFromRatings(hit, bossEvasionRating);
   const playerEvasionRating =
-    Math.min(DODGE_CAP, Math.max(0, dodge)) * evasionRules.statToRating;
+    Math.max(0, dodge) * evasionRules.statToRating;
   const bossHitChance = hitChanceFromRatings(bossAccuracyRating, playerEvasionRating);
-  const bossDefense =
-    (monsterDefense ?? (18 + bossLevel * 2.5) * profile.defense) *
-    monsterMultiplier *
-    (1 - Math.min(0.8, Math.max(0, defenseIgnore) / 100));
-  const bossDamageReduction = Math.min(0.65, bossDefense / (bossDefense + 100));
+  const defenseThreshold = armorThreshold(mapId, localFloor);
+  const bossDefense = (monsterDefense ?? monsterArmorRating((18 + bossLevel * 2.5) * profile.defense,
+    defenseThreshold)) * monsterMultiplier;
+  const bossDamageReduction = armorMitigation(bossDefense, defenseThreshold, defenseIgnore);
   const isCritical = guaranteedCritical || roll < Math.min(1, crit / 100);
   const criticalMultiplier = isCritical ? 1 + (critDamage + critDamageBonus) / 100 : 1;
   const playerDamage = attackRoll * 100 > playerHitChance
@@ -1347,17 +1276,13 @@ function personalBossCombatValues({
         Math.round(
           attack *
             (1 - bossDamageReduction) *
-            (1 + bossDamage / 100) *
-            (skillTriggered ? 1 + skillDamage / 100 : 1) *
+            additiveDamageMultiplier({ bossDamage, skillDamage, lowHealthDamage,
+              bossTarget: true, skillTriggered, lowHealth }) *
             Math.max(0, playerDamageMultiplier ?? 1) *
-            criticalMultiplier *
-            (lowHealth ? 1 + lowHealthDamage / 100 : 1),
+            criticalMultiplier,
         ),
       );
-  const defenseMitigation = Math.min(
-    0.65,
-    (defense / Math.max(1, defense + bossLevel * 8)) * 0.65,
-  );
+  const defenseMitigation = armorMitigation(defense, defenseThreshold);
   const counterDamage = counterRoll * 100 > bossHitChance
     ? 0
     : Math.max(
@@ -1397,95 +1322,7 @@ function saleReturn(item: Item) {
   };
 }
 
-const flatQualityBands = balanceConfig.equipment.affixes.flatQualityMultipliers;
-const percentQualityBands = balanceConfig.equipment.affixes.percentQualityBands as Record<
-  Exclude<EquipmentStatName, "生命" | "攻擊" | "防禦" | "攻速">,
-  readonly (readonly [number, number])[]
->;
-
-function affixOptions(item: Item): AffixRoll[] {
-  const rank = Math.max(0, Math.min(5, qualityOrder.indexOf(item.quality)));
-  const mapId = equipmentMapId(item);
-  const [qualityMinimum, qualityMaximum] = flatQualityBands[rank];
-  const canonicalBase = (name: "生命" | "攻擊" | "防禦") => {
-    const slot = name === "攻擊" ? "武器" : name === "防禦" ? "胸甲" : "腰帶";
-    return (
-      equipmentBaseStats({ ...item, slot } as Item, 0).find(
-        (stat) => stat.name === name,
-      )?.original ?? 1
-    );
-  };
-  const flat = (
-    name: "生命" | "攻擊" | "防禦",
-    multiplier = 1,
-  ): AffixRoll => ({
-    name,
-    minimum: Math.max(
-      1,
-      Math.round(canonicalBase(name) * multiplier * qualityMinimum),
-    ),
-    maximum: Math.max(
-      1,
-      Math.round(canonicalBase(name) * multiplier * qualityMaximum),
-    ),
-  });
-  const percentage = (
-    name: Exclude<EquipmentStatName, "生命" | "攻擊" | "防禦" | "攻速">,
-    growth: number,
-  ): AffixRoll => {
-    const [minimum, maximum] = percentQualityBands[name][rank];
-    const mapBonus = Math.min(2, Math.floor((mapId - 1) * growth));
-    return { name, minimum: minimum + mapBonus, maximum: maximum + mapBonus, percent: true };
-  };
-  const percentageFixed = (
-    name: Exclude<EquipmentStatName, "生命" | "攻擊" | "防禦" | "攻速">,
-  ): AffixRoll => {
-    const [minimum, maximum] = percentQualityBands[name][rank];
-    return { name, minimum, maximum, percent: true };
-  };
-  const speed = (): AffixRoll => {
-    const speedBands = balanceConfig.equipment.affixes.speedQualityBands;
-    const [minimum, maximum] = speedBands[rank];
-    const mapBonus = Math.floor((mapId - 1) * balanceConfig.equipment.affixes.speedMapGrowth);
-    return { name: "攻速", minimum: minimum + mapBonus, maximum: maximum + mapBonus, percent: true };
-  };
-  const percentFlat = (name: "生命%" | "攻擊%" | "防禦%", growth = 0.45): AffixRoll =>
-    percentage(name, growth);
-  const pools: Record<string, AffixRoll[]> = {
-    武器: [flat("攻擊"), percentFlat("攻擊%"), percentage("暴擊", 0.45), percentage("暴擊傷害", 0.45), speed(), percentage("首領傷害", 0.6), percentage("技能傷害", 0.5), percentage("吸血", 0.35), percentage("命中", 0.5)],
-    頭盔: [percentage("命中", 0.5), flat("防禦", 0.65), percentFlat("防禦%", 0.45), flat("生命", 0.35), percentFlat("生命%", 0.45), percentage("經驗", 0.55), percentage("傷害減免", 0.35), percentage("閃避", 0.35)],
-    胸甲: [flat("防禦"), percentFlat("防禦%"), flat("生命", 0.65), percentFlat("生命%"), percentage("傷害減免", 0.5), percentage("首領減傷", 0.45), percentage("閃避", 0.3), flat("攻擊", 0.12), percentFlat("攻擊%", 0.3), percentage("命中", 0.3)],
-    手套: [speed(), flat("攻擊", 0.55), percentFlat("攻擊%"), percentage("暴擊", 0.5), percentage("暴擊傷害", 0.5), percentage("技能傷害", 0.5), percentage("命中", 0.5), percentage("吸血", 0.25)],
-    鞋子: [percentage("閃避", 0.45), speed(), percentage("資源掉落率", 0.45), flat("防禦", 0.45), percentFlat("防禦%", 0.45), percentage("金幣", 0.6), flat("生命", 0.25), percentFlat("生命%", 0.45), percentage("傷害減免", 0.25)],
-    項鍊: [percentage("經驗", 0.6), percentageFixed("元寶掉率"), percentage("技能傷害", 0.5), flat("攻擊", 0.45), percentFlat("攻擊%"), flat("生命", 0.35), percentFlat("生命%"), percentage("命中", 0.5), percentage("暴擊", 0.45), percentage("暴擊傷害", 0.45), percentage("資源掉落率", 0.4), percentage("吸血", 0.3)],
-    戒指: [percentage("暴擊", 0.55), percentage("暴擊傷害", 0.55), flat("攻擊", 0.55), percentFlat("攻擊%"), percentage("吸血", 0.4), percentage("首領傷害", 0.6), speed(), percentage("命中", 0.4)],
-    腰帶: [flat("生命"), percentFlat("生命%"), flat("防禦", 0.5), percentFlat("防禦%"), percentage("資源掉落率", 0.45), percentage("傷害減免", 0.4), percentage("金幣", 0.6), percentage("閃避", 0.3), flat("攻擊", 0.1), percentFlat("攻擊%", 0.1)],
-    護腕: [percentage("命中", 0.55), flat("攻擊", 0.45), percentFlat("攻擊%"), flat("防禦", 0.5), percentFlat("防禦%"), percentage("首領傷害", 0.5), percentage("暴擊", 0.4), percentage("暴擊傷害", 0.4), speed()],
-    披風: [percentage("傷害減免", 0.45), percentageFixed("元寶掉率"), percentage("首領減傷", 0.45), flat("生命", 0.6), percentFlat("生命%"), percentage("資源掉落率", 0.45), percentage("閃避", 0.5), percentage("經驗", 0.5), flat("防禦", 0.35), percentFlat("防禦%"), percentage("金幣", 0.5)],
-  };
-  const slotPool = pools[item.slot] ?? pools.武器;
-  const universalPool = Array.from(
-    new Map(Object.values(pools).flat().map((option) => [option.name, option])).values(),
-  ).filter((option) => option.name !== "元寶掉率" || item.slot === "項鍊" || item.slot === "披風");
-  // 部位核心詞綴仍優先；其餘詞綴從完整允許池隨機抽取，且允許同件重複。
-  const core = slotPool[0];
-  return core ? [core, ...universalPool.filter((option) => option.name !== core.name)] : universalPool;
-}
-
-function rollAffix(roll: AffixRoll) {
-  const value =
-    roll.minimum + Math.floor(Math.random() * (roll.maximum - roll.minimum + 1));
-  const labels: Partial<Record<EquipmentStatName, string>> = {
-    生命: "生命力",
-    "生命%": "生命力",
-    攻擊: "攻擊力",
-    "攻擊%": "攻擊力",
-    防禦: "防禦力",
-    "防禦%": "防禦力",
-    攻速: "攻擊速度",
-  };
-  return `${labels[roll.name] ?? roll.name} +${value}${roll.percent && roll.name !== "命中" && roll.name !== "閃避" ? "%" : ""}`;
-}
+function affixOptions(item: Item): AffixRoll[] { return sharedAffixOptions(item); }
 
 function affixName(affix: string) {
   const [rawName] = affix.split(" ");
@@ -1554,79 +1391,8 @@ function affixRangeLabel(item: Item, affix: string) {
   return `${item.quality}範圍 ${range.minimum}～${range.maximum}${suffix}`;
 }
 
-function normalizeSceneItem(item: Item): Item {
-  const definition = findEquipmentDefinition(item);
-  const catalogFields = definition
-    ? {
-        name: definition.name,
-        slot: definition.slot,
-        quality: definition.kind === "special-legendary" ? "傳奇" : "神話",
-        equipmentType:
-          definition.kind === "special-legendary"
-            ? "特殊傳奇" as const
-            : "神話裝備" as const,
-        ...(definition.kind === "special-legendary"
-          ? { legendaryId: definition.id }
-          : { mythicId: definition.id }),
-        artKey: definition.artKey,
-        set: "",
-      }
-    : {};
-  const normalized = {
-    ...item,
-    ...catalogFields,
-    equipmentType: definition
-      ? definition.kind === "special-legendary"
-        ? "特殊傳奇" as const
-        : "神話裝備" as const
-      : item.quality === "神話" || item.equipmentType === "神話裝備"
-        ? "神話裝備" as const
-        : item.equipmentType === "特殊傳奇"
-          ? "特殊傳奇" as const
-          : "場景普通裝備" as const,
-    affixSchemaVersion: 7,
-    reforgeCount: Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(item.reforgeCount ?? 0) || 0))),
-  };
-  const maxAffixes = MAX_AFFIXES_BY_QUALITY[Math.max(0, qualityOrder.indexOf(normalized.quality))] ?? 0;
-  const cleanAffixes = (item.affixes ?? [])
-    .map((affix) => affix.replace(/^(?:菁英傷害|精英傷害)(?= )/, "首領傷害"))
-    .filter((affix) => ALLOWED_AFFIX_NAMES.has(affixName(affix)))
-    .map((affix) => {
-      const range = affixRange(normalized, affix);
-      if (!range) return affix;
-      const oldValue = Number(affix.match(/\d+(?:\.\d+)?/)?.[0] ?? range.minimum);
-      const value = Math.max(range.minimum, Math.min(range.maximum, oldValue));
-      return `${range.name} +${value}${range.percent ? "%" : ""}`;
-    });
-  // 洗鍊允許同一種詞綴重複出現；正規化只能清理非法／超出區間的數值，
-  // 不可依詞綴名稱去重，否則重新登入或下一次存檔會吃掉合法的重複詞綴。
-  return normalizeItemEpithets({
-    ...normalized,
-    affixes: cleanAffixes.slice(0, maxAffixes),
-    sockets: normalizeEquipmentSockets(item.sockets),
-  });
-}
 
-function rollAffixes(item: Item) {
-  const rank = Math.max(0, qualityOrder.indexOf(item.quality));
-  const affixCount = MAX_AFFIXES_BY_QUALITY[Math.min(rank, MAX_AFFIXES_BY_QUALITY.length - 1)] ?? 0;
-  if (affixCount <= 0) return [];
-  const options = affixOptions(item);
-  const [core] = options;
-  // 洗鍊詞綴允許重複；保留第一條部位核心詞綴，其餘詞綴從完整池中獨立抽取。
-  return [core, ...Array.from({ length: Math.max(0, affixCount - 1) }, () =>
-    options[Math.floor(Math.random() * options.length)],
-  )].map(rollAffix);
-}
-
-function rerollSingleAffix(item: Item, affix: string, index: number) {
-  const options = affixOptions(item);
-  const [core] = options;
-  if (index === 0) return rollAffix(core);
-  // 定向洗鍊同樣允許洗出目前已存在的詞綴，符合重複詞綴玩法。
-  const pool = options;
-  return rollAffix(pool[Math.floor(Math.random() * pool.length)]);
-}
+function rollAffixes(item: Item) { return sharedRollAffixes(item); }
 
 function Panel({
   children,
@@ -1641,12 +1407,16 @@ function Panel({
 function Meter({
   value,
   color = "var(--gold)",
+  className = "",
+  ariaLabel,
 }: {
   value: number;
   color?: string;
+  className?: string;
+  ariaLabel?: string;
 }) {
   return (
-    <div className="meter">
+    <div className={`meter ${className}`} aria-label={ariaLabel}>
       <span
         style={{
           width: `${Math.max(0, Math.min(100, value))}%`,
@@ -1728,7 +1498,7 @@ function GearTooltip({
           <span>目前穿著：{compared.name}</span>
           <strong className={(powerDifference ?? 0) >= 0 ? "gain" : "loss"}>
             {(powerDifference ?? 0) >= 0 ? "▲" : "▼"} 實際戰力{" "}
-            {Math.abs(powerDifference ?? 0).toLocaleString()}
+            {formatAssessedPower(Math.abs(powerDifference ?? 0))}
           </strong>
         </div>
       )}
@@ -1871,7 +1641,7 @@ function CharacterCreate({
               </div>
             </div>
             <div className="class-portrait-frame">
-              <img className="class-portrait" src={`/characters/${cls.name === "戰士" ? "warrior" : cls.name === "遊俠" ? "ranger" : "mage"}.png`} alt={`${cls.name}角色`} />
+              <NextImage unoptimized width={1024} height={1536} loading="eager" className="class-portrait" src={`/characters/${cls.name === "戰士" ? "warrior" : cls.name === "遊俠" ? "ranger" : "mage"}.webp`} alt={`${cls.name}角色`} />
             </div>
             <div className="starter-skill">
               <Sparkles size={15} />
@@ -1978,10 +1748,20 @@ function Game({
   const [wave, setWave] = useState(1);
   const [enemyName, setEnemyName] = useState<string>(() => maps[0].monsters[0]);
   const [enemyHp, setEnemyHp] = useState(100);
+  const towerCadenceRef=useRef<CombatCadence|null>(null);
+  const bossCadenceRef=useRef<CombatCadence|null>(null);
+  const [presentedEnemyHealth,setPresentedEnemyHealth]=useState<{token: string | object | null;percent:number;viewKey:string}>({token:null,percent:100,viewKey:"boot"});
+  const pendingEnemyDefeatRef=useRef<{token: string | object;queuedAt:number;shownAt?:number;volleyKey?:number;finish:()=>void}|null>(null);
+  const [documentVisible,setDocumentVisible]=useState(true);
+  useEffect(()=>{
+    const update=()=>setDocumentVisible(document.visibilityState!=="hidden");
+    update();document.addEventListener("visibilitychange",update);
+    return()=>document.removeEventListener("visibilitychange",update);
+  },[]);
   const [playerHp, setPlayerHp] = useState(100);
   const [battlePulse, setBattlePulse] = useState(0);
   const [enemyDefeated, setEnemyDefeated] = useState(false);
-  const [round, setRound] = useState(1);
+  const [, setRound] = useState(1);
   const [skillEffect, setSkillEffect] = useState<{
     name: string;
     key: number;
@@ -1999,22 +1779,200 @@ function Game({
   }[]>([]);
   // Ranger image VFX own their lifetime. A following combat round may update
   // the skill banner without cutting off an arrow sequence already in flight.
-  const [rangerPiercingEffect, setRangerPiercingEffect] = useState<{ key: number } | null>(null);
+  const [rangerPiercingEffect, setRangerPiercingEffect] = useState<{ key: number; hit: boolean } | null>(null);
+  const pendingPiercingDamageRef = useRef(new Map<number, () => void>());
+  const publishPiercingImpactDamage = (eventKey: number) => {
+    const publish = pendingPiercingDamageRef.current.get(eventKey);
+    pendingPiercingDamageRef.current.delete(eventKey);
+    publish?.();
+  };
+  const finishPiercingVisual = (eventKey: number) => {
+    pendingPiercingDamageRef.current.delete(eventKey);
+    setRangerPiercingEffect((current) => current?.key === eventKey ? null : current);
+  };
+  const [starbreakVisuals, setStarbreakVisuals] = useState<{ key: number; hit: boolean; ascended: boolean; chargeRecovered: boolean }[]>([]);
+  const pendingStarbreakDamageRef = useRef(new Map<number, () => void>());
+  const publishStarbreakImpact = (key: number) => {
+    const publish = pendingStarbreakDamageRef.current.get(key);
+    pendingStarbreakDamageRef.current.delete(key); publish?.();
+  };
+  const finishStarbreakVisual = (key: number) => {
+    pendingStarbreakDamageRef.current.delete(key);
+    setStarbreakVisuals((current) => current.filter((item) => item.key !== key));
+  };
+  const updateStarbreakVisual = useCallback((battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name !== "破星狙擊") return;
+    setStarbreakVisuals((current) => [...current.filter((item) => item.key !== key),
+      { key, hit: action.hits.some((part) => part.hit), ascended: battle.ascended.has("破星狙擊"),
+        chargeRecovered: action.starbreakChargeRecovered }]);
+  }, []);
+  const [tailwindVisuals, setTailwindVisuals] = useState<{
+    key: number; hit: boolean; echo: { hit: boolean } | null; chargeRecovered: boolean;
+  }[]>([]);
+  const [tailwindEchoVisuals, setTailwindEchoVisuals] = useState<{ key: number; hit: boolean }[]>([]);
+  const [tailwindChargeVisuals, setTailwindChargeVisuals] = useState<{ key: number }[]>([]);
+  const pendingTailwindDamageRef = useRef(new Map<number, () => void>());
+  const pendingTailwindEchoDamageRef = useRef(new Map<number, () => void>());
+  const publishTailwindImpactDamage = (eventKey: number, echo: { hit: boolean } | null, chargeRecovered: boolean) => {
+    const publish = pendingTailwindDamageRef.current.get(eventKey);
+    pendingTailwindDamageRef.current.delete(eventKey);
+    publish?.();
+    if (echo) setTailwindEchoVisuals((current) => [...current.filter((item) => item.key !== eventKey), { key: eventKey, hit: echo.hit }]);
+    if (chargeRecovered) setTailwindChargeVisuals((current) => [...current.filter((item) => item.key !== eventKey), { key: eventKey }]);
+  };
+  const publishTailwindEchoDamage = (eventKey: number) => {
+    const publish = pendingTailwindEchoDamageRef.current.get(eventKey);
+    pendingTailwindEchoDamageRef.current.delete(eventKey);
+    publish?.();
+  };
+  const finishTailwindVisual = (eventKey: number) => {
+    pendingTailwindDamageRef.current.delete(eventKey);
+    setTailwindVisuals((current) => current.filter((item) => item.key !== eventKey));
+  };
+  const finishTailwindEchoVisual = (eventKey: number) => {
+    pendingTailwindEchoDamageRef.current.delete(eventKey);
+    setTailwindEchoVisuals((current) => current.filter((item) => item.key !== eventKey));
+  };
+  const finishTailwindChargeVisual = (eventKey: number) => {
+    setTailwindChargeVisuals((current) => current.filter((item) => item.key !== eventKey));
+  };
   const [rangerWindVolleyEffect, setRangerWindVolleyEffect] = useState<{
     key: number;
     shotCount: number;
+    arrows?: ReturnType<typeof resolveLiveCombatAttack>["volleyArrows"];
   }[]>([]);
+  const pendingVolleyDamageRef = useRef(new Map<number, ((index: number) => void)>());
+  const publishVolleyImpact = (eventKey: number, index: number) => {
+    pendingVolleyDamageRef.current.get(eventKey)?.(index);
+  };
+  const finishVolleyVisual = (eventKey: number) => {
+    pendingVolleyDamageRef.current.delete(eventKey);
+    setRangerWindVolleyEffect((current) => current.filter((effect) => effect.key !== eventKey));
+  };
+  const updateVolleyVisual = useCallback((action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name !== "疾風連射") return;
+    setRangerWindVolleyEffect((current) => [...current.filter((effect) => effect.key !== key),
+      { key, shotCount: action.volleyArrows.length, arrows: action.volleyArrows }]);
+  }, []);
+  const queueVolleyNumbers = (key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void) => {
+    const arrows = action.volleyArrows;
+    const weights = arrows.map((arrow) => arrow.hit ? arrow.damagePercent : 0);
+    const sum = weights.reduce((value, weight) => value + weight, 0);
+    const amounts = weights.map((weight) => sum > 0 ? Math.floor(total * weight / sum) : 0);
+    let remainder = sum > 0 ? total - amounts.reduce((value, amount) => value + amount, 0) : 0;
+    for (let index = 0; remainder > 0; index = (index + 1) % arrows.length) {
+      if (weights[index] > 0) { amounts[index]++; remainder--; }
+    }
+    const published = new Set<number>();
+    let extrasPublished = false;
+    pendingVolleyDamageRef.current.set(key, (index) => {
+      if (published.has(index)) return;
+      published.add(index);
+      if (!extrasPublished && (arrows[index]?.hit || published.size === arrows.length)) {
+        extrasPublished = true; publishExtras();
+      }
+      if (!arrows[index]?.hit || amounts[index] <= 0) return;
+      const groupKey = -key - (index + 1) / 16;
+      setBattleHitGroups((current) => [...current, { key: groupKey, skillName: "疾風連射",
+        hits: [{ damage: amounts[index], critical: arrows[index].critical,
+          label: arrows[index].sixth ? "六重風葬" : undefined, delayMs: 0 }] }]);
+      window.setTimeout(() => setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey)), 1200);
+    });
+  };
+  const [astralVisual, setAstralVisual] = useState<AstralVisual | null>(null);
+  const astralKeyRef = useRef<number | null>(null);
+  const pendingAstralDamageRef = useRef(new Map<number, { count: number; publish: (index: number) => void }>());
+  const pendingAstralVictoryRef = useRef(new Map<number, () => void>());
+  const updateAstralVisual = useCallback((battle: LiveCombatBattle,
+    action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name !== "星界寂滅") return;
+    astralKeyRef.current = key;
+    setAstralVisual({ key, ascended: battle.ascended.has("星界寂滅"), segments: action.astralSegments });
+  }, []);
+  const publishAstralImpact = (key: number, index: number) => pendingAstralDamageRef.current.get(key)?.publish(index);
+  const queueAstralNumbers = useCallback((key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void) => {
+    const segments = action.astralSegments;
+    const amounts = astralAmounts(segments, total);
+    const published = new Set<number>();
+    pendingAstralDamageRef.current.set(key, { count: segments.length, publish: index => {
+      if (published.has(index) || !segments[index]) return;
+      published.add(index);
+      if (index === 6) publishExtras();
+      const part = segments[index];
+      if (part.hit && amounts[index] <= 0) return;
+      const groupKey = -key - (index + 1) / 128;
+      setBattleHitGroups(current => [...current, { key: groupKey, skillName: "星界寂滅", ultimate: index === 6,
+        hits: [{ damage: amounts[index], critical: part.critical, label: part.label,
+          channel: index === 6 ? "ultimate" : index > 6 ? "extra" : "primary", delayMs: 0,
+          ...(!part.hit ? { text: "未命中！" } : {}) }] }]);
+      window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== groupKey)), 1500);
+    } });
+  }, []);
+  const finishAstralVisual = (key: number) => {
+    pendingAstralDamageRef.current.delete(key);
+    setAstralVisual(current => current?.key === key ? null : current);
+    if (astralKeyRef.current === key) astralKeyRef.current = null;
+    if (ultimateAnimationLockRef.current === key) ultimateAnimationLockRef.current = null;
+    ultimatePlaybackGuardRef.current.complete(key);
+    const victory = pendingAstralVictoryRef.current.get(key);
+    pendingAstralVictoryRef.current.delete(key); victory?.();
+  };
+  const [skyRainVisual, setSkyRainVisual] = useState<{ key: number; ascended: boolean;
+    arrows: ReturnType<typeof resolveLiveCombatAttack>["skyArrows"] } | null>(null);
+  const skyRainKeyRef = useRef<number | null>(null);
+  const pendingSkyDamageRef = useRef(new Map<number, (index: number) => void>());
+  const pendingSkyVictoryRef = useRef(new Map<number, () => void>());
+  const updateSkyRainVisual = useCallback((battle: LiveCombatBattle,
+    action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name !== "蒼穹箭雨") return;
+    skyRainKeyRef.current = key;
+    setSkyRainVisual({ key, ascended: battle.ascended.has("蒼穹箭雨"), arrows: action.skyArrows });
+  }, []);
+  const publishSkyRainImpact = (key: number, index: number) => pendingSkyDamageRef.current.get(key)?.(index);
+  const queueSkyRainNumbers = (key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void, ascended: boolean) => {
+    const arrows = action.skyArrows;
+    const extraWeight = Math.max(0, action.damagePercent
+      - arrows.reduce((sum, arrow) => sum + arrow.damagePercent, 0)
+      - (action.hunterExplosion?.damagePercent ?? 0));
+    const amounts = skyRainDisplayAmounts(total, arrows, extraWeight);
+    const published = new Set<number>();
+    pendingSkyDamageRef.current.set(key, (index) => {
+      if (published.has(index)) return;
+      published.add(index);
+      if (index === 8) publishExtras();
+      const hits = [
+        ...(arrows[index] && !arrows[index].hit ? [{damage:0,critical:false,text:"未命中！",
+          label:index===8?(ascended?"天罰主箭":"蒼穹主箭"):"聖箭",delayMs:0,skyIndex:index}] : []),
+        ...(arrows[index]?.hit && amounts[index] > 0 ? [{ damage: amounts[index],
+          critical: arrows[index].critical, label: index === 8 ? (ascended ? "天罰主箭" : "蒼穹主箭") : "聖箭",
+          delayMs: 0, skyIndex: index }] : []),
+        ...(index === 8 && amounts[9] > 0 ? [{ damage: amounts[9], critical: false,
+          label: "追加", delayMs: 80 }] : []),
+      ];
+      if (!hits.length) return;
+      const groupKey = -key - (index + 1) / 32;
+      setBattleHitGroups((current) => [...current, { key: groupKey, skillName: ascended ? "天罰箭雨" : "蒼穹箭雨", hits }]);
+      window.setTimeout(() => setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey)), 1500);
+    });
+  };
+  const finishSkyRainVisual = (key: number) => {
+    pendingSkyDamageRef.current.delete(key);
+    setSkyRainVisual((current) => current?.key === key ? null : current);
+    if (skyRainKeyRef.current === key) skyRainKeyRef.current = null;
+    if (ultimateAnimationLockRef.current === key) ultimateAnimationLockRef.current = null;
+    ultimatePlaybackGuardRef.current.complete(key);
+    const victory = pendingSkyVictoryRef.current.get(key);
+    pendingSkyVictoryRef.current.delete(key); victory?.();
+  };
   const [deadlyMarkEffect, setDeadlyMarkEffect] = useState<{
     key: number;
     detonationKey: number | null;
   } | null>(null);
   const [rangerImpactPulse, setRangerImpactPulse] = useState(false);
   const rangerImpactPulseTimerRef = useRef<number | null>(null);
-  const [frostfireImpactPulse, setFrostfireImpactPulse] = useState<"normal" | "detonation" | null>(null);
-  const frostfireImpactPulseTimerRef = useRef<number | null>(null);
-  const frostfireImpactDelayTimerRef = useRef<number | null>(null);
-  const [meteorImpactPulse, setMeteorImpactPulse] = useState(false);
-  const meteorImpactPulseTimerRef = useRef<number | null>(null);
 
   const triggerRangerImpact = () => {
     setRangerImpactPulse(false);
@@ -2028,35 +1986,13 @@ function Game({
     }, 190);
   };
 
-  const triggerFrostfireImpact = (detonation = false) => {
-    setFrostfireImpactPulse(null);
-    if (frostfireImpactDelayTimerRef.current !== null) {
-      window.clearTimeout(frostfireImpactDelayTimerRef.current);
-      frostfireImpactDelayTimerRef.current = null;
-    }
-    if (frostfireImpactPulseTimerRef.current !== null) {
-      window.clearTimeout(frostfireImpactPulseTimerRef.current);
-    }
-    const startPulse = () => {
-      window.requestAnimationFrame(() => setFrostfireImpactPulse(detonation ? "detonation" : "normal"));
-      frostfireImpactPulseTimerRef.current = window.setTimeout(() => {
-        setFrostfireImpactPulse(null);
-        frostfireImpactPulseTimerRef.current = null;
-      }, detonation ? 720 : 430);
-    };
-    if (detonation) startPulse();
-    else frostfireImpactDelayTimerRef.current = window.setTimeout(() => {
-      frostfireImpactDelayTimerRef.current = null;
-      startPulse();
-    }, 1320);
-  };
-
-  const queueMythicVfx = (effect: { name: string; key: number }) => {
+  const queueMythicVfx = useCallback((effect: { name: string; key: number }) => {
     const skill = effect.name.startsWith("致命標記")
       ? "致命標記"
       : effect.name.replace(/・(?:回響|爆炸|強化斬擊|血爆|裂痕引爆|灼燒引爆)$/, "");
-    // Frostfire Nova's six-frame VFX belongs to the skill itself. The
-    // Polar Staff only changes the follow-up into the four-frame detonation.
+    // Frostfire now owns one WebGL canvas; never mount its legacy CSS sprites.
+    if (skill === "霜火新星") return;
+    if (skill === "閃電鏈" || skill === "元素蝕印" || skill === "隕星術") return;
     if (skill !== "霜火新星" && skill !== "隕星術" && skill !== "奧術回響" && !equippedSkillMythic(equippedGearRef.current, skill)) return;
     const phase: MythicVfxPhase = /(?:爆炸|血爆|引爆)/.test(effect.name)
       ? "impact"
@@ -2070,58 +2006,96 @@ function Game({
     }, skill === "霜火新星" && variant === "normal"
       ? 2_400
       : (phase as MythicVfxPhase) === "loop" ? 2_600 : 1_700);
-  };
+  }, []);
 
-  const queueSkillVisual = (effect: { name: string; key: number }) => {
-    queueMythicVfx(effect);
+  const queueSkillVisual = useCallback((
+    effect: { name: string; key: number },
+    options: { showVisual?: boolean; showBanner?: boolean } = {},
+  ) => {
+    const showVisual = options.showVisual ?? true;
+    const ultimate = SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+      skill.category === "ultimate" && skill.name === effect.name.split("・")[0]);
+    const showBanner = (options.showBanner ?? true) && !ultimate;
+    if (showVisual) queueMythicVfx(effect);
     const baseName = effect.name.replace(/・(?:回響|爆炸|強化斬擊|血爆|裂痕引爆|灼燒引爆)$/, "");
-    if (baseName === "霜火新星") triggerFrostfireImpact(effect.name.includes("灼燒引爆"));
-    if (baseName === "隕星術") {
-      if (meteorImpactPulseTimerRef.current !== null) window.clearTimeout(meteorImpactPulseTimerRef.current);
-      meteorImpactPulseTimerRef.current = window.setTimeout(() => {
-        window.requestAnimationFrame(() => setMeteorImpactPulse(true));
-        meteorImpactPulseTimerRef.current = window.setTimeout(() => {
-          setMeteorImpactPulse(false);
-          meteorImpactPulseTimerRef.current = null;
-        }, 520);
-      }, 650);
+    setSkillEffect(showVisual ? effect : null);
+    if (ultimate) {
+      setSkillBannerEffect(null);
+    } else if (showBanner) {
+      setSkillBannerEffect(effect);
+      window.setTimeout(() => {
+        setSkillBannerEffect((current) => (current?.key === effect.key ? null : current));
+      }, skillBannerDuration());
     }
-    setSkillEffect(effect);
-    setSkillBannerEffect(effect);
-    window.setTimeout(() => {
-      setSkillBannerEffect((current) => (current?.key === effect.key ? null : current));
-    }, skillBannerDuration());
-    if (["裂地斬", "處決", "穿雲箭", "疾風連射", "致命標記", "致命標記・爆炸", "霜火新星", "隕星術"].includes(baseName) || baseName.endsWith("・共鳴斬")) return;
+    if (!showVisual) return;
+    if (["裂地斬", "處決", "穿雲箭", "追風箭", "獵殺標記", "風行領域", "破星狙擊", "疾風連射", "致命標記", "致命標記・爆炸", "霜火新星", "閃電鏈", "元素蝕印", "隕星術", "虛空崩解", "奧術超載", "血戰烙印", "碎甲猛擊", "泰坦斷界斬", "蒼穹箭雨", "星界寂滅"].includes(baseName) || baseName.endsWith("・共鳴斬")) return;
     setSkillVisualEffects((current) => [...current, effect]);
     window.setTimeout(() => {
       setSkillVisualEffects((current) => current.filter((item) => item.key !== effect.key));
     }, 2_200);
-  };
+  }, [playerClass, queueMythicVfx]);
   // Ground-split owns its own lifetime so a dying/changing enemy or a normal
   // attack cannot unmount the fissure before its visual timeout.
-  const [groundSplitEffect, setGroundSplitEffect] = useState<{ key: number } | null>(null);
+  const [groundSplitEffect, setGroundSplitEffect] = useState<{ key: number; hit: boolean } | null>(null);
+  const [groundShockEffects, setGroundShockEffects] = useState<{ key: number }[]>([]);
+  const pendingGroundDamageRef = useRef(new Map<number, () => void>());
+  const pendingGroundShockDamageRef = useRef(new Map<number, () => void>());
+  const publishGroundImpactDamage = (eventKey: number) => {
+    const publish = pendingGroundDamageRef.current.get(eventKey);
+    pendingGroundDamageRef.current.delete(eventKey);
+    publish?.();
+  };
+  const publishGroundShockDamage = (eventKey: number) => {
+    const publish = pendingGroundShockDamageRef.current.get(eventKey);
+    pendingGroundShockDamageRef.current.delete(eventKey);
+    publish?.();
+  };
   const [executionEffect, setExecutionEffect] = useState<{
     key: number;
   } | null>(null);
   const [executionImpactPulse, setExecutionImpactPulse] = useState(false);
+  const [unyieldingVisual, setUnyieldingVisual] = useState({
+    eventKey: 0, active: false, activated: false, blocked: false, countered: false,
+    remainingEnemyAttacks: 0, ascendedCounterStacks: 0,
+  });
+  const [bloodBrandVisual, setBloodBrandVisual] = useState<{ castKey: number; expiresAt: number; burstKey: number } | null>(null);
   const [bloodRoarVisualActive, setBloodRoarVisualActive] = useState(false);
   const [bloodRoarSlashKey, setBloodRoarSlashKey] = useState(0);
+  const [bloodReturnKey, setBloodReturnKey] = useState(0);
+  const [berserkerStanceVisual, setBerserkerStanceVisual] = useState({ active: false, activationKey: 0, pulseKey: 0, attackKey: 0, attackHit: false, attackTarget: "", ascended: false, extensions: 0 });
+  const berserkerStanceExtensionsRef = useRef(0);
+  const [armorSmashVisual, setArmorSmashVisual] = useState<{ key: number; hit: boolean; enhanced: boolean; ascended: boolean } | null>(null);
+  const [titanUltimateVisual, setTitanUltimateVisual] = useState<{ key: number; hit: boolean; ascended: boolean } | null>(null);
+  const ultimateAnimationLockRef = useRef<number | null>(null);
+  const ultimatePlaybackGuardRef = useRef(new CombatPlaybackGuard());
+  const beginUltimateAnimation = useCallback((eventKey:number) => {
+    ultimateAnimationLockRef.current=eventKey;
+    ultimatePlaybackGuardRef.current.begin(eventKey,performance.now());
+  },[]);
+  const [titanEchoVisuals, setTitanEchoVisuals] = useState<{ key: number; slashIndex: number }[]>([]);
+  // Queue display only: combat has already settled this damage. The loaded
+  // sprite calls this publisher at frame 15, even when image loading is slow.
+  const pendingTitanDamageRef = useRef(new Map<number, () => void>());
+  const titanDamageTimersRef = useRef(new Map<number, number>());
+  const publishTitanImpactDamage = (eventKey: number) => {
+    const publish = pendingTitanDamageRef.current.get(eventKey);
+    pendingTitanDamageRef.current.delete(eventKey);
+    publish?.();
+  };
   const [comboCount, setComboCount] = useState(1);
-  const [lastDamage, setLastDamage] = useState(0);
-  const [battleHits, setBattleHits] = useState<
+  const [, setLastDamage] = useState(0);
+  const [, setBattleHits] = useState<
     { damage: number; critical: boolean; volley?: boolean }[]
   >([]);
   const [battleHitGroups, setBattleHitGroups] = useState<{
     key: number;
-    hits: { damage: number; critical: boolean; delayMs?: number }[];
+    titan?: boolean; ultimate?: boolean; skillName?: string;
+    hits: { damage: number; critical: boolean; delayMs?: number; label?: string; text?: string; skyIndex?: number; channel?: FloatChannel }[];
   }[]>([]);
   const [setElementalHits, setSetElementalHits] = useState<{
     key: number;
-    hits: { damage: number; label: string }[];
+    hits: { damage: number; label: string; delayMs?: number }[];
     volley: boolean;
-  }[]>([]);
-  const [dotDamageGroups, setDotDamageGroups] = useState<{
-    key: number; kind: "bleed" | "burn"; damage: number;
   }[]>([]);
   const [enemyHitFeedback, setEnemyHitFeedback] = useState<{
     damage: number;
@@ -2132,15 +2106,411 @@ function Game({
     damage: number;
     dodged: boolean;
     blocked?: boolean;
+    label?: string;
     key: number;
   } | null>(null);
+  const [unyieldingCounterFeedback, setUnyieldingCounterFeedback] = useState<number | null>(null);
   const [missFeedback, setMissFeedback] = useState<number | null>(null);
+  const [elementSigilVisual, setElementSigilVisual] = useState(emptyElementSigilVisual);
+  const [manaShieldVisual, setManaShieldVisual] = useState(emptyManaShieldVisual);
+  const [overloadVisual, setOverloadVisual] = useState(emptyOverloadVisual);
+  const [voidVisuals, setVoidVisuals] = useState<VoidVisual[]>([]);
+  const pendingVoidRef = useRef(new Map<number, { at: number; publish: () => void }>());
+  const publishVoidImpact = (key: number) => pendingVoidRef.current.get(key)?.publish();
+  const finishVoidVisual = (key: number) => {
+    pendingVoidRef.current.delete(key);
+    setVoidVisuals(current => current.filter(effect => effect.key !== key));
+  };
+  const queueVoidNumbers = useCallback((key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void, ascended: boolean) => {
+    const hit = action.hits.some(part => part.hit);
+    let published = false;
+    setVoidVisuals(current => [...current.filter(effect => effect.key !== key), { key, hit, ascended }]);
+    pendingVoidRef.current.set(key, { at: performance.now(), publish: () => {
+      if (published) return;
+      published = true; publishExtras();
+      if (hit && total <= 0) return;
+      const groupKey = -key - 7 / 64;
+      setBattleHitGroups(current => [...current, { key: groupKey, skillName: "虛空崩解",
+        hits: [{ damage: total, critical: action.critical, channel: "primary", delayMs: 0,
+          ...(!hit ? { text: "未命中！" } : {}) }] }]);
+      window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== groupKey)), 1200);
+    } });
+  }, []);
+  const [meteorVisuals, setMeteorVisuals] = useState<MeteorVisual[]>([]);
+  const pendingMeteorRef = useRef(new Map<number, { at: number; publish: (index: number) => void }>());
+  const publishMeteorImpact = (key: number, index: number) => pendingMeteorRef.current.get(key)?.publish(index);
+  const finishMeteorVisual = (key: number) => {
+    pendingMeteorRef.current.delete(key);
+    setMeteorVisuals(current => current.filter(effect => effect.key !== key));
+  };
+  const queueMeteorNumbers = useCallback((key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void) => {
+    const hit = action.hits.some(part => part.hit), afterburst = action.meteorAfterburst;
+    const ascended = liveCombatRef.current?.ascended.has("隕星術") ?? false;
+    const amounts = meteorAmounts(total, action.damagePercent, afterburst);
+    const published = new Set<number>();
+    const burnExpiry = action.statuses.includes("burn") ? liveCombatRef.current?.combat.session.enemy.burn?.expiresAt : undefined;
+    if (burnExpiry !== undefined) frostfireGatesRef.current.burn = burnExpiry;
+    setMeteorVisuals(current => [...current.filter(effect => effect.key !== key), { key, hit, afterburst, ascended }]);
+    pendingMeteorRef.current.set(key, { at: performance.now(), publish: index => {
+      if (index > (afterburst ? 1 : 0) || published.has(index)) return;
+      published.add(index);
+      if (index === 0) {
+        publishExtras();
+        if (burnExpiry !== undefined && frostfireGatesRef.current.burn === burnExpiry) delete frostfireGatesRef.current.burn;
+      }
+      const landed = index === 0 ? hit : afterburst!.hit;
+      if (landed && amounts[index] <= 0) return;
+      const groupKey = -key - (index + 1) / 64;
+      setBattleHitGroups(current => [...current, { key: groupKey, skillName: "隕星術",
+        hits: [{ damage: amounts[index], critical: index === 0 ? action.critical : afterburst!.critical,
+          channel: index === 0 ? "primary" : "extra", delayMs: 0,
+          label: index === 1 ? "天火墜星" : undefined, ...(!landed ? { text: "未命中！" } : {}) }] }]);
+      window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== groupKey)), 1200);
+    } });
+  }, []);
+  const updateMeteorVisual = useCallback((action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name === "隕星術") queueMeteorNumbers(key, action, 0, () => {});
+  }, [queueMeteorNumbers]);
+  const [lightningVisuals, setLightningVisuals] = useState<LightningVisual[]>([]);
+  const [lightningParalysis, setLightningParalysis] = useState<number | undefined>();
+  const pendingLightningRef = useRef(new Map<number, (index: number) => void>());
+  const lightningParalysisGateRef = useRef<number | undefined>(undefined);
+  const publishLightningImpact = (key: number, index: number) => pendingLightningRef.current.get(key)?.(index);
+  const finishLightningVisual = (key: number) => {
+    pendingLightningRef.current.delete(key);
+    setLightningVisuals(current => current.filter(effect => effect.key !== key));
+  };
+  const queueLightningNumbers = useCallback((key: number, action: ReturnType<typeof resolveLiveCombatAttack>,
+    total: number, publishExtras: () => void, ascended: boolean) => {
+    const segments = action.lightningSegments;
+    const amounts = lightningAmounts(segments, total);
+    const published = new Set<number>(); let extrasPublished = false;
+    if (action.statuses.includes("paralysis")) lightningParalysisGateRef.current = liveCombatRef.current?.combat.session.enemy.paralysis?.expiresAt;
+    setLightningVisuals(current => [...current.filter(effect => effect.key !== key), { key, segments, ascended }]);
+    pendingLightningRef.current.set(key, index => {
+      const part = segments[index];
+      if (!part || published.has(index)) return;
+      published.add(index);
+      if (!extrasPublished && (part.hit || published.size === segments.length)) {
+        extrasPublished = true; publishExtras(); lightningParalysisGateRef.current = undefined;
+      }
+      if (part.hit && amounts[index] <= 0) return;
+      const groupKey = -key - (index + 1) / 32;
+      setBattleHitGroups(current => [...current, { key: groupKey, skillName: index === 3 ? "雷環共鳴" : "閃電鏈",
+        hits: [{ damage: amounts[index], critical: part.critical, delayMs: 0,
+          channel: index === 3 ? "extra" : "primary", label: index === 3 ? "雷環共鳴" : undefined,
+          ...(!part.hit ? { text: "未命中！" } : {}) }] }]);
+      window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== groupKey)), 1200);
+    });
+  }, []);
+  const [frostfireVisuals, setFrostfireVisuals] = useState<FrostfireVisual[]>([]);
+  const [frostfireStatuses, setFrostfireStatuses] = useState<FrostfireStatusVisual>({});
+  const pendingFrostfireDamageRef = useRef(new Map<number, () => void>());
+  const frostfireGatesRef = useRef<FrostfireStatusVisual>({});
+  const publishFrostfireImpact = (key: number) => {
+    const publish = pendingFrostfireDamageRef.current.get(key);
+    pendingFrostfireDamageRef.current.delete(key); publish?.();
+    const effect = frostfireVisuals.find(item => item.key === key);
+    if (effect?.status && frostfireGatesRef.current[effect.status.kind] === effect.status.expiresAt)
+      delete frostfireGatesRef.current[effect.status.kind];
+    if (effect?.afterburst) setFrostfireVisuals(current => [...current,
+      { key: effect.afterburst!.key, kind: "afterburst", hit: effect.afterburst!.hit }]);
+  };
+  const finishFrostfireVisual = (key: number) => {
+    pendingFrostfireDamageRef.current.delete(key);
+    setFrostfireVisuals(current => current.filter(item => item.key !== key));
+  };
+  const publishFrostfireNumber = useCallback((key: number, damage: number, critical: boolean, label?: string, missed = false) => {
+    if (!(damage > 0) && !missed) return;
+    setBattleHitGroups(current => [...current, { key, skillName: label ? undefined : "霜火新星", hits: [{ damage, critical, label,
+      channel: label ? "extra" : "primary", delayMs: 0, ...(missed ? { text: "未命中！" } : {}) }] }]);
+    window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== key)), 1200);
+  }, []);
+  const updateFrostfireVisual = useCallback((battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (action.name !== "霜火新星") return;
+    const kind = action.statuses.includes("freeze") ? "freeze" : action.statuses.includes("burn") ? "burn" : null;
+    const expiresAt = kind ? battle.combat.session.enemy[kind]?.expiresAt : undefined;
+    if (kind && expiresAt !== undefined) frostfireGatesRef.current[kind] = expiresAt;
+    const hit = action.hits.some(part => part.hit);
+    const afterburst = action.frostfireAfterburst;
+    setFrostfireVisuals(current => [...current.filter(item => item.key !== key), { key, kind: "main", hit,
+      ...(kind && expiresAt !== undefined ? { status: { kind, expiresAt } } : {}),
+      ...(afterburst ? { afterburst: { key: -key - .75, hit: afterburst.hit } } : {}) }]);
+    if (!hit) pendingFrostfireDamageRef.current.set(key, () => publishFrostfireNumber(key, 0, false, undefined, true));
+  }, [publishFrostfireNumber]);
+  const queueFrostfireAfterburstNumber = useCallback((key: number, damage: number, extra: ReturnType<typeof resolveLiveCombatAttack>["frostfireAfterburst"]) => {
+    if (!extra) return;
+    const burstKey = -key - .75;
+    pendingFrostfireDamageRef.current.set(burstKey, () => publishFrostfireNumber(burstKey, damage, extra.critical, "灼燒餘爆", !extra.hit));
+  }, [publishFrostfireNumber]);
+  const queueFrostfireShatter = useCallback((group: { key: number; kind: "freeze"; damage: number; critical?: boolean }) => {
+    const key = -group.key - .25;
+    pendingFrostfireDamageRef.current.set(key, () => {
+      setDotDamageGroups(current => [...current, group]);
+      window.setTimeout(() => setDotDamageGroups(current => current.filter(item => item.key !== group.key)), 1200);
+    });
+    setFrostfireVisuals(current => [...current, { key, kind: "shatter", hit: true }]);
+  }, []);
+  const [dotDamageGroups, setDotDamageGroups] = useState<{
+    key: number; kind: "bleed" | "burn" | "freeze" | "echo"; damage: number; critical?: boolean;
+  }[]>([]);
+  const dotDamageKeyRef = useRef(0);
+  const showDotDamage = useCallback((events: readonly LiveDotDamageEvent[], actualDamage: number) => {
+    const groups = splitAsyncDamageForDisplay(events, actualDamage)
+      .map((event) => ({ ...event, key: ++dotDamageKeyRef.current }));
+    if (!groups.length) return;
+    for (const group of groups) if (group.kind === "freeze") queueFrostfireShatter({ ...group, kind: "freeze" });
+    setDotDamageGroups((current) => [...current, ...groups.filter(group => group.kind !== "freeze")]);
+    window.setTimeout(() => setDotDamageGroups((current) => current.filter((item) =>
+      !groups.some((group) => group.key === item.key))), 1_200);
+  }, [queueFrostfireShatter]);
+  const counterDamageKeyRef=useRef(0);
+  const showCounterDamage=(damage:number,label="反擊")=>{
+    if(damage<=0)return;
+    const key=-(++counterDamageKeyRef.current)-.9375;
+    setBattleHitGroups((current)=>[...current,{key,hits:[{damage,critical:false,label,channel:"extra",delayMs:0}]}]);
+    window.setTimeout(()=>setBattleHitGroups((current)=>current.filter((group)=>group.key!==key)),1200);
+  };
+  const showMythicDamage = (hits: ReturnType<typeof splitMythicDamage>["hits"]) => {
+    const shown = hits.filter(hit => hit.damage > 0);
+    if (!shown.length) return;
+    const key = -(++counterDamageKeyRef.current) - .875;
+    setBattleHitGroups(current => [...current, { key,
+      hits: shown.map(hit => ({ damage: hit.damage, label: hit.label, critical: hit.critical,
+        channel: "extra" as const, delayMs: 0 })) }]);
+    window.setTimeout(() => setBattleHitGroups(current => current.filter(group => group.key !== key)), 1200);
+  };
+  const updateLiveBloodRoar = (battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (battle.characterClass !== "戰士" || !action.bloodRoarEmpowered) return;
+    const remaining = (battle.combat as WarriorCombat).buffs.bloodRoarRemaining;
+    if (action.bloodRoarActivated) {
+      bloodRoarVisualTokenRef.current++;
+      setBloodRoarVisualActive(true);
+      queueSkillVisual({ name: "鮮血怒吼", key });
+    }
+    if (action.currentHealthCostPercent && action.equipmentHits.some(hit => hit.label === "血神降臨"))
+      queueSkillVisual({ name: "鮮血怒吼・血爆", key: key + .125 }, { showBanner: false });
+    if (remaining === 0) {
+      const token = bloodRoarVisualTokenRef.current;
+      if (bloodRoarHideTimerRef.current !== null) window.clearTimeout(bloodRoarHideTimerRef.current);
+      bloodRoarHideTimerRef.current = window.setTimeout(() => {
+        if (token === bloodRoarVisualTokenRef.current) setBloodRoarVisualActive(false);
+        bloodRoarHideTimerRef.current = null;
+      }, 700);
+    }
+  };
   const [combatStatuses, setCombatStatuses] = useState<CombatStatus[]>([]);
   const showCombatStatus = (status: CombatStatus) => {
     setCombatStatuses((current) => [
       ...current.filter((item) => !(item.name === status.name && item.target === status.target)),
-      status,
+      status.unit === "秒" ? { ...status, expiresAt: status.expiresAt ?? Date.now() + status.remaining * 1000 } : status,
     ]);
+  };
+  const [hunterMarkVisual, setHunterMarkVisual] = useState<HunterMarkVisual | null>(null);
+  const [hunterBursts, setHunterBursts] = useState<HunterBurstVisual[]>([]);
+  const pendingHunterBurstRef = useRef(new Map<number, HunterBurstVisual>());
+  const pendingHunterDamageRef = useRef(new Map<number, () => void>());
+  const publishHunterImpact = (eventKey: number) => {
+    const publish = pendingHunterDamageRef.current.get(eventKey);
+    if (!publish) return;
+    pendingHunterDamageRef.current.delete(eventKey); publish();
+  };
+  const finishHunterBurst = (eventKey: number) => {
+    pendingHunterDamageRef.current.delete(eventKey);
+    setHunterBursts((current) => current.filter((item) => item.key !== eventKey));
+  };
+  const expireHunterMark = (castKey: number) => {
+    setHunterMarkVisual((current) => current?.castKey === castKey && !current.pending
+      && current.expiresAt <= Date.now() ? null : current);
+  };
+  const triggerHunterBurst = useCallback((eventKey: number) => {
+    const burst = pendingHunterBurstRef.current.get(eventKey);
+    if (!burst) return;
+    pendingHunterBurstRef.current.delete(eventKey);
+    setHunterBursts((current) => [...current.filter((item) => item.key !== eventKey), burst]);
+  }, []);
+  const updateHunterVisual = useCallback((battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (battle.characterClass !== "遊俠") return;
+    const mark = action.hunterMark;
+    setHunterMarkVisual((current) => mark ? { ...mark,
+      castKey: mark.activated ? eventKey : current?.castKey ?? eventKey,
+      pulseKey: !mark.activated && action.hits.some(part => part.hit) ? eventKey : current?.pulseKey ?? 0 } : null);
+    if (action.hunterExplosion) {
+      pendingHunterBurstRef.current.set(eventKey, { key: eventKey, hit: action.hunterExplosion.hit });
+      if (action.damagePercent <= 0) triggerHunterBurst(eventKey);
+    }
+  }, [triggerHunterBurst]);
+  const queueHunterBurstNumber = (eventKey: number, damage: number, critical: boolean) => {
+    if (damage <= 0) return;
+    pendingHunterDamageRef.current.set(eventKey, () => {
+      const key = -eventKey - .75;
+      setBattleHitGroups((current) => [...current, { key,
+        hits: [{ damage, critical, label: "死亡鎖定", delayMs: 0 }] }]);
+      window.setTimeout(() => setBattleHitGroups((current) => current.filter((group) => group.key !== key)), 1200);
+    });
+  };
+  const [windDomainVisual, setWindDomainVisual] = useState<WindDomainVisual | null>(null);
+  const updateWindDomainVisual = useCallback((battle: LiveCombatBattle,
+    action: ReturnType<typeof resolveLiveCombatAttack>, key: number) => {
+    if (battle.characterClass !== "遊俠") return;
+    const domain = (battle.combat as RangerCombat).windDomain;
+    const activated = action.name === "風行領域";
+    const attacking = !activated && action.name !== "獵殺標記" && action.hits.length > 0;
+    setWindDomainVisual((current) => windDomainVisualState(domain, current, key, activated, attacking));
+  }, []);
+  const finishWindDomain = (key: number) => {
+    setWindDomainVisual((current) => current?.castKey === key && current.ending ? null : current);
+  };
+  const [phantomStepVisual, setPhantomStepVisual] = useState<PhantomStepVisual | null>(null);
+  const updatePhantomStepVisual = (battle: LiveCombatBattle, eventKey: number, event?: PhantomStepEvent) => {
+    if (battle.characterClass !== "遊俠") return;
+    const defense = (battle.combat as RangerCombat).defense;
+    setPhantomStepVisual((current) => phantomStepVisualState(defense, current, eventKey, event));
+  };
+  const finishPhantomStepBurst = (eventKey: number) => {
+    setPhantomStepVisual((current) => {
+      if (!current || current.eventKey !== eventKey) return current;
+      return current.active || current.nextHitReady || current.nextSkillReady
+        ? { ...current, eventKey: 0, burst: null } : null;
+    });
+  };
+  const updateUnyieldingVisual = (event: NonNullable<ReturnType<typeof resolveLiveEnemyAttack>["unyielding"]>, eventKey: number) => {
+    setUnyieldingVisual((current) => {
+      if (!event.active && !event.activated && !current.active) return current;
+      return { ...event, eventKey };
+    });
+  };
+  const finishUnyieldingVisual = (eventKey: number) => {
+    setUnyieldingVisual((current) => current.eventKey === eventKey && !current.active
+      ? { eventKey: 0, active: false, activated: false, blocked: false, countered: false,
+        remainingEnemyAttacks: 0, ascendedCounterStacks: 0 }
+      : current);
+  };
+  const updateBloodBrandVisual = (action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name === "血戰烙印" && action.statuses.includes("bloodBrand") && action.bloodBrandExpiresAt) {
+      setBloodBrandVisual((current) => ({ castKey: eventKey, expiresAt: action.bloodBrandExpiresAt!,
+        burstKey: action.bloodBrandBurst ? eventKey : current?.burstKey ?? 0 }));
+    } else if (action.bloodBrandBurst) {
+      setBloodBrandVisual((current) => current && current.expiresAt > Date.now()
+        ? { ...current, burstKey: eventKey } : current);
+    }
+  };
+  const finishBloodBrandVisual = (castKey: number) => {
+    setBloodBrandVisual((current) => current?.castKey === castKey && current.expiresAt <= Date.now()
+      ? null : current);
+  };
+  const updateBerserkerStanceVisual = (battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (battle.characterClass !== "戰士") return;
+    const buffs = (battle.combat as WarriorCombat).buffs;
+    const activated = action.name === "狂戰姿態";
+    const extended = !activated && buffs.stanceExtensions > berserkerStanceExtensionsRef.current;
+    berserkerStanceExtensionsRef.current = buffs.stanceExtensions;
+    setBerserkerStanceVisual((current) => ({
+      active: buffs.stanceRemaining > 0,
+      activationKey: activated ? eventKey : current.activationKey,
+      pulseKey: extended ? eventKey : current.pulseKey,
+      attackKey: action.stanceEmpowered ? eventKey : current.attackKey,
+      attackHit: action.stanceEmpowered ? action.hits.some(part => part.hit) : current.attackHit,
+      attackTarget: action.stanceEmpowered ? battle.target : current.attackTarget,
+      ascended: battle.ascended.has("狂戰姿態"),
+      extensions: buffs.stanceExtensions,
+    }));
+  };
+  const updateArmorSmashVisual = (battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name !== "碎甲猛擊") return;
+    const hit = action.hits.some((part) => part.hit);
+    setArmorSmashVisual({ key: eventKey, hit, enhanced: hit && action.repeatedArmorBreakBonusPercent > 0, ascended: battle.ascended.has("碎甲猛擊") });
+  };
+  const updateGroundSplitVisuals = (action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name === "裂地斬")
+      setGroundSplitEffect({ key: eventKey, hit: action.hits.some((part) => part.hit) });
+    if (action.groundShockDamagePercent > 0)
+      setGroundShockEffects((current) => [...current.filter((effect) => effect.key !== eventKey), { key: eventKey }]);
+  };
+  const updatePiercingVisual = (action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name === "穿雲箭")
+      setRangerPiercingEffect({ key: eventKey, hit: action.hits.some((part) => part.hit) });
+  };
+  const updateTailwindVisual = (action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name !== "追風箭") return;
+    setTailwindVisuals((current) => [...current.filter((item) => item.key !== eventKey), {
+      key: eventKey, hit: action.hits.some((part) => part.hit),
+      echo: action.tailwindEcho, chargeRecovered: action.tailwindChargeRecovered,
+    }]);
+  };
+  const queueTailwindEchoNumber = (eventKey: number, damage: number, critical: boolean) => {
+    if (damage <= 0) return;
+    pendingTailwindEchoDamageRef.current.set(eventKey, () => {
+      const key = -eventKey - .5;
+      setBattleHitGroups((current) => [...current, { key,
+        hits: [{ damage, critical, label: "追擊", delayMs: 0 }] }]);
+      window.setTimeout(() => setBattleHitGroups((current) => current.filter((group) => group.key !== key)), 1200);
+    });
+  };
+  const finishGroundSplitVisual = (eventKey: number) => {
+    pendingGroundDamageRef.current.delete(eventKey);
+    setGroundSplitEffect((current) => current?.key === eventKey ? null : current);
+  };
+  const finishGroundShockVisual = (eventKey: number) => {
+    pendingGroundShockDamageRef.current.delete(eventKey);
+    setGroundShockEffects((current) => current.filter((effect) => effect.key !== eventKey));
+  };
+  const queueGroundShockNumber = (eventKey: number, damage: number) => {
+    if (damage <= 0) return;
+    pendingGroundShockDamageRef.current.set(eventKey, () => {
+      const key = -eventKey;
+      setBattleHitGroups((current) => [...current, { key,
+        hits: [{ damage, critical: false, label: "震地", delayMs: 0 }] }]);
+      window.setTimeout(() => setBattleHitGroups((current) => current.filter((group) => group.key !== key)), 1200);
+    });
+  };
+  const finishArmorSmashVisual = (eventKey: number) => {
+    setArmorSmashVisual((current) => current?.key === eventKey ? null : current);
+  };
+  const updateTitanVisuals = (battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>, eventKey: number) => {
+    if (action.name === "泰坦斷界斬") {
+      pendingTitanDamageRef.current.clear();
+      setTitanUltimateVisual({ key: eventKey, hit: action.hits.some((part) => part.hit), ascended: battle.ascended.has("泰坦斷界斬") });
+    }
+    if (action.titanSlashHits > 0 && action.titanSlashIndex !== null)
+      setTitanEchoVisuals((current) => [...current.filter((item) => item.key !== eventKey),
+        { key: eventKey, slashIndex: action.titanSlashIndex! }]);
+  };
+  const finishTitanUltimateVisual = (eventKey: number) => {
+    pendingTitanDamageRef.current.delete(eventKey);
+    setTitanUltimateVisual((current) => current?.key === eventKey ? null : current);
+    if (ultimateAnimationLockRef.current === eventKey) ultimateAnimationLockRef.current = null;
+    ultimatePlaybackGuardRef.current.complete(eventKey);
+  };
+  const finishUltimateAnimation = (eventKey: number) => {
+    if (ultimateAnimationLockRef.current === eventKey) ultimateAnimationLockRef.current = null;
+    ultimatePlaybackGuardRef.current.complete(eventKey);
+  };
+  const recoverInterruptedUltimate = useEffectEvent(() => {
+    if(!saveReady || sessionSuperseded)return;
+    const visible=tab==="主控" && documentVisible;
+    const key=ultimatePlaybackGuardRef.current.takeRecovery(performance.now(),visible);
+    if(key===null || ultimateAnimationLockRef.current!==key)return;
+    // Only publish settled display amounts. Never reroll, deal new damage or
+    // award a second kill; the existing keyed publishers/victory guard own it.
+    publishTitanImpactDamage(key);
+    for(let index=0;index<9;index++)pendingSkyDamageRef.current.get(key)?.(index);
+    for (let index=0;index<(pendingAstralDamageRef.current.get(key)?.count ?? 0);index++) pendingAstralDamageRef.current.get(key)?.publish(index);
+    finishAstralVisual(key);
+    finishSkyRainVisual(key);
+    finishTitanUltimateVisual(key);
+    finishUltimateAnimation(key);
+    setSkillVisualEffects((current)=>current.filter((effect)=>effect.key!==key));
+  });
+  useEffect(()=>{
+    recoverInterruptedUltimate();
+    const timer=window.setInterval(recoverInterruptedUltimate,100);
+    return()=>window.clearInterval(timer);
+  },[tab,documentVisible]);
+  const finishTitanEchoVisual = (eventKey: number) => {
+    setTitanEchoVisuals((current) => current.filter((item) => item.key !== eventKey));
   };
   const [battleDrops, setBattleDrops] = useState<BattleDrop[]>([]);
   const [lootInspect, setLootInspect] = useState<BattleDrop | null>(null);
@@ -2151,7 +2521,7 @@ function Game({
   const [blessingDrawing, setBlessingDrawing] = useState(false);
   const [blessingUnavailable, setBlessingUnavailable] = useState(false);
   const [blessingCountdown, setBlessingCountdown] = useState(5);
-  const [causePrompt, setCausePrompt] = useState("");
+  const [, setCausePrompt] = useState("");
   const [resourceDrop, setResourceDrop] = useState<{
     key: number;
     gold: number;
@@ -2170,6 +2540,7 @@ function Game({
   const [highestFloor, setHighestFloor] = useState(1);
   const [completedRuns, setCompletedRuns] = useState(0);
   const [rebirthCount, setRebirthCount] = useState(0);
+  const [legacyRebirthCount, setLegacyRebirthCount] = useState(0);
   const [selectedTitle, setSelectedTitle] = useState<TitleId>("none");
   const [selectedAppearance, setSelectedAppearance] = useState<AppearanceId>("none");
   const [ownedTitles, setOwnedTitles] = useState<TitleId[]>(["none"]);
@@ -2178,11 +2549,26 @@ function Game({
   const [rebirthTalents, setRebirthTalents] = useState<RebirthTalents>(emptyRebirthTalents);
   const [finalBossDefeated, setFinalBossDefeated] = useState(false);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
-  const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [rebirthOpen, setRebirthOpen] = useState(false);
   const [restartCountdown, setRestartCountdown] = useState(10);
   const [storedSeconds, setStoredSeconds] = useState(0);
+  const idleStorageClockRef = useRef<IdleStorageClock | null>(null);
+  const resetStoredTime = useCallback((seconds: number, updatedAt?: string | null) => {
+    const clock = resetIdleStorageClock(idleStorageClockRef.current, seconds, performance.now(), updatedAt);
+    idleStorageClockRef.current = clock;
+    setStoredSeconds(clock.seconds);
+  }, []);
+  const reconcileStoredTime = useCallback((seconds: number, epoch: number, updatedAt?: string | null) => {
+    const clock = idleStorageClockRef.current;
+    if (!clock) return;
+    const next = reconcileIdleStorageClock(clock, seconds, performance.now(), epoch, updatedAt);
+    idleStorageClockRef.current = next;
+    setStoredSeconds(next.seconds);
+  }, []);
   const [offlineClaimPending, setOfflineClaimPending] = useState(false);
+  const offlineClaimPendingRef = useRef(false);
+  const pendingIdleClaimIdRef = useRef<string | null>(null);
+  const lastIdleClaimIdRef = useRef<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [bagCategory, setBagCategory] = useState<"全部" | "武器" | "防具" | "飾品" | "套裝" | "未查看">("全部");
   const [bagSort, setBagSort] = useState<"戰力" | "品質" | "強化" | "最新">("戰力");
@@ -2199,16 +2585,44 @@ function Game({
     1: [],
     2: [],
   });
-  const [skillPoints, setSkillPoints] = useState(0);
   const [skillReworkBuild, setSkillReworkBuild] = useState<SkillBuild>(createSkillBuild);
+  const availableSkillPoints = Math.max(0,
+    Math.max(earnedSkillPoints(level), skillReworkBuild.adminPointLimit ?? earnedSkillPoints(level))
+      - spentSkillPoints(skillReworkBuild));
+  const bloodRoarLevel = skillReworkBuild.ranks["鮮血怒吼"] ?? 0;
   const liveCombatRef = useRef<LiveCombatBattle | null>(null);
+  const updateOverload = useCallback((battle: LiveCombatBattle | null) => {
+    if (!battle || battle.characterClass !== "法師") { setOverloadVisual(previous => previous.enabled ? emptyOverloadVisual() : previous); return; }
+    const mage = battle.combat as MageCombat, overload = mage.overload;
+    const snapshot = { owner: `${battle.owner}:${battle.signature}`, enabled: (battle.build.ranks["奧術超載"] ?? 0) > 0 && battle.build.activeSlots.includes("奧術超載"),
+      phase: overload.phase, charge: mage.session.charge.charges["奧術超載"] ?? 0,
+      remaining: overload.phase === "overloaded" ? overload.remainingSuccessfulCasts : 0,
+      stability: overload.phase === "overloaded" ? overload.stabilityStacks : 0,
+      ascended: overload.phase === "overloaded" ? overload.ascended : battle.ascended.has("奧術超載"),
+      expiresAt: overload.phase === "exhausted" ? overload.expiresAt ?? 0 : 0 };
+    const now = Date.now();
+    setOverloadVisual(previous => updateOverloadVisual(previous, snapshot, now));
+  }, []);
+  const updateElementSigil = useCallback((battle: LiveCombatBattle, action: ReturnType<typeof resolveLiveCombatAttack>) => {
+    if (battle.characterClass !== "法師") return;
+    const mage = battle.combat as MageCombat;
+    const snapshot = { target: battle.target, expiresAt: mage.session.enemy.elementSigil?.expiresAt ?? 0,
+      ascended: mage.sigil.markedAscended, firstAnomalyUsed: mage.sigil.firstAnomalyUsed };
+    const visualAction = { name: action.name, hit: action.hits.some(part => part.hit), statuses: action.statuses };
+    const now = Date.now();
+    setElementSigilVisual(previous => updateElementSigilVisual(previous, snapshot, now, visualAction));
+  }, []);
+  const updateManaShield = useCallback((battle: LiveCombatBattle | null, event?: ManaShieldEvent) => {
+    if (!battle || battle.characterClass !== "法師") return;
+    const shield = (battle.combat as MageCombat).shield;
+    const target = battle.target, value = shield.value, ascended = shield.ascended, now = Date.now();
+    setManaShieldVisual(previous => updateManaShieldVisual(previous, target, value, ascended, now, event));
+  }, []);
   const [skillAscensions, setSkillAscensions] = useState<SkillAscensionState>(createSkillAscensions);
   const [skillActionBusy, setSkillActionBusy] = useState(false);
   const skillActionInFlightRef = useRef(false);
   const skillActionRetryRef = useRef<{ key: string; id: string } | null>(null);
-  const [skills, setSkills] = useState(() =>
-    skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })),
-  );
+  const [skills] = useState<Skill[]>([]);
   const [bossTickets, setBossTickets] = useState(10);
   const [worldAttempts, setWorldAttempts] = useState(3);
   const [selectedBoss, setSelectedBoss] = useState(personalBosses[0]);
@@ -2244,23 +2658,30 @@ function Game({
   const bossPlayerHpRef = useRef(bossPlayerHp);
   bossEnemyHpRef.current = bossEnemyHp;
   bossPlayerHpRef.current = bossPlayerHp;
-  const [lastBossDamage, setLastBossDamage] = useState(0);
-  const [lastBossCounterDamage, setLastBossCounterDamage] = useState(0);
+  const [, setLastBossDamage] = useState(0);
+  const [, setLastBossCounterDamage] = useState(0);
   const [bossOutcome, setBossOutcome] = useState<"win" | "loss" | "timeout" | null>(null);
   const [abyssBossEffect, setAbyssBossEffect] = useState<{ key: number } | null>(null);
   const [abyssImpactPulse, setAbyssImpactPulse] = useState(false);
   const playerId = characterId;
   const [saveReady, setSaveReady] = useState(false);
+  const [saveReloadTick,setSaveReloadTick] = useState(0);
+  const integrityRecoveryUsedRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState("載入存檔");
   const [saveUpdatedAt, setSaveUpdatedAt] = useState<string | null>(null);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [sessionEndedReason, setSessionEndedReason] = useState<"replaced" | "suspended" | "expired" | "conflict" | "maintenance">("replaced");
   const [saveRetryTick, setSaveRetryTick] = useState(0);
+  const equipmentBusyRef = useRef(false);
+  const equipmentPendingRef = useRef<{id:string;kind:"reforge"|"drill";itemId:number;targetIndex?:number}|null>(null);
+  const [equipmentBusy,setEquipmentBusy] = useState(false);
   const saveInFlightRef = useRef(false);
   const saveRequestIdRef = useRef<string | null>(null);
   const saveClientIdRef = useRef("");
   const saveSequenceRef = useRef(0);
   const saveQueuedRef = useRef(false);
+  const saveRetryAfterRef = useRef(0);
+  const saveFailureCountRef = useRef(0);
   const lastSaveStartedAtRef = useRef(0);
   const saveCadenceStartedAtRef = useRef(0);
   const prioritySaveRef = useRef(false);
@@ -2275,8 +2696,11 @@ function Game({
   const shopPurchaseRetryRef = useRef<{ id: string; item: string } | null>(null);
   const [worldDamage, setWorldDamage] = useState(0);
   const [worldRoundDamage, setWorldRoundDamage] = useState(0);
+  const [presentedWorldScore, setPresentedWorldScore] = useState<{token: BossBattle | null; damage: number; viewKey: string}>({token: null, damage: 0, viewKey: "boot"});
   const [worldBossSecondsLeft, setWorldBossSecondsLeft] = useState(WORLD_BOSS_ROUND_MS / 1_000);
   const [worldRank, setWorldRank] = useState<number | null>(null);
+  const [worldBossMailDeliveryId,setWorldBossMailDeliveryId]=useState("");
+  const [worldPeriodDamage,setWorldPeriodDamage]=useState(0);
   const [worldLeaderDamage, setWorldLeaderDamage] = useState(0);
   const [worldTopRanks, setWorldTopRanks] = useState<Array<{
     name?: string; cls?: string; damage?: number;
@@ -2310,6 +2734,49 @@ function Game({
     arcaneEchoReady: false,
   });
   const resetCombatPerks = () => {
+    pendingEnemyDefeatRef.current=null;
+    towerCadenceRef.current=null;bossCadenceRef.current=null;
+    towerDeathPendingRef.current=false;
+    ultimateAnimationLockRef.current=null;
+    ultimatePlaybackGuardRef.current.clear();
+    setSkillVisualEffects([]);
+    astralKeyRef.current = null; setAstralVisual(null);
+    pendingAstralDamageRef.current.clear(); pendingAstralVictoryRef.current.clear();
+    skyRainKeyRef.current = null; setSkyRainVisual(null);
+    pendingSkyDamageRef.current.clear(); pendingSkyVictoryRef.current.clear();
+    pendingTailwindDamageRef.current.clear();
+    pendingTailwindEchoDamageRef.current.clear();
+    setTailwindVisuals([]); setTailwindEchoVisuals([]); setTailwindChargeVisuals([]);
+    pendingVolleyDamageRef.current.clear(); setRangerWindVolleyEffect([]);
+    pendingStarbreakDamageRef.current.clear(); setStarbreakVisuals([]);
+    pendingPiercingDamageRef.current.clear();
+    setRangerPiercingEffect(null);
+    pendingVoidRef.current.clear();
+    pendingMeteorRef.current.clear();
+    pendingLightningRef.current.clear(); lightningParalysisGateRef.current = undefined;
+    pendingFrostfireDamageRef.current.clear(); frostfireGatesRef.current = {};
+    setVoidVisuals([]);
+    setMeteorVisuals([]);
+    setFrostfireVisuals([]); setFrostfireStatuses({}); setLightningVisuals([]); setLightningParalysis(undefined);
+    setElementSigilVisual(emptyElementSigilVisual());
+    setManaShieldVisual(emptyManaShieldVisual());
+    setOverloadVisual(emptyOverloadVisual());
+    setWindDomainVisual(null);
+    setPhantomStepVisual(null);
+    setHunterMarkVisual(null); setHunterBursts([]);
+    pendingHunterBurstRef.current.clear(); pendingHunterDamageRef.current.clear();
+    pendingGroundDamageRef.current.clear();
+    pendingGroundShockDamageRef.current.clear();
+    setGroundSplitEffect(null);
+    setGroundShockEffects([]);
+    pendingTitanDamageRef.current.clear();
+    titanDamageTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    titanDamageTimersRef.current.clear();
+    setTitanUltimateVisual(null);
+    setTitanEchoVisuals([]);
+    setBattleHitGroups([]); setSetElementalHits([]); setDotDamageGroups([]);
+    setPlayerHitFeedback(null); setEnemyHitFeedback(null); setMissFeedback(null);
+    setUnyieldingCounterFeedback(null);
     combatPerksRef.current = {
       killBuffRemaining: 0,
       nextAttackMultiplier: 1,
@@ -2325,18 +2792,44 @@ function Game({
   };
 
   useEffect(() => {
+    const pendingTitanDamage = pendingTitanDamageRef.current;
+    const pendingGroundDamage = pendingGroundDamageRef.current;
+    const pendingGroundShockDamage = pendingGroundShockDamageRef.current;
+    const pendingAstralDamage = pendingAstralDamageRef.current;
+    const pendingAstralVictory = pendingAstralVictoryRef.current;
+    const pendingSkyDamage = pendingSkyDamageRef.current;
+    const pendingSkyVictory = pendingSkyVictoryRef.current;
+    const pendingVolleyDamage = pendingVolleyDamageRef.current;
+    const pendingStarbreakDamage = pendingStarbreakDamageRef.current;
+    const pendingPiercingDamage = pendingPiercingDamageRef.current;
+    const pendingFrostfireDamage = pendingFrostfireDamageRef.current;
+    const pendingLightning = pendingLightningRef.current;
+    const pendingVoid = pendingVoidRef.current;
+    const pendingMeteor = pendingMeteorRef.current;
+    const pendingTailwindDamage = pendingTailwindDamageRef.current;
+    const pendingTailwindEchoDamage = pendingTailwindEchoDamageRef.current;
+    const pendingHunterBurst = pendingHunterBurstRef.current;
+    const pendingHunterDamage = pendingHunterDamageRef.current;
+    const titanDamageTimers = titanDamageTimersRef.current;
+    const playbackGuard=ultimatePlaybackGuardRef.current;
     return () => {
+      playbackGuard.clear();
+      pendingTailwindDamage.clear();
+      pendingTailwindEchoDamage.clear();
+      pendingHunterBurst.clear(); pendingHunterDamage.clear();
+      pendingAstralDamage.clear(); pendingAstralVictory.clear();
+      pendingSkyDamage.clear(); pendingSkyVictory.clear();
+      pendingVolleyDamage.clear();
+      pendingStarbreakDamage.clear();
+      pendingPiercingDamage.clear();
+      pendingFrostfireDamage.clear(); pendingLightning.clear(); pendingVoid.clear(); pendingMeteor.clear();
+      pendingGroundDamage.clear();
+      pendingGroundShockDamage.clear();
+      pendingTitanDamage.clear();
+      titanDamageTimers.forEach((timer) => window.clearTimeout(timer));
+      titanDamageTimers.clear();
       if (bloodRoarHideTimerRef.current !== null) {
         window.clearTimeout(bloodRoarHideTimerRef.current);
-      }
-      if (frostfireImpactDelayTimerRef.current !== null) {
-        window.clearTimeout(frostfireImpactDelayTimerRef.current);
-      }
-      if (frostfireImpactPulseTimerRef.current !== null) {
-        window.clearTimeout(frostfireImpactPulseTimerRef.current);
-      }
-      if (meteorImpactPulseTimerRef.current !== null) {
-        window.clearTimeout(meteorImpactPulseTimerRef.current);
       }
     };
   }, []);
@@ -2348,13 +2841,12 @@ function Game({
       window.clearTimeout(bloodRoarHideTimerRef.current);
       bloodRoarHideTimerRef.current = null;
     }
-    setBloodRoarVisualActive(false);
+    const resetTimer = window.setTimeout(() => setBloodRoarVisualActive(false), 0);
+    return () => window.clearTimeout(resetTimer);
   }, [battleOn]);
 
   useEffect(() => {
-    if (!battleOn || playerClass !== "戰士" || playerHp >= 40) return;
-    const bloodRoar = skills.find((skill) => skill.name === "鮮血怒吼" && skill.level > 0);
-    if (!bloodRoar) return;
+    if (liveCombatRef.current || !battleOn || playerClass !== "戰士" || playerHp >= 40 || bloodRoarLevel <= 0) return;
     const battleKey = `${mapId}:${wave}`;
     if (bloodRoarStateRef.current.battleKey !== battleKey) {
       bloodRoarStateRef.current = { battleKey, remaining: 0, used: false };
@@ -2371,15 +2863,16 @@ function Game({
     setBloodRoarVisualActive(true);
     queueSkillVisual({ name: "鮮血怒吼", key: Date.now() });
     showCombatStatus({
-      name: `鮮血怒吼：${bloodRoarCount} 次／傷害 +${bloodRoarDamageBonus(bloodRoar.level)}%／吸血 ${bloodRoarLifesteal(bloodRoar.level)}%`,
+      name: `鮮血怒吼：${bloodRoarCount} 次／傷害 +${bloodRoarDamageBonus(bloodRoarLevel)}%／吸血 ${bloodRoarLifesteal(bloodRoarLevel)}%`,
       target: "player",
       remaining: bloodRoarStateRef.current.remaining,
       unit: "攻擊",
       tone: "red",
     });
     setCausePrompt("生命低於 40% → 鮮血怒吼立刻發動");
-  }, [battleOn, mapId, playerClass, playerHp, skills, wave]);
+  }, [battleOn, bloodRoarLevel, mapId, playerClass, playerHp, queueSkillVisual, wave]);
 
+  const gmInbox = useGmInbox(loginId);
   const [mails, setMails] = useState<MailMessage[]>(() => [
     {
       id: 1,
@@ -2409,30 +2902,14 @@ function Game({
   const bagItems = items.filter((item) => !equipped.includes(item.id));
   const defensiveSlots = new Set(["頭盔", "胸甲", "手套", "鞋子", "腰帶", "護腕", "披風"]);
   const accessorySlots = new Set(["項鍊", "戒指"]);
-  const visibleBagItems = [...bagItems]
-    .filter((item) => {
-      if (bagCategory === "套裝") return Boolean(item.set);
-      if (bagCategory === "武器") return item.slot === "武器";
-      if (bagCategory === "防具") return defensiveSlots.has(item.slot);
-      if (bagCategory === "飾品") return accessorySlots.has(item.slot);
-      if (bagCategory === "未查看") return unseenItemIds.includes(item.id);
-      return true;
-    })
-    .sort((a, b) => {
-      if (bagSort === "品質") return qualityOrder.indexOf(b.quality) - qualityOrder.indexOf(a.quality);
-      if (bagSort === "強化") return b.enhance - a.enhance || equipmentDisplayRating(b) - equipmentDisplayRating(a);
-      if (bagSort === "最新") return items.indexOf(b) - items.indexOf(a);
-      return equipmentDisplayRating(b) - equipmentDisplayRating(a);
-    });
-  // 批次分解後強制以實際背包內容重建列表，避免手機瀏覽器保留舊的卡片節點。
-  const bagRenderKey = visibleBagItems.length
-    ? visibleBagItems.map((item, index) => `${item.id}:${index}`).join("|")
-    : "empty";
   useEffect(() => {
-    setSelectedItem((index) =>
-      items.length ? Math.max(0, Math.min(index, items.length - 1)) : 0,
-    );
-    setUnseenItemIds((old) => old.filter((id) => items.some((item) => item.id === id)));
+    const normalizeTimer = window.setTimeout(() => {
+      setSelectedItem((index) =>
+        items.length ? Math.max(0, Math.min(index, items.length - 1)) : 0,
+      );
+      setUnseenItemIds((old) => old.filter((id) => items.some((item) => item.id === id)));
+    }, 0);
+    return () => window.clearTimeout(normalizeTimer);
   }, [items]);
   const updateEquipped = (update: (old: number[]) => number[]) =>
     setLoadouts((old) => ({
@@ -2446,11 +2923,33 @@ function Game({
     .sort()
     .join("|");
   const rebirthTier = Math.min(MAX_REBIRTHS, rebirthCount);
-  const rebirthCombatBonus = rebirthTier * 3;
+  const rebirthCombatBonus = rebirthTier * REBIRTH_REWARD_PER_TURN.coreStats;
   const rebirthBonuses = {
     hp: rebirthCombatBonus + rebirthTalents.survivalHp * 10,
     attack: rebirthCombatBonus,
     defense: rebirthCombatBonus + rebirthTalents.survivalDefense * 10,
+  };
+  const legacyTitleReward = legacyRebirthReward(legacyRebirthCount);
+  const legacyBonuses = equippedLegacyRebirthReward(legacyRebirthCount, selectedTitle);
+  const legacyBonusesActive = legacyTitleReward.titleId !== null && selectedTitle === legacyTitleReward.titleId;
+  const cosmeticBonuses = equippedCosmeticBonuses(selectedTitle, selectedAppearance);
+  const titleCosmeticBonuses = equippedCosmeticBonuses(selectedTitle, "none");
+  const selectedTitleBonus = [
+        legacyBonusesActive ? [
+        legacyBonuses.experience > 0 ? `經驗 +${legacyBonuses.experience}%` : null,
+        legacyBonuses.gold > 0 ? `金幣 +${legacyBonuses.gold}%` : null,
+        legacyBonuses.attack > 0 ? `攻擊 +${legacyBonuses.attack}%` : null,
+        legacyBonuses.defense > 0 ? `防禦 +${legacyBonuses.defense}%` : null,
+        legacyBonuses.attackSpeed > 0 ? `攻速 +${legacyBonuses.attackSpeed}%` : null,
+        legacyBonuses.resourceDrop > 0 ? `資源掉落 +${legacyBonuses.resourceDrop}%` : null,
+        ] : [],
+        titleCosmeticBonuses.experience > 0 ? `經驗 +${titleCosmeticBonuses.experience}%` : null,
+        titleCosmeticBonuses.attack > 0 ? `攻擊 +${titleCosmeticBonuses.attack}%` : null,
+        titleCosmeticBonuses.defense > 0 ? `防禦 +${titleCosmeticBonuses.defense}%` : null,
+      ].flat().filter((value): value is string => value !== null).join("・") || "無";
+  const combatBonuses = {
+    attack: legacyBonuses.attack + cosmeticBonuses.attack,
+    defense: legacyBonuses.defense + cosmeticBonuses.defense,
   };
   const combatPower = calculateCombatPower(
     playerClass,
@@ -2458,7 +2957,13 @@ function Game({
     equippedGear,
     skills,
     rebirthBonuses,
+    combatBonuses,
   );
+  const assessGearPower = (gear: Item[]) => calculateAssessedCombatPower(
+    playerClass, level, gear, skills, skillReworkBuild, skillAscensions,
+    rebirthBonuses, combatBonuses, rebirthTalents, legacyBonuses.attackSpeed, cosmeticBonuses,
+  );
+  const assessedCombatPower = assessGearPower(equippedGear);
   const powerDifferenceForItem = (item: Item) => {
     const isEquipped = equipped.includes(item.id);
     const projectedGear = isEquipped
@@ -2468,14 +2973,32 @@ function Game({
           item,
         ];
     return (
-      calculateCombatPower(playerClass, level, projectedGear, skills, rebirthBonuses) -
-      combatPower
+      assessGearPower(projectedGear) - assessedCombatPower
     );
   };
-  const hasBlessing = (id: string) =>
-    blessings.some((blessing) => blessing.id === id);
-  const blessingUpgraded = (id: string) =>
-    blessings.some((blessing) => blessing.id === id && blessing.upgraded);
+  const visibleBagItems = [...bagItems]
+    .filter((item) => {
+      if (bagCategory === "套裝") return Boolean(item.set);
+      if (bagCategory === "武器") return item.slot === "武器";
+      if (bagCategory === "防具") return defensiveSlots.has(item.slot);
+      if (bagCategory === "飾品") return accessorySlots.has(item.slot);
+      if (bagCategory === "未查看") return unseenItemIds.includes(item.id);
+      return true;
+    })
+    .sort((a, b) => {
+      if (bagSort === "品質") return qualityOrder.indexOf(b.quality) - qualityOrder.indexOf(a.quality);
+      if (bagSort === "強化") return b.enhance - a.enhance || powerDifferenceForItem(b) - powerDifferenceForItem(a) || equipmentDisplayRating(b) - equipmentDisplayRating(a);
+      if (bagSort === "最新") return items.indexOf(b) - items.indexOf(a);
+      return powerDifferenceForItem(b) - powerDifferenceForItem(a) || equipmentDisplayRating(b) - equipmentDisplayRating(a);
+    });
+  // 批次分解後強制以實際背包內容重建列表，避免手機瀏覽器保留舊的卡片節點。
+  const bagRenderKey = visibleBagItems.length
+    ? visibleBagItems.map((item, index) => `${item.id}:${index}`).join("|")
+    : "empty";
+  const hasBlessing = useCallback((id: string) =>
+    blessings.some((blessing) => blessing.id === id), [blessings]);
+  const blessingUpgraded = useCallback((id: string) =>
+    blessings.some((blessing) => blessing.id === id && blessing.upgraded), [blessings]);
   const baseCharacterStats = calculateCharacterStats(
     playerClass,
     level,
@@ -2485,24 +3008,24 @@ function Game({
   const activeSetCount = equippedSetPieceCount(equippedGear);
   const activeSetAttackMultiplier = equippedSetAttackMultiplier(equippedGear);
   const activeSetAttackBonusPct = Math.round((activeSetAttackMultiplier - 1) * 100);
-  const skillPassiveStats = skillPassivePanelStats(skillReworkBuild, playerClass, playerHp);
-  const skillHealthBonus = skillPassiveStats.maxHealthBonusPercent;
-  const rangerBaseStats = playerClass === "遊俠" ? skillPassiveStats : null;
+  const warriorPassiveStats = playerClass === "戰士" ? warriorPassiveDefenses(skillReworkBuild, playerHp) : null;
+  const rangerBaseStats = playerClass === "遊俠" ? rangerPassiveStats(skillReworkBuild) : null;
   const characterStats = {
     ...baseCharacterStats,
-    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1) * (1 + skillHealthBonus / 100)),
+    hp: Math.round(baseCharacterStats.hp * (1 + rebirthBonuses.hp / 100) * (hasBlessing("stat-hp") ? (blessingUpgraded("stat-hp") ? 1.3 : 1.15) : 1)),
     attack: Math.round(
-      baseCharacterStats.attack * (1 + rebirthBonuses.attack / 100) *
+      baseCharacterStats.attack * (1 + (rebirthBonuses.attack + legacyBonuses.attack + cosmeticBonuses.attack) / 100) *
       (hasBlessing("stat-attack") ? 1.15 : 1) *
       activeSetAttackMultiplier,
     ),
     defense: Math.round(
-      baseCharacterStats.defense *
-        (1 + rebirthBonuses.defense / 100) *
+      (baseCharacterStats.defense + (warriorPassiveStats?.defenseBonusFlat ?? 0)) *
+        (1 + (rebirthBonuses.defense + legacyBonuses.defense + cosmeticBonuses.defense) / 100) *
         (hasBlessing("stat-defense") ? 1.15 : 1),
     ),
     speed: baseCharacterStats.speed + rebirthTalents.combatAttackSpeed * 5 + (hasBlessing("stat-speed") ? 15 : 0),
-    hit: baseCharacterStats.hit + (hasBlessing("stat-hit") ? 10 : 0),
+    hit: Math.round((baseCharacterStats.hit + (hasBlessing("stat-hit") ? 10 : 0)) * (1 + cosmeticBonuses.hit / 100)),
+    dodge: Math.round(baseCharacterStats.dodge * (1 + cosmeticBonuses.dodge / 100)),
     crit: baseCharacterStats.crit + rebirthTalents.combatCritRate * 4 + (hasBlessing("stat-crit") ? (blessingUpgraded("stat-crit") ? 18 : 12) : 0) + (rangerBaseStats?.criticalChancePoints ?? 0),
     critDamage: baseCharacterStats.critDamage + rebirthTalents.combatCritDamage * 10,
     lifesteal:
@@ -2510,16 +3033,17 @@ function Game({
       (hasBlessing("stat-lifesteal") ? 8 : 0),
     bossDamage: baseCharacterStats.bossDamage + rebirthTalents.combatBoss * 5,
     damageReduction: baseCharacterStats.damageReduction + rebirthTalents.combatDamageReduction * 3,
-    equipmentDrop: baseCharacterStats.equipmentDrop + rebirthTier * 5,
-    expBonus: baseCharacterStats.expBonus + rebirthTier * 20,
-    goldBonus: baseCharacterStats.goldBonus + rebirthTier * 20,
-    enhanceDrop: rebirthTier * 20,
-    reforgeDrop: rebirthTier * 10,
-    highQualityDrop: rebirthTier * 3,
+    equipmentDrop: baseCharacterStats.equipmentDrop + rebirthTier * REBIRTH_REWARD_PER_TURN.equipmentDrop,
+    expBonus: baseCharacterStats.expBonus + rebirthTier * REBIRTH_REWARD_PER_TURN.experience + legacyBonuses.experience + cosmeticBonuses.experience,
+    goldBonus: baseCharacterStats.goldBonus + rebirthTier * REBIRTH_REWARD_PER_TURN.gold + legacyBonuses.gold,
+    resourceDrop: baseCharacterStats.resourceDrop + rebirthTier * REBIRTH_REWARD_PER_TURN.resourceDrop + legacyBonuses.resourceDrop,
+    enhanceDrop: baseCharacterStats.enhanceDrop,
+    reforgeDrop: baseCharacterStats.reforgeDrop,
+    highQualityDrop: rebirthTier * REBIRTH_REWARD_PER_TURN.highQualityDrop,
     skillDamage: baseCharacterStats.skillDamage + rebirthTalents.growthSkill * 5,
   };
   const combatAttackSpeed =
-    characterStats.speed * (1 + ((rangerBaseStats?.attackSpeedBonusPercent ?? 0) +
+    characterStats.speed * (1 + ((rangerBaseStats?.attackSpeedBonusPercent ?? 0) + legacyBonuses.attackSpeed +
       (liveCombatRef.current ? liveCombatSpeedBonus(liveCombatRef.current) : 0)) / 100) +
     (hasBlessing("rapid") ? (blessingUpgraded("rapid") ? 35 : 20) : 0);
   const currentWaveBoss = wave === MAP_FLOORS;
@@ -2536,12 +3060,10 @@ function Game({
   const currentRecommendedPower = recommendedPowerAtFloor(currentMap, wave);
   const currentSuppression = realmSuppression(combatPower, currentRecommendedPower);
   const evasionRules = balanceConfig.combat.evasionModel;
-  const mapAccuracyBonus = [0, 0, 3, 6, 9, 12, 16, 20, 24, 28][mapId] ?? 0;
-  const monsterAccuracyRating =
-    evasionRules.monsterAccuracyBase +
-    mapAccuracyBonus * evasionRules.monsterAccuracyPerMap;
+  const currentMonsterRatings = monsterRatingsForMap(mapId);
+  const monsterAccuracyRating = currentMonsterRatings.accuracy;
   const playerEvasionRating =
-    Math.min(DODGE_CAP, Math.max(0, characterStats.dodge)) * evasionRules.statToRating;
+    Math.max(0, characterStats.dodge) * evasionRules.statToRating;
   const effectiveDodge = evadeChanceFromRatings(monsterAccuracyRating, playerEvasionRating);
   const currentEnemyMaximumHealth = effectiveMonsterMaximumHealth(
     mapId,
@@ -2549,19 +3071,111 @@ function Game({
     currentCombatTier,
     currentEnemyBaseName,
   );
-  const currentEnemyHealth = Math.max(
-    0,
-    healthFromPercent(enemyHp, currentEnemyMaximumHealth),
-  );
-  const equippedSetGroups = maps
-    .map((map) => ({
-      name: map.set,
-      count: items.filter(
-        (item) => item.set === map.set && equipped.includes(item.id),
-      ).length,
-    }))
-    .filter((group) => group.count > 0)
-    .sort((a, b) => b.count - a.count);
+  const enemyPresentationToken=activeBossBattle ?? `${runStartedAt}:${mapId}:${wave}`;
+  const settledEnemyPercent=activeBossBattle?bossEnemyHp:enemyHp;
+  const presentedEnemyPercent=presentedEnemyHealth.token===enemyPresentationToken
+    ? presentedEnemyHealth.percent:settledEnemyPercent;
+  const presentedEnemyMaximum=activeBossBattle?.hp ?? currentEnemyMaximumHealth;
+  const presentationViewKey=`${tab}:${documentVisible}`;
+  if(presentedEnemyHealth.token!==enemyPresentationToken || presentedEnemyHealth.viewKey!==presentationViewKey) {
+    setPresentedEnemyHealth({token:enemyPresentationToken,percent:settledEnemyPercent,viewKey:presentationViewKey});
+  }
+  const worldScoreToken = activeBossBattle?.mode === "world" ? activeBossBattle : null;
+  const worldScoreViewKey = `${presentationViewKey}:${bossOutcome ?? "active"}`;
+  const visibleWorldScore = tab === "主控" && documentVisible && !bossOutcome;
+  const presentedWorldRoundDamage = visibleWorldScore && presentedWorldScore.token === worldScoreToken
+    && presentedWorldScore.viewKey === worldScoreViewKey ? presentedWorldScore.damage : worldRoundDamage;
+  // Switching view/background, finishing or retrying synchronizes the display;
+  // pending floats from a previous encounter cannot affect the new counter.
+  if (presentedWorldScore.token !== worldScoreToken || presentedWorldScore.viewKey !== worldScoreViewKey) {
+    setPresentedWorldScore({token: worldScoreToken, damage: worldRoundDamage, viewKey: worldScoreViewKey});
+  }
+  const onEnemyDamageShown=useCallback((events: readonly CombatFloatEvent[],token:string|object)=>{
+    if(token!==enemyPresentationToken)return;
+    setPresentedEnemyHealth((current)=>({token,viewKey:current.viewKey,
+      percent:presentEnemyDamage(current.token===token?current.percent:settledEnemyPercent,
+        presentedEnemyMaximum,events,settledEnemyPercent)}));
+    if (worldScoreToken && token === worldScoreToken && visibleWorldScore) {
+      setPresentedWorldScore((current) => current.token === token && current.viewKey === worldScoreViewKey
+        ? {...current, damage: presentWorldBossDamage(current.damage, events, worldRoundDamage)} : current);
+    }
+  },[enemyPresentationToken,presentedEnemyMaximum,settledEnemyPercent,worldScoreToken,visibleWorldScore,worldScoreViewKey,worldRoundDamage]);
+  const recoverPendingEnemyDefeat=useEffectEvent(()=>{
+    if(!saveReady || sessionSuperseded)return;
+    const pending=pendingEnemyDefeatRef.current;
+    if(!pending || pending.token!==enemyPresentationToken || settledEnemyPercent>0)return;
+    const visible=tab==="主控" && documentVisible;
+    const volleyPending=pending.volleyKey!==undefined && pendingVolleyDamageRef.current.has(pending.volleyKey);
+    const now=performance.now();
+    if(presentedEnemyPercent<=0 && !volleyPending)pending.shownAt??=now;
+    else pending.shownAt=undefined;
+    const delay=enemyDefeatPresentationDelay(visible,volleyPending?Math.max(1,presentedEnemyPercent):presentedEnemyPercent,
+      pending.queuedAt,now,pending.volleyKey!==undefined?240:120,pending.shownAt);
+    if(delay>0 || pendingEnemyDefeatRef.current!==pending)return;
+    setPresentedEnemyHealth((current)=>current.token===pending.token?{...current,percent:0}:current);
+    pendingEnemyDefeatRef.current=null;pending.finish();
+  });
+  useEffect(()=>{
+    const timer=window.setInterval(recoverPendingEnemyDefeat,50);
+    return()=>window.clearInterval(timer);
+  },[]);
+  useEffect(() => {
+    pendingVoidRef.current.clear();
+    pendingMeteorRef.current.clear();
+    pendingLightningRef.current.clear(); lightningParalysisGateRef.current = undefined;
+    pendingFrostfireDamageRef.current.clear(); frostfireGatesRef.current = {};
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) { setVoidVisuals([]); setMeteorVisuals([]); setFrostfireVisuals([]); setFrostfireStatuses({}); setLightningVisuals([]); setLightningParalysis(undefined); }
+    });
+    return () => { cancelled = true; };
+  }, [enemyPresentationToken]);
+  const recoverVoidDisplay = useEffectEvent(() => {
+    const visible = tab === "主控" && documentVisible && !sessionSuperseded && !(activeBossBattle ? bossOutcome : runSummary);
+    for (const [key, pending] of pendingVoidRef.current) {
+      if (visible && performance.now() - pending.at < 4000) continue;
+      pendingVoidRef.current.delete(key);
+      if (!sessionSuperseded) pending.publish();
+      setVoidVisuals(current => current.filter(effect => effect.key !== key));
+    }
+  });
+  useEffect(() => {
+    const immediate = window.setTimeout(recoverVoidDisplay, 0);
+    const timer = window.setInterval(recoverVoidDisplay, 100);
+    return () => { window.clearTimeout(immediate); window.clearInterval(timer); };
+  }, [tab, documentVisible, sessionSuperseded, activeBossBattle, bossOutcome, runSummary]);
+  const recoverMeteorDisplay = useEffectEvent(() => {
+    const visible = tab === "主控" && documentVisible && !sessionSuperseded && !(activeBossBattle ? bossOutcome : runSummary);
+    for (const [key, pending] of pendingMeteorRef.current) {
+      if (visible && performance.now() - pending.at < 4000) continue;
+      pendingMeteorRef.current.delete(key);
+      if (!sessionSuperseded) { pending.publish(0); pending.publish(1); }
+      setMeteorVisuals(current => current.filter(effect => effect.key !== key));
+    }
+  });
+  useEffect(() => {
+    const immediate = window.setTimeout(recoverMeteorDisplay, 0);
+    const timer = window.setInterval(recoverMeteorDisplay, 100);
+    return () => { window.clearTimeout(immediate); window.clearInterval(timer); };
+  }, [tab, documentVisible, sessionSuperseded, activeBossBattle, bossOutcome, runSummary]);
+  const recoverFrostfireDisplay = useEffectEvent(() => {
+    if (tab === "主控" && documentVisible && !sessionSuperseded && !(activeBossBattle ? bossOutcome : runSummary)) return;
+    if (!sessionSuperseded) {
+      const lightning = [...pendingLightningRef.current.values()]; pendingLightningRef.current.clear();
+      lightning.forEach(publish => { for (let index = 0; index < 4; index++) publish(index); });
+      const pending = [...pendingFrostfireDamageRef.current.values()];
+      pendingFrostfireDamageRef.current.clear(); pending.forEach(publish => publish());
+    } else { pendingFrostfireDamageRef.current.clear(); pendingLightningRef.current.clear(); }
+    setFrostfireVisuals(current => current.length ? [] : current);
+    setLightningVisuals(current => current.length ? [] : current); lightningParalysisGateRef.current = undefined;
+    frostfireGatesRef.current = {};
+  });
+  useEffect(() => {
+    const immediate = window.setTimeout(recoverFrostfireDisplay, 0);
+    const timer = window.setInterval(recoverFrostfireDisplay, 100);
+    return () => { window.clearTimeout(immediate); window.clearInterval(timer); };
+  }, [tab, documentVisible, sessionSuperseded, activeBossBattle, bossOutcome, runSummary]);
+  const equippedSetGroups = groupEquippedSets(equippedGear);
   const activeSet = equippedSetGroups[0];
   const setTier = activeSet
     ? Math.min(
@@ -2569,22 +3183,14 @@ function Game({
         Math.floor(activeSet.count / 2),
       )
     : 0;
-  const setEffect =
-    activeSetCount >= 10
-      ? `每 ${SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發`
-      : activeSetCount >= 8
-        ? `技能傷害 +${SET_SKILL_DAMAGE_PCT}%`
-        : activeSetCount >= 6
-          ? `每次攻擊追加 ${SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害`
-          : activeSetCount >= 4
-            ? "離線收益 +10%"
-            : activeSetAttackBonusPct > 0
-              ? `攻擊 +${activeSetAttackBonusPct}%`
-              : "尚未形成套裝共鳴";
-  const monsterEvasionRating =
-    evasionRules.monsterEvasionBase +
-    mapId * evasionRules.monsterEvasionPerMap +
-    (evasionRules.monsterEvasionBonusByMap[mapId] ?? 0);
+  const setEffectDescription = (count: number) => [
+    ...(count >= 2 ? [`攻擊 +${Math.round((SET_ATTACK_BONUS - 1) * 100)}%`] : []),
+    ...(count >= 4 ? ["離線收益 +10%"] : []),
+    ...(count >= 6 ? [`元素傷害 +${SET_ELEMENTAL_DAMAGE_PCT}%`] : []),
+    ...(count >= 8 ? [`技能傷害 +${SET_SKILL_DAMAGE_PCT}%`] : []),
+    ...(count >= 10 ? [`每 ${SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發（${SET_RESONANCE_DAMAGE_PCT}%）`] : []),
+  ].join(" · ") || "再穿 1 件啟用套裝效果";
+  const monsterEvasionRating = currentMonsterRatings.evasion;
   const effectiveHit = Math.max(
     evasionRules.minimumHitChance,
     hitChanceFromRatings(characterStats.hit, monsterEvasionRating) - currentSuppression.hitBonus,
@@ -2639,7 +3245,7 @@ function Game({
     { gold: 0, stones: 0 },
   );
   const canClaim = storedSeconds >= 60;
-  const offlineSetMultiplier = activeSetCount >= 4 ? 1.1 : 1;
+  const offlineSetMultiplier = equippedSetOfflineMultiplier(equippedGear, 0.1);
   // 首波只開放深淵王；其餘世界首領保留預告卡。
   const worldBossOpen = true;
   const refreshSeconds = 3600 - (now.getMinutes() * 60 + now.getSeconds());
@@ -2659,6 +3265,7 @@ function Game({
           setWorldTopRanks(ranks.slice(0, 5));
           const rankIndex = ranks.findIndex((rank) => rank.name === playerName);
           setWorldRank(rankIndex >= 0 ? rankIndex + 1 : null);
+          setWorldPeriodDamage(Math.max(0,Number(rankIndex>=0?ranks[rankIndex]?.damage:0)));
           setWorldLeaderDamage(Math.max(0, Number(ranks[0]?.damage ?? 0)));
         })
         .catch(() => {
@@ -2678,21 +3285,31 @@ function Game({
   }, [bossMode, playerName, tab]);
 
   useEffect(() => {
+    let cancelled=false;
+    const controller=new AbortController();
     queueMicrotask(() => {
+      if(cancelled)return;
+      if(saveReloadTick>0){
+        resetCombatPerks();liveCombatRef.current=null;
+        setBlessings([]);setBlessingOpen(false);setBlessingUnavailable(false);
+        setBattleDrops([]);setRunSummary(null);setActiveBossBattle(null);setBossOutcome(null);
+        setRunStartedAt(Date.now());
+      }
       fetch(`/api/save?playerId=${encodeURIComponent(playerId)}`, {
         cache: "no-store",
         headers: loginHeaders(loginId),
+        signal:controller.signal,
       })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then(({ save, updatedAt }) => {
+          if(cancelled)return;
           setSaveUpdatedAt(updatedAt ?? null);
           const today = new Date().toLocaleDateString("en-CA", {
             timeZone: "Asia/Taipei",
           });
           setDailyDate(today);
           if (save) {
-            const inferredClass = inferClassFromSkills(save.skills);
-            const savedClass = save.playerClass ?? inferredClass;
+            const savedClass = save.playerClass;
             if (savedClass && savedClass !== playerClass) {
               setSaveStatus("職業存檔不符");
               setSaveReady(false);
@@ -2721,10 +3338,21 @@ function Game({
             setDrillingStones(Math.max(0, Math.floor(Number(save.drillingStones ?? 0))));
             setGemInventory(normalizeGemInventory(save.gemInventory));
             setAdminRevision(Number(save.adminRevision ?? 0));
-            setRebirthCount(Math.min(MAX_REBIRTHS, Number(save.rebirthCount ?? 0)));
-            setSelectedTitle((save.selectedTitle ?? "none") as TitleId);
+            setRebirthCount(clampRebirthCount(save.rebirthCount));
+            const savedLegacyRebirthCount = Math.max(0, Math.min(20, Number(save.legacyRebirthCount ?? 0)));
+            const legacyTitles = legacyRebirthReward(savedLegacyRebirthCount);
+            setLegacyRebirthCount(savedLegacyRebirthCount);
+            const legacyTitleIds: TitleId[] = ["beta-reincarnator", "seasoned-reincarnator", "elite-reincarnator", "abyss-reincarnator"];
+            const savedTitles: TitleId[] = Array.isArray(save.ownedTitles) ? save.ownedTitles as TitleId[] : ["none"];
+            const availableTitles = [...new Set<TitleId>([
+              "none",
+              ...savedTitles.filter((id) => !legacyTitleIds.includes(id)),
+              ...legacyTitles.unlockedTitleIds as TitleId[],
+            ])];
+            const savedSelectedTitle = typeof save.selectedTitle === "string" ? save.selectedTitle as TitleId : legacyTitles.titleId ?? "none";
+            setSelectedTitle(availableTitles.includes(savedSelectedTitle) ? savedSelectedTitle : legacyTitles.titleId ?? "none");
             setSelectedAppearance((save.selectedAppearance ?? "none") as AppearanceId);
-            setOwnedTitles(Array.isArray(save.ownedTitles) ? save.ownedTitles : ["none"]);
+            setOwnedTitles(availableTitles);
             setOwnedAppearances(Array.isArray(save.ownedAppearances) ? save.ownedAppearances : ["none"]);
             setRebirthPoints(Math.max(0, Number(save.rebirthPoints ?? 0)));
             setRebirthTalents({ ...emptyRebirthTalents, ...(save.rebirthTalents ?? {}) });
@@ -2767,17 +3395,17 @@ function Game({
               towerDeathPendingRef.current = false;
             } else {
               setEnemyHp(save.enemyHp ?? 100);
+              setPresentedEnemyHealth((current)=>({...current,percent:save.enemyHp ?? 100}));
               setPlayerHp(savedPlayerHp);
             }
             const normalizedSavedItems = Array.isArray(save.items)
               ? save.items.map((item: Item) => normalizeSceneItem(item))
               : [];
             if (Array.isArray(save.items)) setItems(normalizedSavedItems);
-            if (save.loadouts) setLoadouts(save.loadouts);
+            if (save.loadouts) setLoadouts(safeLoadouts({items:normalizedSavedItems,loadouts:save.loadouts}) as Record<1|2,number[]>);
             if (save.activeLoadout === 1 || save.activeLoadout === 2) {
               setActiveLoadout(save.activeLoadout);
             }
-            if (Array.isArray(save.skills)) setSkills(save.skills);
             setSkillReworkBuild(restoreSkillBuild(save.skillReworkBuild, playerClass, savedLevel));
             setSkillAscensions(restoreSkillAscensions(save.skillAscensions, playerClass));
             const needsBossTicketReset = save.bossTicketResetVersion !== PERSONAL_BOSS_RESET_VERSION;
@@ -2787,10 +3415,12 @@ function Game({
             // Idle time is settled by the server after this load. Keeping the
             // raw saved value here prevents a background tab and the server
             // from crediting the same seconds twice.
-            setStoredSeconds(Math.min(43200, save.storedSeconds ?? 0));
+            resetStoredTime(save.storedSeconds ?? 0, updatedAt);
+            lastIdleClaimIdRef.current = typeof save._lastIdleClaimId === "string" ? save._lastIdleClaimId : null;
             setIdleSeconds(Math.max(0, Math.min(599, save.idleSeconds ?? 0)));
-            setBattleOn(save.battleOn !== false);
-            setSkillPoints(save.skillPoints ?? 1);
+            // The manual pause control has been removed; resume older paused saves.
+            setBattleOn(true);
+            setWorldBossMailDeliveryId(typeof save._worldBossMailDeliveryId==="string"?save._worldBossMailDeliveryId:"");
             if (Array.isArray(save.mails))
               setMails(
                 save.mails.slice(0, MAIL_CAPACITY).map((mail: MailMessage) => ({
@@ -2828,13 +3458,15 @@ function Game({
           setSaveReady(true);
         })
         .catch(() => {
+          if(cancelled)return;
           // Never mark a failed load as save-ready: the default in-memory
           // state could otherwise overwrite the player's cloud progress.
           setSaveStatus("讀檔失敗，已停止存檔");
           setSaveReady(false);
         });
     });
-  }, [loginId, playerClass, playerId]);
+    return ()=>{cancelled=true;controller.abort();};
+  }, [loginId, playerClass, playerId,saveReloadTick,resetStoredTime]);
 
   const pauseSupersededSession = useCallback((reason: "replaced" | "suspended" | "expired" | "maintenance" = "replaced") => {
     setSessionEndedReason(reason);
@@ -2857,8 +3489,30 @@ function Game({
     setSaveRetryTick((value) => value + 1);
   }, []);
 
-  const settleBackgroundProgress = useCallback(() => {
+  useEffect(() => {
     if (!saveReady || !playerId || sessionSuperseded) return;
+    const initial = idleStorageClockRef.current ?? resetIdleStorageClock(null, 0, performance.now());
+    idleStorageClockRef.current = { ...initial, at: performance.now() };
+    const advanceStoredTime = () => {
+      const clock = idleStorageClockRef.current;
+      if (!clock) return;
+      const next = advanceIdleStorageClock(clock, performance.now());
+      idleStorageClockRef.current = next;
+      setStoredSeconds(next.seconds);
+    };
+    const timer = window.setInterval(advanceStoredTime, 1000);
+    document.addEventListener("visibilitychange", advanceStoredTime);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", advanceStoredTime);
+      const clock = idleStorageClockRef.current;
+      if (clock) idleStorageClockRef.current = { ...clock, epoch: clock.epoch + 1 };
+    };
+  }, [saveReady, playerId, sessionSuperseded]);
+
+  const settleBackgroundProgress = useCallback(() => {
+    if (!saveReady || !playerId || sessionSuperseded || offlineClaimPendingRef.current) return;
+    const idleEpoch = idleStorageClockRef.current?.epoch ?? 0;
     void fetch("/api/save", {
       method: "POST",
       headers: loginHeaders(loginId, true),
@@ -2879,14 +3533,14 @@ function Game({
           return;
         }
         if (!response.ok || result?.ok !== true) return;
-        if (typeof result?.save?.storedSeconds === "number") {
-          setStoredSeconds(Math.min(43200, Math.max(0, result.save.storedSeconds)));
+        if (!offlineClaimPendingRef.current && typeof result?.save?.storedSeconds === "number") {
+          reconcileStoredTime(result.save.storedSeconds, idleEpoch, result.updatedAt);
         }
         setSaveUpdatedAt(result.updatedAt ?? null);
         setSaveStatus("雲端已同步");
       })
       .catch(() => undefined);
-  }, [loginId, pauseSupersededSession, playerId, saveReady, sessionSuperseded]);
+  }, [loginId, pauseSupersededSession, playerId, saveReady, sessionSuperseded, reconcileStoredTime]);
 
   useEffect(() => {
     if (!saveReady || !playerId || sessionSuperseded) return;
@@ -2917,7 +3571,7 @@ function Game({
   }, [loginId, pauseSupersededSession, playerId, sessionSuperseded]);
 
   useEffect(() => {
-    if (!saveReady || !playerId || sessionSuperseded) return;
+    if (!saveReady || !playerId || sessionSuperseded || adminOpen || skillActionBusy || offlineClaimPending || equipmentBusy || equipmentPendingRef.current) return;
     if (saveInFlightRef.current) {
       saveQueuedRef.current = true;
       return;
@@ -2928,15 +3582,21 @@ function Game({
     const maxWait = lastSaveStartedAtRef.current
       ? Math.max(0, SAVE_MAX_INTERVAL_MS - elapsedSinceLastSave)
       : SAVE_DEBOUNCE_MS;
-    const delay = prioritySaveRef.current
-      ? 0
-      : Math.min(SAVE_DEBOUNCE_MS, maxWait);
+    const delay = Math.max(
+      Math.max(0, saveRetryAfterRef.current - Date.now()),
+      prioritySaveRef.current ? 0 : Math.min(SAVE_DEBOUNCE_MS, maxWait),
+    );
     const timer = setTimeout(() => {
+      if (offlineClaimPendingRef.current || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+      // Do not persist an intermediate zero-HP target before its kill/loot
+      // and next wave have committed; a reload cannot restore that callback.
+      if(!activeBossBattle && enemyHp<=0 && towerDeathPendingRef.current)return;
       if (saveInFlightRef.current) {
         saveQueuedRef.current = true;
         return;
       }
       saveInFlightRef.current = true;
+      const idleEpoch = idleStorageClockRef.current?.epoch ?? 0;
       prioritySaveRef.current = false;
       lastSaveStartedAtRef.current = Date.now();
       setSaveStatus("儲存中");
@@ -2977,9 +3637,8 @@ function Game({
         enemyHp,
         playerHp,
         items: items.map(normalizeSceneItem),
-        loadouts,
+        loadouts:safeLoadouts({items,loadouts}),
         activeLoadout,
-        skills,
         skillReworkBuild,
         skillAscensions,
         bossTickets,
@@ -2989,10 +3648,11 @@ function Game({
         highestFloor,
         completedRuns,
         storedSeconds,
+        _lastIdleClaimId: lastIdleClaimIdRef.current,
         battleOn,
         idleSeconds,
-        skillPoints,
         mails,
+        _worldBossMailDeliveryId:worldBossMailDeliveryId,
         dailyKills,
         dailyDate,
         dailyRewardClaimed,
@@ -3003,6 +3663,7 @@ function Game({
         protectPowerUpgrade,
         adminRevision,
         rebirthCount,
+        legacyRebirthCount,
         selectedTitle,
         selectedAppearance,
         ownedTitles,
@@ -3014,13 +3675,12 @@ function Game({
         unseenItemIds,
         logs,
       };
-      fetch("/api/save", {
+      saveJsonWithTimeout("/api/save", {
         method: "POST",
         headers: loginHeaders(loginId, true),
         body: JSON.stringify({ playerId, save: payload }),
       })
-        .then(async (response) => {
-          const result = await response.json();
+        .then(({ response, result }) => {
           if (response.status === 401 || result?.error === "maintenance") {
             saveRequestIdRef.current = null;
             pauseSupersededSession(
@@ -3034,10 +3694,20 @@ function Game({
             );
             return;
           }
+          if (response.status === 409 && result?.error === "save_integrity_rejected") {
+            saveQueuedRef.current = false; saveRequestIdRef.current = null;
+            setSaveReady(false);
+            setBattleOn(false); setSaveStatus("資料不一致，重新同步中");
+            const retry=()=>{setSaveStatus("正在重新同步");setSaveReloadTick(v=>v+1);};
+            toast.error("進度需要重新同步", { description: "雲端進度已保留，登入狀態不受影響。", action:{label:"重新同步",onClick:retry} });
+            if(!integrityRecoveryUsedRef.current){integrityRecoveryUsedRef.current=true;retry();}
+            else setSaveStatus("存檔暫停，請重新同步");
+            return;
+          }
           if (response.status === 409 && result?.error === "save_conflict") {
             saveQueuedRef.current = false;
             saveRequestIdRef.current = null;
-            setSaveStatus("雲端已同步");
+            setSaveReady(false);setBattleOn(false);setSaveStatus("正在重新同步");setSaveReloadTick(v=>v+1);
             return;
           }
           if (response.status === 409) {
@@ -3048,22 +3718,33 @@ function Game({
           }
           if (!response.ok) throw new Error();
           if (result?.ok !== true) throw new Error();
+          saveFailureCountRef.current = 0;
+          saveRetryAfterRef.current = 0;
           if (result?.accepted === false) {
             // Duplicate/idempotent writes mean the authoritative server save
             // already contains this operation. Confirm it silently instead of
             // remounting the whole game and resetting the visible battle UI.
-            setSaveUpdatedAt(result.updatedAt ?? saveUpdatedAt);
+            if(result.save){setSaveReady(false);setBattleOn(false);setSaveReloadTick(v=>v+1);}
+            setSaveUpdatedAt((current) => result.updatedAt ?? current);
             saveRequestIdRef.current = null;
             setSaveStatus("雲端已同步");
             sessionStorage.removeItem(`dark-world-save-conflict-recovery:${playerId}`);
             return;
           }
-          setSaveUpdatedAt(result.updatedAt ?? saveUpdatedAt);
+          setSaveUpdatedAt((current) => result.updatedAt ?? current);
           setSaveStatus("雲端已同步");
+          if (typeof result.idleClock?.storedSeconds === "number")
+            reconcileStoredTime(result.idleClock.storedSeconds, idleEpoch, result.updatedAt);
           saveRequestIdRef.current = null;
           sessionStorage.removeItem(`dark-world-save-conflict-recovery:${playerId}`);
         })
-        .catch(() => setSaveStatus("等待連線"))
+        .catch(() => {
+          setSaveStatus("等待連線");
+          saveQueuedRef.current = true;
+          saveFailureCountRef.current += 1;
+          const backoff = Math.min(30_000, 1_000 * 2 ** Math.min(5, saveFailureCountRef.current - 1));
+          saveRetryAfterRef.current = Date.now() + backoff * (0.8 + Math.random() * 0.4);
+        })
         .finally(() => {
           saveInFlightRef.current = false;
           if (saveQueuedRef.current) {
@@ -3075,7 +3756,12 @@ function Game({
     return () => clearTimeout(timer);
   }, [
     saveReady,
-    saveUpdatedAt,
+    adminOpen,
+    reconcileStoredTime,
+    equipmentBusy,
+    activeBossBattle,
+    offlineClaimPending,
+    skillActionBusy,
     loginId,
     sessionSuperseded,
     saveRetryTick,
@@ -3101,7 +3787,6 @@ function Game({
     items,
     loadouts,
     activeLoadout,
-    skills,
     skillReworkBuild,
     skillAscensions,
     bossTickets,
@@ -3111,8 +3796,8 @@ function Game({
     storedSeconds,
     battleOn,
     idleSeconds,
-    skillPoints,
     mails,
+    worldBossMailDeliveryId,
     dailyKills,
     dailyDate,
     dailyRewardClaimed,
@@ -3123,6 +3808,7 @@ function Game({
     protectPowerUpgrade,
     adminRevision,
     rebirthCount,
+    legacyRebirthCount,
     selectedTitle,
     selectedAppearance,
     ownedTitles,
@@ -3171,7 +3857,7 @@ function Game({
         .then((result) => {
           const save = result?.save;
           const revision = Number(save?.adminRevision ?? 0);
-          if (!save || revision <= adminRevision) return;
+          if (!save || revision <= adminRevision || equipmentBusyRef.current || equipmentPendingRef.current) return;
           setGold(save.gold ?? 0);
           setYuanbao(save.yuanbao ?? 0);
           setEnhanceStones(save.enhanceStones ?? 0);
@@ -3205,16 +3891,19 @@ function Game({
   useEffect(() => {
     const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     if (!dailyDate || dailyDate === today) return;
-    setDailyDate(today);
-    setDailyKills(0);
-    setDailyRewardClaimed(false);
-    setBossTickets(10);
-    setWorldAttempts(3);
-    setWorldDamage(0);
-    setWorldRank(null);
-    toast.success("每日首領挑戰次數已重置", {
-      description: "個人首領恢復 10 次；世界首領恢復 3 次並重置今日傷害",
-    });
+    const resetTimer = window.setTimeout(() => {
+      setDailyDate(today);
+      setDailyKills(0);
+      setDailyRewardClaimed(false);
+      setBossTickets(10);
+      setWorldAttempts(3);
+      setWorldDamage(0);
+      setWorldRank(null);
+      toast.success("每日首領挑戰次數已重置", {
+        description: "個人首領恢復 10 次；世界首領恢復 3 次並重置今日傷害",
+      });
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
   }, [dailyDate, now]);
 
   const claimDailyHuntReward = async () => {
@@ -3240,7 +3929,9 @@ function Game({
         return;
       }
       if (!response.ok || result?.ok !== true || result?.dailyRewardClaimed !== true) {
-        toast.error("今日獵殺獎勵未領取，請重新載入確認進度");
+        toast.error(result?.error === "daily_claim_rejected"
+          ? "擊殺進度仍在同步，請稍候再領取"
+          : "今日獵殺獎勵未領取，請重新載入確認進度");
         return;
       }
       if (result.accepted === false) {
@@ -3314,7 +4005,7 @@ function Game({
     const cosmeticPrices: Partial<Record<typeof item, number>> = balanceConfig.economy.yuanbaoCosmetics;
     const cosmeticPrice = cosmeticPrices[item];
     if (item === "reforge" || cosmeticPrice !== undefined) {
-      if (shopPurchaseInFlightRef.current) return;
+      if (shopPurchaseInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
       if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
       const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : (cosmeticPrice ?? 0);
       if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
@@ -3416,7 +4107,8 @@ function Game({
         }
         if (levelUps > 0) {
           setLevel(nextLevel);
-          setSkillPoints(earnedSkillPoints(nextLevel));
+          // The reworked skill budget is derived from level; there is no
+          // separate skill-points state to update during combat.
           pushLog("成長", `經驗累積完成，角色提升至 Lv.${nextLevel}`);
         }
         return nextLevel >= 100 ? 0 : remaining;
@@ -3449,7 +4141,7 @@ function Game({
           );
           if (
             protectPowerUpgrade &&
-            (!worn || equipmentDisplayRating(item) > equipmentDisplayRating(worn))
+            (!worn || powerDifferenceForItem(item) > 0)
           )
             return false;
           return true;
@@ -3491,7 +4183,7 @@ function Game({
       const overflowMails = Array.from(
         { length: Math.ceil(overflow.length / 60) },
         (_, index) => ({
-          id: Date.now() + index,
+          id: nextLootId(index),
           title: "背包溢出獎勵",
           body: `${source}獲得的物品因背包已滿而轉入郵件，保存 7 天。可依背包空間分批領取。`,
           claimed: false,
@@ -3522,6 +4214,7 @@ function Game({
 
   const claimMail = (mail: MailMessage) => {
     if (mail.claimed) return;
+    if(mail.expiresAt&&Date.parse(mail.expiresAt)<=Date.now())return toast.error("郵件已過期");
     const freeSlots = Math.max(0, 60 - items.filter((item) => !equipped.includes(item.id)).length);
     if (mail.rewards.items.length > 0 && freeSlots === 0)
       return toast.error("背包空間不足", {
@@ -3534,6 +4227,7 @@ function Game({
       setGold((v) => v + mail.rewards.gold);
       setEnhanceStones((v) => v + mail.rewards.stones);
       setYuanbao((v) => v + (mail.rewards.yuanbao ?? 0));
+      setReforgeStones(v=>v+(mail.rewards.reforgeStones??0));
     }
     if (claimedItems.length) {
       setItems((old) => [...old, ...claimedItems]);
@@ -3550,6 +4244,7 @@ function Game({
           gold: claimResources ? 0 : m.rewards.gold,
           stones: claimResources ? 0 : m.rewards.stones,
           yuanbao: claimResources ? 0 : m.rewards.yuanbao,
+          reforgeStones: claimResources ? 0 : m.rewards.reforgeStones,
           items: remainingItems,
           resourcesClaimed: true,
         },
@@ -3567,8 +4262,9 @@ function Game({
     let goldGain = 0;
     let stonesGain = 0;
     let yuanbaoGain = 0;
+    let reforgeGain=0;
     const nextMails = mails.map((mail) => {
-      if (mail.claimed) return mail;
+      if (mail.claimed || mail.expiresAt&&Date.parse(mail.expiresAt)<=Date.now()) return mail;
       const itemsToClaim = mail.rewards.items.slice(0, freeSlots);
       freeSlots -= itemsToClaim.length;
       claimedItems.push(...itemsToClaim);
@@ -3578,6 +4274,7 @@ function Game({
         goldGain += mail.rewards.gold;
         stonesGain += mail.rewards.stones;
         yuanbaoGain += mail.rewards.yuanbao ?? 0;
+        reforgeGain+=mail.rewards.reforgeStones??0;
       }
       return {
         ...mail,
@@ -3587,6 +4284,7 @@ function Game({
           gold: claimResources ? 0 : mail.rewards.gold,
           stones: claimResources ? 0 : mail.rewards.stones,
           yuanbao: claimResources ? 0 : mail.rewards.yuanbao,
+          reforgeStones: claimResources ? 0 : mail.rewards.reforgeStones,
           items: remainingItems,
           resourcesClaimed: true,
         },
@@ -3595,6 +4293,7 @@ function Game({
     if (goldGain) setGold((value) => value + goldGain);
     if (stonesGain) setEnhanceStones((value) => value + stonesGain);
     if (yuanbaoGain) setYuanbao((value) => value + yuanbaoGain);
+    if(reforgeGain)setReforgeStones(value=>value+reforgeGain);
     if (claimedItems.length) {
       setItems((old) => [...old, ...claimedItems]);
       setUnseenItemIds((old) => [...new Set([...old, ...claimedItems.map((item) => item.id)])]);
@@ -3671,7 +4370,7 @@ function Game({
         `${tier === "boss" ? "地圖首領" : tier === "guardian" ? "守關者" : tier === "elite" ? "精英" : "怪物"}掉落【${item.quality}】${item.name}`,
       );
     },
-    [addLoot, blessings, mapId, playerClass, pushLog],
+    [addLoot, blessingUpgraded, characterStats.equipmentDrop, characterStats.highQualityDrop, hasBlessing, mapId, playerClass, pushLog],
   );
 
   const offerBlessings = useCallback(() => {
@@ -3762,12 +4461,14 @@ function Game({
     return () => clearTimeout(timer);
   }, [blessingOpen, blessingUnavailable, blessingCountdown]);
 
+  const chooseTimedBlessing = useEffectEvent(chooseBlessing);
+
   useEffect(() => {
     if (!blessingOpen || blessingDrawing || blessingChoices.length === 0)
       return;
     const timer = setTimeout(() => {
       if (blessingCountdown <= 1)
-        chooseBlessing(
+        chooseTimedBlessing(
           blessingChoices[Math.floor(Math.random() * blessingChoices.length)],
         );
       else setBlessingCountdown((value) => value - 1);
@@ -3798,7 +4499,6 @@ function Game({
     setRunGear(0);
     setRunStartedAt(() => Date.now());
     setRunSummary(null);
-    setRunDialogOpen(false);
     setRestartCountdown(10);
     setBattleOn(true);
     setCausePrompt(
@@ -3806,7 +4506,7 @@ function Game({
     );
   };
 
-  const finishRun = (outcome: "death" | "complete", floor: number) => {
+  const finishRun = useEffectEvent((outcome: "death" | "complete", floor: number) => {
     setBattleOn(false);
     if (outcome === "death" && playerId && !sessionSuperseded) {
       void fetch("/api/analytics/deaths", {
@@ -3845,7 +4545,6 @@ function Game({
       gear: runGear,
       duration: Math.max(1, Math.floor((now.getTime() - runStartedAt) / 1000)),
     });
-    setRunDialogOpen(true);
     setRestartCountdown(10);
     pushLog(
       "戰鬥",
@@ -3853,11 +4552,11 @@ function Game({
         ? `擊敗${currentMap.name}第 30 層首領，下一張地圖已解鎖；10 秒後在原地展開新一輪`
         : "角色戰敗，10 秒後從第 1 層重新挑戰",
     );
-  };
+  });
 
   const canRebirth = level >= 100 && (mapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
   const runSkillAction = async (action: SkillSaveAction): Promise<boolean> => {
-    if (!saveReady || sessionSuperseded || skillActionInFlightRef.current) return false;
+    if (!saveReady || sessionSuperseded || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return false;
     skillActionInFlightRef.current = true;
     setSkillActionBusy(true);
     const key = JSON.stringify(action);
@@ -3865,6 +4564,10 @@ function Game({
       ? skillActionRetryRef.current.id : crypto.randomUUID();
     skillActionRetryRef.current = { key, id };
     try {
+      if(action.kind === "begin_rebirth"){
+        for(let wait=0;saveInFlightRef.current&&wait<100;wait++)await new Promise(resolve=>window.setTimeout(resolve,100));
+        if(saveInFlightRef.current)throw new Error("save_busy");
+      }
       const response = await fetch("/api/save", {
         method: "POST",
         headers: loginHeaders(loginId, true),
@@ -3881,7 +4584,7 @@ function Game({
         toast.error("新版技能操作未完成，請重新載入後再試");
         return false;
       }
-      if (action.kind === "paid_reset") {
+      if (action.kind === "paid_reset" || action.kind === "begin_rebirth") {
         if (Number.isSafeInteger(result.yuanbao)) setYuanbao(result.yuanbao);
         if (Number.isSafeInteger(result.adminRevision)) setAdminRevision(result.adminRevision);
       }
@@ -3901,13 +4604,15 @@ function Game({
 
   const rebirth = async () => {
     if (!canRebirth) return;
-    // Legacy rebirth progression remains separate; the new preview unlocks
-    // ascensions only after this action has been accepted by the save server.
-    if (!(await runSkillAction({ kind: "begin_rebirth" }))) return;
+    // Progression and ascension reset commit together on the server.
+    // Pause until the canonical reset has been loaded before resuming battle.
+    setBattleOn(false);
+    if (!(await runSkillAction({ kind: "begin_rebirth" }))){setBattleOn(true);return;}
+    setSaveReady(false);
     towerDeathPendingRef.current = false;
     resetCombatPerks();
     setRebirthCount((value) => Math.min(MAX_REBIRTHS, value + 1));
-    setRebirthPoints((value) => value + 2);
+    setRebirthPoints((value) => value + REBIRTH_REWARD_PER_TURN.talentPoints);
     setLevel(1);
     setExp(0);
     setMapId(1);
@@ -3923,10 +4628,8 @@ function Game({
     setUnseenItemIds([]);
     setLoadouts({ 1: [], 2: [] });
     setSelectedItem(0);
-    setSkills(skillsByClass[playerClass].map((skill) => ({ ...skill, level: 0 })));
-    setSkillPoints(0);
     setCompletedRuns(0);
-    setStoredSeconds(0);
+    resetStoredTime(0);
     setBlessings([]);
     setDailyKills(0);
     setDailyDate(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }));
@@ -3934,10 +4637,10 @@ function Game({
     setFinalBossDefeated(false);
     setBattleDrops([]);
     setRunSummary(null);
-    setRunDialogOpen(false);
-    setBattleOn(true);
+    setBattleOn(false);
+    setSaveReloadTick(v=>v+1);
     setCausePrompt(`第 ${rebirthCount + 1} 轉開始，裝備、信件與地圖進度已重置`);
-    pushLog("系統", `完成第 ${rebirthCount + 1} 次輪迴，獲得輪迴天賦點 +2`);
+    pushLog("系統", `完成第 ${rebirthCount + 1} 次輪迴，獲得輪迴天賦點 +${REBIRTH_REWARD_PER_TURN.talentPoints}`);
     toast.success("輪迴完成", { description: "等級、地圖、技能、掛機、祝福、全部裝備與信件已重置；資源與輪迴成長保留。" });
   };
   const spendRebirthTalent = (id: RebirthTalentId) => {
@@ -3979,7 +4682,6 @@ function Game({
     setRunGear(0);
     setRunStartedAt(() => Date.now());
     setRunSummary(null);
-    setRunDialogOpen(false);
     setRestartCountdown(10);
     setBattleOn(true);
     setTab("主控");
@@ -3987,33 +4689,34 @@ function Game({
     pushLog("系統", `前往${target.name}，從第 1 層開始定點掛機`);
   };
 
+  const restartRun = useEffectEvent(beginNewRun);
+  // HP changes on every hit; read its current value without resetting attack clocks.
+  const readTowerHealth = useEffectEvent(() => playerHp);
+
   useEffect(() => {
     if (!runSummary) return;
     const timer = setTimeout(() => {
-      if (restartCountdown <= 1) beginNewRun();
+      if (restartCountdown <= 1) restartRun();
       else setRestartCountdown((value) => value - 1);
     }, 1000);
     return () => clearTimeout(timer);
   }, [runSummary, restartCountdown]);
 
   useEffect(() => {
-    if (!battleOn || activeBossBattle || runSummary) return;
-    // The live skill queue still owns hits, rewards and death handling. Keep its
-    // settlement route on legacy until the replacement owns all three together.
+    if (!saveReady || sessionSuperseded || !battleOn || activeBossBattle || runSummary) return;
     const cutoverRoute = beginSkillBattleCutover({
       battleId: `tower:${runStartedAt}:${mapId}`,
       encounter: "tower",
-      enableRework: false,
-      reworkReady: false,
+      enableRework: true,
+      reworkReady: true,
     });
     let actionSequence = 0;
     liveCombatRef.current = syncLiveCombat(liveCombatRef.current, `tower:${runStartedAt}:${mapId}`,
       `${runStartedAt}:${mapId}:${wave}`, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const monsterAttackSpeed = monsterProfile(currentEnemyBaseName).speed * 100;
-    let playerClock = 0;
-    let monsterClock = 0;
-    let realSecondClock = 0;
+    const cadence=retainCombatCadence(towerCadenceRef.current,`${runStartedAt}:${mapId}:${wave}`);
+    towerCadenceRef.current=cadence;
     let skillCooldown = 0;
     let defenseBreakRemaining = 0;
     let markedRemaining = nextEnemyMarkStacksRef.current;
@@ -4027,9 +4730,8 @@ function Game({
     let playerAttackCount = 0;
     let enemyAttackCount = 0;
     let fissureRemaining = 0;
-    let fissureDetonationPending = false;
-    const hasPerk = (id: string) => hasCatalogItem(equippedGear, id);
-    const hasSkillMythic = (skill: string) => Boolean(equippedSkillMythic(equippedGear, skill));
+    const hasPerk = (id: string) => hasCatalogItem(equippedGearRef.current, id);
+    const hasSkillMythic = (skill: string) => Boolean(equippedSkillMythic(equippedGearRef.current, skill));
     if (markedRemaining > 0 && hasSkillMythic("致命標記")) {
       showCombatStatus({ name: "致命標記 ×2", target: "enemy", remaining: markedRemaining + 1, unit: "攻擊", tone: "gold" });
     }
@@ -4049,6 +4751,7 @@ function Game({
       // mark immediately when that target dies; an explosion already
       // in progress is allowed to finish independently.
       setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setHunterMarkVisual(null);
       setEnemyDefeated(true);
       window.setTimeout(() => setEnemyDefeated(false), executionFinisher ? 980 : 320);
       setEnemyHitFeedback(null);
@@ -4123,11 +4826,11 @@ function Game({
       setPlayerHp(100);
       enemyAttackCount = 0;
       setCombatStatuses([]);
+      setBloodBrandVisual(null);
       defenseBreakRemaining = 0;
       markedRemaining = 0;
       markExplosionPending = false;
       fissureRemaining = 0;
-      fissureDetonationPending = false;
       burningUntil = 0;
       setBloodShieldReady(true);
       setRound(1);
@@ -4168,28 +4871,30 @@ function Game({
       advanceToNextEnemy();
       return 100;
     };
+    const queueTowerKill = (executionFinisher: boolean, markExplosion: boolean, tier: "normal"|"elite"|"guardian"|"boss", volleyKey?:number) => {
+      towerDeathPendingRef.current=true;
+      pendingEnemyDefeatRef.current={token:targetKey,queuedAt:performance.now(),volleyKey,finish:()=>{
+        setEnemyHp(resolveTowerKill(executionFinisher,markExplosion,tier));
+      }};
+      return 0;
+    };
     const timer = setInterval(
       () => {
+        const playerHp = readTowerHealth();
+        if (ultimateAnimationLockRef.current !== null) return;
         if (towerDeathPendingRef.current) return;
         if (towerVictoryGuardRef.current.has(targetKey)) return;
         const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
         const tickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
         if (tickDamage > 0) {
-          const dotKey = Date.now();
-          const byKind = new Map<"bleed" | "burn", number>();
-          for (const event of dotTicks) {
-            if (event.damage > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + Math.round(event.damage));
-          }
-          const dotGroups = [...byKind].map(([kind, damage], index) => ({ key: dotKey + index, kind, damage }));
-          setDotDamageGroups((current) => [...current, ...dotGroups]);
-          window.setTimeout(() => setDotDamageGroups((current) =>
-            current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
           const tickTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
           const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName);
           setEnemyHp((health) => {
+            if(towerDeathPendingRef.current)return 0;
             if (towerVictoryGuardRef.current.has(targetKey)) return 100;
             const settled = settleCombatHealth(health, maximum, tickDamage);
-            return settled.defeated ? resolveTowerKill(false, false, tickTier) : settled.remainingPercent;
+            showDotDamage(dotTicks, settled.actualDamage);
+            return settled.defeated ? queueTowerKill(false, false, tickTier) : settled.remainingPercent;
           });
         }
         const battleKey = `${mapId}:${wave}`;
@@ -4202,37 +4907,30 @@ function Game({
           }
           setBloodRoarVisualActive(false);
         }
-        realSecondClock += tickMs;
-        if (realSecondClock >= 1000) {
-          realSecondClock -= 1000;
-          setStoredSeconds((s) => Math.min(43200, s + 1));
-          setCombatStatuses((current) =>
-            current
-              .map((status) => status.unit === "秒" ? { ...status, remaining: status.remaining - 1 } : status)
-              .filter((status) => status.remaining > 0),
-          );
-        }
-        playerClock += tickMs;
-        monsterClock += tickMs;
+        cadence.player += tickMs;
+        const enemyControl = liveEnemyControl(liveCombatRef.current, Date.now());
+        cadence.enemy = enemyControl.frozen ? 0 : cadence.enemy + tickMs * enemyControl.speedMultiplier;
         const activeCombatAttackSpeed = combatAttackSpeed * (
           combatPerksRef.current.dodgeSpeedAttacks > 0 ? 1.12 : 1
         );
         const playerInterval = 100000 / Math.max(1, activeCombatAttackSpeed);
         const monsterInterval = 100000 / monsterAttackSpeed;
-        const playerActs = playerClock >= playerInterval;
-        const monsterActs = monsterClock >= monsterInterval;
+        const playerActs = cadence.player >= playerInterval;
+        let monsterActs = !enemyControl.frozen && cadence.enemy >= monsterInterval;
         if (!playerActs && !monsterActs) return;
-        if (playerActs) playerClock %= playerInterval;
-        if (monsterActs) monsterClock %= monsterInterval;
+        if (playerActs) cadence.player %= playerInterval;
+        if (monsterActs) cadence.enemy %= monsterInterval;
         if (burningUntil > Date.now() && Date.now() >= nextBurnAt) {
           nextBurnAt = Date.now() + 1000;
           const burnLevel = skills.find((skill) => skill.name === "霜火新星")?.level ?? 1;
           const burnTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
           const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName);
           setEnemyHp((health) => {
+            if(towerDeathPendingRef.current)return 0;
             if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
             const settled = settleCombatHealth(health, maximumHealth, maximumHealth * (1.5 + burnLevel * 0.5) / 100);
-            return settled.defeated ? resolveTowerKill(false, false, burnTier) : settled.remainingPercent;
+            showDotDamage([{kind:"burn",damage:settled.actualDamage}],settled.actualDamage);
+            return settled.defeated ? queueTowerKill(false, false, burnTier) : settled.remainingPercent;
           });
         }
         const dynamicDamageReduction = characterStats.damageReduction +
@@ -4258,6 +4956,7 @@ function Game({
                 : "normal";
           if (!playerActs) {
             const monsterOnlyValues = towerCombatValues({
+              secondChapterTuning: mapId === 2,
               combatPower,
               recommendedPower: currentRecommendedPower,
               mapId,
@@ -4318,14 +5017,14 @@ function Game({
                 return playerHealth;
               }
               const magicShieldLevel = skills.find((skill) => skill.name === "魔力護盾")?.level ?? 0;
-              if (playerClass === "法師" && !shieldExpired && magicShieldCooldown <= 0 && magicShieldLevel > 0 && Math.random() < skillProcChance("魔力護盾", magicShieldLevel)) {
+              if (!liveCombatRef.current && playerClass === "法師" && !shieldExpired && magicShieldCooldown <= 0 && magicShieldLevel > 0 && Math.random() < skillProcChance("魔力護盾", magicShieldLevel)) {
                 monsterDamage = Math.max(1, Math.round(monsterDamage * (1 - skillReduction("魔力護盾", magicShieldLevel))));
                 magicShieldCooldown = 4 + Math.floor(Math.random() * 3);
                 queueSkillVisual({ name: "魔力護盾", key: next });
                 showCombatStatus({ name: `魔力護盾 -${Math.round(skillReduction("魔力護盾", magicShieldLevel) * 100)}%`, target: "player", remaining: 1, unit: "次", tone: "blue" });
                 setCausePrompt(`魔力護盾觸發 → 下一次傷害降低 ${Math.round(skillReduction("魔力護盾", magicShieldLevel) * 100)}%`);
               }
-              if (shieldExpired && hasPerk("skill-mage-eternal-core")) {
+              if (!liveCombatRef.current && shieldExpired && hasPerk("skill-mage-eternal-core")) {
                 magicShieldExplosionPending = true;
                 queueSkillVisual({ name: "魔力護盾・爆炸", key: next });
                 showCombatStatus({ name: "過載爆炸", target: "player", remaining: 1, unit: "次", tone: "gold" });
@@ -4342,19 +5041,30 @@ function Game({
                   damage: monsterDamage, baseDodgeChance: effectiveDodge,
                    defense: characterStats.defense, equippedItems: equippedGearRef.current,
                 });
+                updateManaShield(liveCombatRef.current, liveDefense.manaShield);
+                updatePhantomStepVisual(liveCombatRef.current, next, liveDefense.phantomStep);
+                if (liveDefense.unyielding) {
+                  updateUnyieldingVisual(liveDefense.unyielding, next);
+                  setUnyieldingCounterFeedback(liveDefense.unyielding.countered ? next : null);
+                }
                 monsterDamage = liveDefense.damage;
-                if (liveDefense.counterDamagePercent > 0) {
-                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                if (liveDefense.counterDamagePercent > 0 || (liveDefense.equipmentDamage ?? 0) > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
                   const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
                   setEnemyHp((health) => {
+                    if(towerDeathPendingRef.current)return 0;
                     if (towerVictoryGuardRef.current.has(targetKey)) return 100;
                     const settled = settleCombatHealth(health, maximum, counter);
-                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                    showCounterDamage(settled.actualDamage, liveDefense.equipmentDamage ? "過載爆炸" : "反擊");
+                    return settled.defeated ? queueTowerKill(false, false, tier) : settled.remainingPercent;
                   });
                 }
                 if (liveDefense.blocked || liveDefense.dodged) {
-                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  setPlayerHitFeedback({ damage: 0, dodged: liveDefense.dodged && !liveDefense.blocked,
+                    blocked: liveDefense.blocked, label: liveDefense.unyielding?.blocked ? "格擋成功！" : undefined, key: next });
+                  setCausePrompt(liveDefense.unyielding?.blocked
+                    ? `不屈戰意格擋${liveDefense.unyielding.countered ? "並反擊" : "成功"} · 尚餘 ${liveDefense.unyielding.remainingEnemyAttacks} 次`
+                    : liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
                   return playerHealth;
                 }
               }
@@ -4422,13 +5132,43 @@ function Game({
             hitChance: effectiveHit, criticalChance: characterStats.crit,
             criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
           }) : null;
-          const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
+          if (liveAction?.currentHealthCostPercent) setPlayerHp(health => Math.max(
+            healthPercentFromDamage(1, characterStats.hp), health * (1 - liveAction.currentHealthCostPercent / 100)));
+          if (liveEnemyControl(liveCombat, Date.now()).frozen) { monsterActs = false; cadence.enemy = 0; }
+          if (liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+            skill.category === "ultimate" && skill.name === liveAction.name)) {
+            beginUltimateAnimation(next);
+            if ((liveAction.name === "蒼穹箭雨" || liveAction.name === "星界寂滅") && monsterActs) cadence.enemy += monsterInterval;
+          }
+          if (liveAction && liveCombat) {
+            updateLiveBloodRoar(liveCombat, liveAction, next);
+            updateBloodBrandVisual(liveAction, next);
+            updateBerserkerStanceVisual(liveCombat, liveAction, next);
+            updateArmorSmashVisual(liveCombat, liveAction, next);
+            updateTitanVisuals(liveCombat, liveAction, next);
+            updateGroundSplitVisuals(liveAction, next);
+            updatePiercingVisual(liveAction, next);
+            updateStarbreakVisual(liveCombat, liveAction, next);
+            updateElementSigil(liveCombat, liveAction);
+          updateFrostfireVisual(liveCombat, liveAction, next);
+          updateMeteorVisual(liveAction, next);
+          updateOverload(liveCombat);
+            updateVolleyVisual(liveAction, next);
+            updateAstralVisual(liveCombat, liveAction, next);
+            updateSkyRainVisual(liveCombat, liveAction, next);
+            updateWindDomainVisual(liveCombat, liveAction, next);
+            updateTailwindVisual(liveAction, next);
+            updatePhantomStepVisual(liveCombat, next);
+            updateHunterVisual(liveCombat, liveAction, next);
+          }
           let triggered: Skill | null = null;
+          const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
           let triggeredMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
           let triggeredDefenseIgnore = liveAction?.defenseIgnore ?? (defenseBreakRemaining > 0 ? 35 : 0);
           let frostfireDetonationDamage = 0;
           let meteorSecondTriggered = false;
-          const bloodRoarWasActive = bloodRoarStateRef.current.remaining > 0;
+          const bloodRoarWasActive = !liveAction && bloodRoarStateRef.current.remaining > 0;
+          if (playerActs && (bloodRoarWasActive || liveAction?.bloodRoarEmpowered)) setBloodRoarSlashKey(next);
           const markedWasActive = markedRemaining > 0;
           const markExplosionWasActive = markedRemaining === 0 && markExplosionPending;
           let fissureDetonationThisAttack = false;
@@ -4439,7 +5179,7 @@ function Game({
             if (bloodRoarWasActive) {
               bloodRoarStateRef.current.remaining -= 1;
               // 強化攻擊各自播放一次鮮血斬擊；神話裝備會將總數提高至七次。
-              setBloodRoarSlashKey(next);
+              // Blade playback is queued after the resolved attack below.
               // 最後一次強化攻擊的命中回饋結束後才收起血焰邊框。
               if (bloodRoarStateRef.current.remaining <= 0) {
                 const visualToken = bloodRoarVisualTokenRef.current;
@@ -4497,7 +5237,6 @@ function Game({
               triggeredDefenseIgnore = hasPerk("skill-warrior-titan-axe") ? 35 : 20 + triggered.level * 5;
               triggeredMultiplier = skillMultiplier(triggered.name, triggered.level);
               fissureRemaining = 3;
-              fissureDetonationPending = false;
               showCombatStatus({ name: `破防 ${triggeredDefenseIgnore}%`, target: "enemy", remaining: defenseBreakRemaining + 1, unit: "攻擊", tone: "red" });
             }
             if (triggered?.name === "處決" || triggered?.name === "穿雲箭" || triggered?.name === "霜火新星" || triggered?.name === "奧術回響" || triggered?.name === "隕星術") triggeredMultiplier = skillMultiplier(triggered.name, triggered.level);
@@ -4530,7 +5269,6 @@ function Game({
               fissureRemaining -= 1;
               if (fissureRemaining === 0) {
                 fissureDetonationThisAttack = true;
-                fissureDetonationPending = true;
               }
             }
             if (
@@ -4629,6 +5367,7 @@ function Game({
             : 1;
           const hitRoll = Math.random() * 100;
           const combatValues = towerCombatValues({
+            secondChapterTuning: mapId === 2,
             combatPower,
             recommendedPower: currentRecommendedPower,
             mapId,
@@ -4646,11 +5385,12 @@ function Game({
                 : markedWasActive
                   ? 1 + (deadlyMarkBonusPct(skills.find((skill) => skill.name === "致命標記")?.level ?? 0) * (6 - markedRemaining)) / 100
                   : 1) *
-              (bloodRoarWasActive ? 1 + bloodRoarDamageBonus(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0) / 100 : 1),
+              (bloodRoarWasActive ? 1 + bloodRoarDamageBonus(bloodRoarLevel) / 100 : 1),
             skillDamage: characterStats.skillDamage +
               (activeSetCount >= 8 ? SET_SKILL_DAMAGE_PCT : 0) +
               (!liveAction && skillDamageTriggered && magicShieldCooldown > 0 && hasPerk("skill-mage-eternal-core") ? 25 : 0),
             eliteDamage: 0,
+            bossDamage: characterStats.bossDamage,
             bossReduction: characterStats.bossReduction,
             lowHealthDamage: characterStats.lowHealthDamage,
             lowHealthReduction: characterStats.lowHealthReduction,
@@ -4662,26 +5402,18 @@ function Game({
             defenseIgnore: triggeredDefenseIgnore,
             playerHit: characterStats.hit,
             monsterEvasionRating:
-              balanceConfig.combat.evasionModel.monsterEvasionBase +
-              mapId * balanceConfig.combat.evasionModel.monsterEvasionPerMap +
-              (balanceConfig.combat.evasionModel.monsterEvasionBonusByMap[mapId] ?? 0),
+              monsterRatingsForMap(mapId).evasion,
             playerDamageMultiplier:
               attackPerkMultiplier *
               (fissureWasActive ? 1.3 : 1) *
-              (enemyAttackCount === 1 && hasEquippedEpithet(equippedGear, "chase") ? 1.1 : 1) *
-              (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGear, "charge")
+              (enemyAttackCount === 1 && hasEquippedEpithet(equippedGearRef.current, "chase") ? 1.1 : 1) *
+              (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGearRef.current, "charge")
                 ? (100 + characterStats.critDamage + 8) / (100 + characterStats.critDamage)
                 : 1),
           });
-          const bossDamageMultiplier =
-            currentWaveBoss || currentWaveGuardian || currentWaveElite
-              ? 1 + characterStats.bossDamage / 100
-              : 1;
-          if (liveAction?.damagePercent === 0) combatValues.playerDamage = 0;
           const baseHpDamage = Math.round(
             combatValues.playerDamage *
-              windCriticalMultiplier *
-              bossDamageMultiplier,
+              windCriticalMultiplier,
           );
           const setElementalDamage = activeSetCount >= 6
             ? Math.round(combatValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100) : 0;
@@ -4710,25 +5442,28 @@ function Game({
             ? "套裝共鳴"
             : markExplosionWasActive
               ? "致命標記・爆炸"
-            : triggered
+              : triggered
               ? `${triggered.name}${echoMultiplier > 1 ? "・回響" : ""}`
               : null);
+          const bloodRoarBurstMissed = bloodRoarFinalAttack && hitRoll > effectiveHit;
           setComboCount(attacks);
-          if (effectName) queueSkillVisual({ name: effectName, key: next });
-          else setSkillEffect(null);
-          if (triggered?.name === "穿雲箭") {
-            setRangerPiercingEffect({ key: next });
-            window.setTimeout(triggerRangerImpact, 140);
+          if (effectName) {
+            queueSkillVisual(
+              { name: effectName, key: next },
+              { showVisual: !(effectName === "鮮血怒吼・血爆" && bloodRoarBurstMissed) },
+            );
           }
-          if (triggered?.name === "疾風連射") {
-            const shotCount = windVolleyCriticals.length;
-            setRangerWindVolleyEffect((current) => [...current, { key: next, shotCount }]);
-            window.setTimeout(() => {
-              setRangerWindVolleyEffect((current) => current.filter((effect) => effect.key !== next));
-            }, 250 + (shotCount - 1) * 250 + 1_700);
-            Array.from({ length: shotCount }, (_, index) => 495 + index * 250).forEach((impactDelay) => {
-              window.setTimeout(triggerRangerImpact, impactDelay);
-            });
+          // A triggering skill can share the empowered final attack. Keep both
+          // visuals, but only show the blood burst after the final hit lands.
+          if (bloodRoarFinalAttack && !bloodRoarBurstMissed && effectName !== "鮮血怒吼・血爆") {
+            queueSkillVisual({ name: "鮮血怒吼・血爆", key: Date.now() }, { showBanner: false });
+          }
+          else setSkillEffect(null);
+          if (!liveAction && triggered?.name === "穿雲箭") {
+            setRangerPiercingEffect({ key: next, hit: hitRoll <= effectiveHit });
+          }
+          if (!liveAction && triggered?.name === "疾風連射") {
+            setRangerWindVolleyEffect((current) => [...current, { key: next, shotCount: windVolleyCriticals.length }]);
           }
           if (triggered?.name === "致命標記") {
             setDeadlyMarkEffect({ key: next, detonationKey: null });
@@ -4738,7 +5473,7 @@ function Game({
             setDeadlyMarkEffect((current) => current ? { ...current, detonationKey: next } : current);
             window.setTimeout(triggerRangerImpact, 240);
           }
-          if (triggered?.name === "裂地斬") setGroundSplitEffect({ key: next });
+          if (!liveAction && triggered?.name === "裂地斬") setGroundSplitEffect({ key: next, hit: hitRoll <= effectiveHit });
           if (triggered?.name === "處決") {
             setExecutionEffect({ key: next });
             window.setTimeout(() => {
@@ -4747,6 +5482,12 @@ function Game({
             }, 750);
           }
           if (liveAction && liveAction.damagePercent <= 0 && actionDotDamage <= 0) {
+            if (liveAction.name === "星界寂滅") queueAstralNumbers(next, liveAction, 0, () => {});
+            if(liveAction.name==="蒼穹箭雨")
+              queueSkyRainNumbers(next,liveAction,0,()=>{},liveCombat?.ascended.has("蒼穹箭雨")??false);
+            if (liveAction.name === "閃電鏈") queueLightningNumbers(next, liveAction, 0, () => {}, liveCombat?.ascended.has("閃電鏈") ?? false);
+            if (liveAction.name === "虛空崩解") queueVoidNumbers(next, liveAction, 0, () => {}, liveCombat?.ascended.has("虛空崩解") ?? false);
+            setMissFeedback(liveAction.name!=="蒼穹箭雨" && liveAction.name!=="星界寂滅" && liveAction.name!=="霜火新星" && liveAction.name!=="閃電鏈" && liveAction.name!=="隕星術" && liveAction.name!=="虛空崩解" && liveAction.hits.length > 0 && liveAction.hits.every((hit) => !hit.hit) ? next : null);
             setLastDamage(0);
             setBattleHits([]);
             setCausePrompt(liveAction.name ? `${liveAction.name}已施放` : "攻擊落空");
@@ -4762,8 +5503,6 @@ function Game({
             return next;
           }
           setMissFeedback(null);
-          for (const status of liveAction?.statuses ?? [])
-            showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
           const attackDebugParts = [
             effectName ? `特效：${effectName}` : "特效：普通攻擊",
             `命中：${effectiveHit.toFixed(0)}%`,
@@ -4782,6 +5521,7 @@ function Game({
           setCausePrompt(attackDebugParts);
           const currentAction = ++actionSequence;
           setEnemyHp((h) => {
+            if(towerDeathPendingRef.current)return 0;
             if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
             const execution =
               hasBlessing("execute") &&
@@ -4796,18 +5536,26 @@ function Game({
               (execution ? (blessingUpgraded("execute") ? 1.6 : 1.45) : 1) *
               executionMythicBonus *
               (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner") && h < 25 ? 2 : 1);
-            const finalHpDamage = settleCutoverAction(cutoverRoute, {
-              battleId: cutoverRoute.battleId,
-              sequence: currentAction,
-              legacyDamage: Math.round((hpDamage - actionDotDamage) * finalMultiplier) + Math.round(actionDotDamage),
-            }).damage;
             const enemyMaximumHealth = effectiveMonsterMaximumHealth(
               mapId,
               currentRecommendedPower,
               tier,
               currentEnemyBaseName,
             );
-            const healthSettlement = settleCombatHealth(h, enemyMaximumHealth, finalHpDamage);
+            const currentHealth = healthFromPercent(h, enemyMaximumHealth);
+            const actionLedger = createSkillDamageLedger(cutoverRoute.battleId, targetKey,
+              enemyMaximumHealth, currentHealth);
+            const cutover = settleCutoverAction(cutoverRoute, {
+              battleId: cutoverRoute.battleId,
+              sequence: currentAction,
+              rework: {
+                ledger: { ...actionLedger, lastActionSequence: currentAction - 1 },
+                segments: [{ key: "resolved-player-action", source: "original", hit: hpDamage > 0,
+                  damage: Math.round((hpDamage - actionDotDamage) * finalMultiplier) + Math.round(actionDotDamage) }],
+              },
+            });
+            if (cutover.mode !== "rework") throw new Error("Tower battle left the reworked damage route");
+            const healthSettlement = settleCombatHealth(h, enemyMaximumHealth, cutover.damage);
             const actualPercentDamage = healthSettlement.percentDamage;
             const totalDisplayedDamage = Math.max(
               1,
@@ -4822,14 +5570,25 @@ function Game({
             const dotDisplayedDamage = Math.min(totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed,
               Math.round(actionDotDamage));
             mainDisplayedDamage += totalDisplayedDamage - mainDisplayedDamage - elementalDisplayed - resonanceDisplayed - dotDisplayedDamage;
-            const visibleDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
-            let dotRemaining = dotDisplayedDamage;
-            const dotGroupKey = next * 10;
-            for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
-              const damage = Math.min(dotRemaining, Math.max(0, Math.round(event.damage)));
-              dotRemaining -= damage;
-              if (damage > 0) visibleDotGroups.push({ key: dotGroupKey + index, kind: event.kind, damage });
-            }
+            const mythicDisplay = splitMythicDamage(liveAction, mainDisplayedDamage);
+            mainDisplayedDamage = mythicDisplay.remaining;
+            const groundShockDisplayed = liveAction && liveAction.damagePercent > 0
+              ? Math.min(mainDisplayedDamage, Math.round(mainDisplayedDamage * liveAction.groundShockDamagePercent / liveAction.damagePercent)) : 0;
+            mainDisplayedDamage -= groundShockDisplayed;
+            queueGroundShockNumber(next, groundShockDisplayed);
+            const tailwindEchoDisplayed = liveAction && liveAction.damagePercent > 0
+              ? Math.min(mainDisplayedDamage, Math.round(mainDisplayedDamage * (liveAction.tailwindEcho?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+            mainDisplayedDamage -= tailwindEchoDisplayed;
+            queueTailwindEchoNumber(next, tailwindEchoDisplayed, liveAction?.tailwindEcho?.critical ?? false);
+            const hunterBurstDisplayed = liveAction && liveAction.damagePercent > 0
+              ? Math.min(mainDisplayedDamage, Math.round((mainDisplayedDamage + tailwindEchoDisplayed)
+                * (liveAction.hunterExplosion?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+            mainDisplayedDamage -= hunterBurstDisplayed;
+            queueHunterBurstNumber(next, hunterBurstDisplayed, liveAction?.hunterExplosion?.critical ?? false);
+            const frostfireAfterburstDisplayed = liveAction && liveAction.damagePercent > 0
+              ? Math.min(mainDisplayedDamage, Math.round(mainDisplayedDamage * (liveAction.frostfireAfterburst?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+            mainDisplayedDamage -= frostfireAfterburstDisplayed;
+            queueFrostfireAfterburstNumber(next, frostfireAfterburstDisplayed, liveAction?.frostfireAfterburst ?? null);
             const baseHitDamage = Math.floor(mainDisplayedDamage / attacks);
             const remainder = Math.max(0, mainDisplayedDamage - baseHitDamage * attacks);
             const hitDamages = windVolleyTriggered
@@ -4847,19 +5606,25 @@ function Game({
                 );
             const perHitDamage = hitDamages[0] ?? baseHitDamage;
             const publishDamageDisplay = () => {
+              showMythicDamage(mythicDisplay.hits);
+              if (liveAction?.name === "霜火新星" && liveAction.hits.every(part => !part.hit))
+                publishFrostfireNumber(next, 0, false, undefined, true);
+              triggerHunterBurst(next);
+              if (dotDisplayedDamage > 0) showDotDamage(liveAction?.ticks ?? [], dotDisplayedDamage);
               const elementalHits = [
                 ...(elementalDisplayed > 0 ? [{ damage: elementalDisplayed, label: "元素" }] : []),
                 ...(resonanceDisplayed > 0 ? [{ damage: resonanceDisplayed, label: "元素爆發" }] : []),
               ];
-              if (visibleDotGroups.length) {
-                setDotDamageGroups((current) => [...current, ...visibleDotGroups]);
-                window.setTimeout(() => setDotDamageGroups((current) =>
-                  current.filter((event) => event.key < dotGroupKey || event.key >= dotGroupKey + visibleDotGroups.length)), 1_200);
-              }
               if (elementalHits.length) {
-                setSetElementalHits((current) => [...current, { key: next, hits: elementalHits, volley: windVolleyTriggered }]);
+                setSetElementalHits((current) => [...current, { key: next,
+                  hits: liveAction?.name==="疾風連射"?elementalHits.map((hit)=>({...hit,delayMs:0})):elementalHits,
+                  volley: windVolleyTriggered && liveAction?.name!=="疾風連射" }]);
                 window.setTimeout(() => setSetElementalHits((current) => current.filter((hit) => hit.key !== next)),
                   windVolleyTriggered ? 1_800 : 1_200);
+              }
+              if (liveAction?.name === "疾風連射" || liveAction?.name === "星界寂滅" || liveAction?.name === "蒼穹箭雨" || liveAction?.name === "閃電鏈" || liveAction?.name === "隕星術" || liveAction?.name === "虛空崩解") {
+                setLastDamage(mainDisplayedDamage);
+                return;
               }
               if (windVolleyTriggered) {
                 const groupKey = next;
@@ -4879,19 +5644,26 @@ function Game({
                 }, 495 + (windVolleyCriticals.length - 1) * 250 + 1_200);
               } else {
                 const groupKey = next;
+                const titan = liveAction?.name === "泰坦斷界斬";
+                const ultimate = Boolean(liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+                  skill.category === "ultimate" && skill.name === liveAction.name));
                 setBattleHitGroups((current) => [
                   ...current,
                   {
                     key: groupKey,
+                    titan, ultimate, skillName: liveAction?.name ?? undefined,
                     hits: hitDamages.map((damage) => ({
                       damage,
                       critical: critical || triggered?.name === "處決",
+                      label: liveAction?.name === "破星狙擊" ? (liveCombat?.ascended.has("破星狙擊") ? "星隕" : "破星") : undefined,
                     })),
                   },
                 ]);
-                window.setTimeout(() => {
+                const timer = window.setTimeout(() => {
                   setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey));
-                }, 1_200);
+                  titanDamageTimersRef.current.delete(groupKey);
+                }, titan ? 1_500 : 1_200);
+                if (titan) titanDamageTimersRef.current.set(groupKey, timer);
               }
               setLastDamage(perHitDamage);
             };
@@ -4901,28 +5673,51 @@ function Game({
               ? 750
               : triggered?.name === "裂地斬"
                 ? 540
-                : triggered?.name === "霜火新星"
-                  ? (frostfireDetonationDamage > 0 ? 520 : 1320)
                 : triggered?.name === "隕星術"
                   ? 650
                 : markExplosionWasActive || magicShieldExplosionWasActive
                   ? 240
                 : 0;
-            if (damageDisplayDelay > 0) {
+            if (liveAction?.name === "疾風連射") {
+              queueVolleyNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay);
+            } else if (liveAction?.name === "星界寂滅") {
+              queueAstralNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay);
+            } else if (liveAction?.name === "蒼穹箭雨") {
+              queueSkyRainNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay, liveCombat?.ascended.has("蒼穹箭雨") ?? false);
+            } else if (liveAction?.name === "閃電鏈") {
+              queueLightningNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay, liveCombat?.ascended.has("閃電鏈") ?? false);
+            } else if (liveAction?.name === "虛空崩解") {
+              queueVoidNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay, liveCombat?.ascended.has("虛空崩解") ?? false);
+            } else if (liveAction?.name === "隕星術") {
+              queueMeteorNumbers(next, liveAction, mainDisplayedDamage, publishDamageDisplay);
+            } else if (liveAction?.name === "泰坦斷界斬") {
+              pendingTitanDamageRef.current.set(next, publishDamageDisplay);
+            } else if (liveAction?.name === "裂地斬") {
+              pendingGroundDamageRef.current.set(next, publishDamageDisplay);
+            } else if (liveAction?.name === "霜火新星") {
+              pendingFrostfireDamageRef.current.set(next, publishDamageDisplay);
+            } else if (liveAction?.name === "穿雲箭") {
+              pendingPiercingDamageRef.current.set(next, publishDamageDisplay);
+            } else if (liveAction?.name === "破星狙擊") {
+              pendingStarbreakDamageRef.current.set(next, publishDamageDisplay);
+            } else if (liveAction?.name === "追風箭") {
+              pendingTailwindDamageRef.current.set(next, publishDamageDisplay);
+            } else if (damageDisplayDelay > 0) {
               window.setTimeout(publishDamageDisplay, damageDisplayDelay);
             } else {
               publishDamageDisplay();
             }
             setCausePrompt(
-              `${windVolleyTriggered ? "疾風連射：" : ""}攻擊 ${characterStats.attack.toLocaleString()} × 技能 ${Math.round(triggeredMultiplier * 100)}%${skillDamageTriggered && characterStats.skillDamage > 0 ? ` × 技能傷害 +${characterStats.skillDamage}%` : ""}${critical ? ` × 暴擊 ${(1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100).toFixed(2)}` : ""} × 怪物減傷${activeAttackPerks?.ironWallBonus ? ` × 絕對防禦 +${activeAttackPerks.ironWallBonus}` : ""} → ${attacks} 段，共 ${totalDisplayedDamage.toLocaleString()} 傷害`,
+              `${windVolleyTriggered ? "疾風連射：" : ""}攻擊 ${characterStats.attack.toLocaleString()} × 技能 ${Math.round(triggeredMultiplier * 100)}%${combatValues.damageBonusMultiplier > 1 ? ` × 一般增傷 ${combatValues.damageBonusMultiplier.toFixed(2)}` : ""}${critical ? ` × 暴擊 ${(1 + (characterStats.critDamage + (activeAttackPerks?.nextAttackCritDamage ?? 0)) / 100).toFixed(2)}` : ""} × 怪物減傷${activeAttackPerks?.ironWallBonus ? ` × 絕對防禦 +${activeAttackPerks.ironWallBonus}` : ""} → ${attacks} 段，共 ${totalDisplayedDamage.toLocaleString()} 傷害`,
             );
             const temporaryLifesteal = bloodRoarWasActive
-              ? bloodRoarLifesteal(skills.find((skill) => skill.name === "鮮血怒吼")?.level ?? 0)
+              ? bloodRoarLifesteal(bloodRoarLevel)
               : 0;
             const totalLifesteal = Math.min(100, dynamicLifesteal + temporaryLifesteal + (liveAction?.lifestealPercent ?? 0));
             if (bloodRoarFinalAttack) {
-              setPlayerHp((health) => Math.max(1, health * 0.9));
+              setPlayerHp((health) => Math.max(healthPercentFromDamage(1, characterStats.hp), health * 0.9));
             }
+            if ((bloodRoarWasActive || liveAction?.bloodRoarEmpowered) && totalLifesteal > 0 && actualPercentDamage > 0 && playerHp < 100) setBloodReturnKey(next);
             if (totalLifesteal > 0 && actualPercentDamage > 0)
               setPlayerHp((health) =>
                 Math.min(
@@ -4948,8 +5743,19 @@ function Game({
               combatPerksRef.current.nextAttackCritDamage = 40;
               showCombatStatus({ name: "完美獵殺・下一擊暴傷 +40%", target: "player", remaining: 1, unit: "次", tone: "gold" });
             }
-            if (healthSettlement.defeated) return resolveTowerKill(triggered?.name === "處決", markExplosionWasActive, tier);
-            if (!monsterActs) return healthSettlement.remainingPercent;
+            if (healthSettlement.defeated && (liveAction?.name === "蒼穹箭雨" || liveAction?.name === "星界寂滅")) {
+              towerDeathPendingRef.current = true;
+              const victoryRef = liveAction.name === "星界寂滅" ? pendingAstralVictoryRef : pendingSkyVictoryRef;
+              victoryRef.current.set(next, () => {
+                towerDeathPendingRef.current = false;
+                const health = resolveTowerKill(false, markExplosionWasActive, tier);
+                setEnemyHp(health);
+              });
+              return 0;
+            }
+            if (healthSettlement.defeated) return queueTowerKill(triggered?.name === "處決", markExplosionWasActive, tier,
+              liveAction?.name==="疾風連射"?next:undefined);
+            if (!monsterActs || liveAction?.name === "蒼穹箭雨" || liveAction?.name === "星界寂滅") return healthSettlement.remainingPercent;
             setPlayerHp((playerHealth) => {
               const shieldWasActive = magicShieldCooldown > 0;
               if (magicShieldCooldown > 0) magicShieldCooldown -= 1;
@@ -4987,14 +5793,14 @@ function Game({
                 return playerHealth;
               }
               const magicShieldLevel = skills.find((skill) => skill.name === "魔力護盾")?.level ?? 0;
-              if (playerClass === "法師" && !shieldExpired && magicShieldCooldown <= 0 && magicShieldLevel > 0 && Math.random() < skillProcChance("魔力護盾", magicShieldLevel)) {
+              if (!liveCombatRef.current && playerClass === "法師" && !shieldExpired && magicShieldCooldown <= 0 && magicShieldLevel > 0 && Math.random() < skillProcChance("魔力護盾", magicShieldLevel)) {
                 monsterDamage = Math.max(1, Math.round(monsterDamage * (1 - skillReduction("魔力護盾", magicShieldLevel))));
                 magicShieldCooldown = 4 + Math.floor(Math.random() * 3);
                 queueSkillVisual({ name: "魔力護盾", key: next });
                 showCombatStatus({ name: `魔力護盾 -${Math.round(skillReduction("魔力護盾", magicShieldLevel) * 100)}%`, target: "player", remaining: 1, unit: "次", tone: "blue" });
                 setCausePrompt(`魔力護盾觸發 → 下一次傷害降低 ${Math.round(skillReduction("魔力護盾", magicShieldLevel) * 100)}%`);
               }
-              if (shieldExpired && hasPerk("skill-mage-eternal-core")) {
+              if (!liveCombatRef.current && shieldExpired && hasPerk("skill-mage-eternal-core")) {
                 magicShieldExplosionPending = true;
                 queueSkillVisual({ name: "魔力護盾・爆炸", key: next });
                 showCombatStatus({ name: "過載爆炸", target: "player", remaining: 1, unit: "次", tone: "gold" });
@@ -5016,19 +5822,30 @@ function Game({
                   damage: monsterDamage, baseDodgeChance: effectiveDodge,
                    defense: characterStats.defense, equippedItems: equippedGearRef.current,
                 });
+                updateManaShield(liveCombatRef.current, liveDefense.manaShield);
+                updatePhantomStepVisual(liveCombatRef.current, next, liveDefense.phantomStep);
+                if (liveDefense.unyielding) {
+                  updateUnyieldingVisual(liveDefense.unyielding, next);
+                  setUnyieldingCounterFeedback(liveDefense.unyielding.countered ? next : null);
+                }
                 monsterDamage = liveDefense.damage;
-                if (liveDefense.counterDamagePercent > 0) {
-                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100;
+                if (liveDefense.counterDamagePercent > 0 || (liveDefense.equipmentDamage ?? 0) > 0) {
+                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
                   const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
                   setEnemyHp((health) => {
+                    if(towerDeathPendingRef.current)return 0;
                     if (towerVictoryGuardRef.current.has(targetKey)) return 100;
                     const settled = settleCombatHealth(health, maximum, counter);
-                    return settled.defeated ? resolveTowerKill(false, false, tier) : settled.remainingPercent;
+                    showCounterDamage(settled.actualDamage, liveDefense.equipmentDamage ? "過載爆炸" : "反擊");
+                    return settled.defeated ? queueTowerKill(false, false, tier) : settled.remainingPercent;
                   });
                 }
                 if (liveDefense.blocked || liveDefense.dodged) {
-                  setPlayerHitFeedback({ damage: 0, dodged: true, key: next });
-                  setCausePrompt(liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
+                  setPlayerHitFeedback({ damage: 0, dodged: liveDefense.dodged && !liveDefense.blocked,
+                    blocked: liveDefense.blocked, label: liveDefense.unyielding?.blocked ? "格擋成功！" : undefined, key: next });
+                  setCausePrompt(liveDefense.unyielding?.blocked
+                    ? `不屈戰意格擋${liveDefense.unyielding.countered ? "並反擊" : "成功"} · 尚餘 ${liveDefense.unyielding.remainingEnemyAttacks} 次`
+                    : liveDefense.blocked ? "新版格擋成功" : "新版閃避成功");
                   return playerHealth;
                 }
               }
@@ -5063,6 +5880,44 @@ function Game({
     );
     return () => clearInterval(timer);
   }, [
+    activeBossBattle,
+    blessingUpgraded,
+    beginUltimateAnimation,
+    bloodRoarLevel,
+    characterStats.critDamage,
+    characterStats.defense,
+    characterStats.enhanceDrop,
+    characterStats.hp,
+    characterStats.reforgeDrop,
+    currentEnemyBaseName,
+    currentRecommendedPower,
+    equippedCatalogKey,
+    hasBlessing,
+    playerClass,
+    pushLog,
+    updateManaShield,
+    updateOverload,
+    queueSkillVisual,
+    triggerHunterBurst,
+    updateHunterVisual,
+    updateVolleyVisual,
+    updateAstralVisual,
+    queueAstralNumbers,
+    updateSkyRainVisual,
+    updateWindDomainVisual,
+    updateStarbreakVisual,
+    queueLightningNumbers,
+    queueVoidNumbers,
+    queueMeteorNumbers,
+    updateMeteorVisual,
+    updateElementSigil,
+    updateFrostfireVisual,
+    queueFrostfireAfterburstNumber,
+    publishFrostfireNumber,
+    showDotDamage,
+    skills,
+    saveReady,
+    sessionSuperseded,
     battleOn,
     runSummary,
     currentMap,
@@ -5087,7 +5942,6 @@ function Game({
     characterStats.yuanbaoDrop,
     bloodShieldReady,
     combatAttackSpeed,
-    skills,
     skillReworkBuild,
     skillAscensions,
     blessings,
@@ -5121,24 +5975,64 @@ function Game({
   };
 
   const claimOfflineReport = async () => {
-    if (offlineClaimPending) return;
+    if (offlineClaimPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+    offlineClaimPendingRef.current = true;
     setOfflineClaimPending(true);
     let claimSeconds = storedSeconds;
+    const claimId = pendingIdleClaimIdRef.current ?? crypto.randomUUID();
+    pendingIdleClaimIdRef.current = claimId;
     try {
-      const response = await fetch("/api/save", {
-        method: "POST",
-        headers: loginHeaders(loginId, true),
-        body: JSON.stringify({ playerId, action: "claim_idle" }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result?.ok !== true) throw new Error(result?.error ?? "claim_failed");
-      claimSeconds = Math.max(0, Math.min(43200, Number(result.claimedSeconds ?? 0)));
-      setStoredSeconds(0);
-      setSaveUpdatedAt(result.updatedAt ?? saveUpdatedAt);
-      setSaveStatus("雲端已同步");
+      // Finish a pending autosave before attempting the conditional claim.
+      for (let wait = 0; saveInFlightRef.current && wait < 100; wait += 1)
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      if (saveInFlightRef.current) throw new Error("save_busy");
+      let claimed = false;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const response = await fetch("/api/save", {
+            method: "POST",
+            headers: loginHeaders(loginId, true),
+            body: JSON.stringify({ playerId, action: "claim_idle", claimId }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (response.status === 401 || result?.error === "maintenance") {
+            pauseSupersededSession(result?.error === "maintenance" ? "maintenance" :
+              result?.error === "session_replaced" ? "replaced" : "expired");
+            throw new Error(result?.error ?? "session_expired");
+          }
+          if (response.status === 503 && attempt < 3) {
+            await new Promise((resolve) => window.setTimeout(resolve, 200 * (attempt + 1)));
+            continue;
+          }
+          if (!response.ok || result?.ok !== true) throw new Error(result?.error ?? "claim_failed");
+          claimSeconds = Math.max(0, Math.min(43200, Number(result.claimedSeconds ?? 0)));
+          lastIdleClaimIdRef.current = claimId;
+          resetStoredTime(0, result.updatedAt);
+          setSaveUpdatedAt(result.updatedAt ?? saveUpdatedAt);
+          setSaveStatus("雲端已同步");
+          claimed = true;
+          break;
+        } catch (error) {
+          if (error instanceof Error && ["session_replaced", "session_expired", "maintenance"].includes(error.message))
+            throw error;
+          if (attempt === 3) throw error;
+          await new Promise((resolve) => window.setTimeout(resolve, 200 * (attempt + 1)));
+        }
+      }
+      if (!claimed) throw new Error("claim_retry_required");
     } catch {
+      offlineClaimPendingRef.current = false;
       setOfflineClaimPending(false);
-      toast.error("離線戰果領取失敗", { description: "請確認連線後再試一次，收益不會被扣除。" });
+      toast.error("離線戰果領取失敗", { description: "存檔同步忙碌，請稍候在此視窗再試一次。" });
+      return;
+    }
+    if (!claimSeconds) {
+      pendingIdleClaimIdRef.current = null;
+      offlineClaimPendingRef.current = false;
+      setOfflineClaimPending(false);
+      setOfflineReportOpen(false);
+      setBattleOn(true);
+      toast.info("目前沒有尚未領取的離線收益");
       return;
     }
     const hours = claimSeconds / 3600;
@@ -5193,6 +6087,8 @@ function Game({
     toast.success("離線戰果已領取", {
       description: `經驗 +${gainedExp.toLocaleString()}・金幣 +${gainedGold.toLocaleString()}・強化石 +${gainedStones}・裝備 +${offlineFinds.length}・寶石 +${offlineGems.reduce((sum, stack) => sum + stack.quantity, 0)}・打孔石 +${offlineDrillingStones}`,
     });
+    pendingIdleClaimIdRef.current = null;
+    offlineClaimPendingRef.current = false;
     setOfflineClaimPending(false);
   };
 
@@ -5251,11 +6147,11 @@ function Game({
     if (isEquipped) {
       updateEquipped((old) => old.filter((id) => id !== currentItem.id));
       toast.info(`已卸下${currentItem.name}`, {
-        description: `實際戰力 ${actualDifference >= 0 ? "+" : ""}${actualDifference.toLocaleString()}`,
+        description: `綜合戰力 ${actualDifference >= 0 ? "+" : ""}${formatAssessedPower(actualDifference)}`,
       });
       pushLog(
         "裝備",
-        `卸下${currentItem.name}，戰力更新為 ${(combatPower + actualDifference).toLocaleString()}`,
+        `卸下${currentItem.name}，綜合戰力更新為 ${formatAssessedPower(assessedCombatPower + actualDifference)}`,
       );
       return;
     }
@@ -5271,60 +6167,41 @@ function Game({
     ]);
     setUnseenItemIds((old) => old.filter((id) => id !== currentItem.id));
     toast.success(`已穿上${currentItem.name}`, {
-      description: `${replaced ? `替換${replaced.name}・` : ""}實際戰力 ${actualDifference >= 0 ? "+" : ""}${actualDifference.toLocaleString()}`,
+      description: `${replaced ? `替換${replaced.name}・` : ""}綜合戰力 ${actualDifference >= 0 ? "+" : ""}${formatAssessedPower(actualDifference)}`,
     });
     pushLog(
       "裝備",
-      `穿上${currentItem.name}，戰力更新為 ${(combatPower + actualDifference).toLocaleString()}`,
+      `穿上${currentItem.name}，綜合戰力更新為 ${formatAssessedPower(assessedCombatPower + actualDifference)}`,
     );
   };
 
-  const reforge = (targeted: boolean) => {
-    if (!currentItem) return;
-    if (targeted && targetedAffix === null)
-      return toast.info("請先點選要定向替換的詞綴");
-    const { stones: stoneNeed, gold: goldNeed } = equipmentReforgeCost(currentReforgeCount, targeted);
-    if (reforgeStones < stoneNeed || gold < goldNeed)
-      return toast.error("洗鍊資源不足", {
-        description: `需要 ${goldNeed.toLocaleString()} 金幣與 ${stoneNeed} 顆洗鍊石`,
-      });
-    const nextAffixes = targeted
-      ? currentItem.affixes.map((affix, index) =>
-          index === targetedAffix
-            ? rerollSingleAffix(currentItem, affix, index)
-            : affix,
-        )
-      : rollAffixes(currentItem);
-    setGold((value) => value - goldNeed);
-    setReforgeStones((value) => value - stoneNeed);
-    setItems((old) =>
-      old.map((item) =>
-        item.id === currentItem.id
-          ? {
-              ...item,
-              affixes: nextAffixes,
-              affixSchemaVersion: 7,
-              reforgeCount: Math.min(Number.MAX_SAFE_INTEGER, currentReforgeCount + 1),
-            }
-          : item,
-      ),
-    );
-    pushLog("裝備", `${currentItem.name}完成${targeted ? "定向" : "一般"}洗鍊`);
-    toast.success("洗鍊完成", {
-      description: `${currentItem.quality}裝備只會產生${currentItem.quality}數值區間・可繼續洗鍊`,
-    });
+  const submitEquipmentAction = async (kind:"reforge"|"drill",targetIndex?:number) => {
+    if(!currentItem || !saveReady || equipmentBusyRef.current || skillActionInFlightRef.current || shopPurchaseInFlightRef.current || offlineClaimPendingRef.current || sessionSuperseded)return;
+    if(saveInFlightRef.current){requestPrioritySave();return toast.info("進度正在同步，請稍後再試");}
+    const pending=equipmentPendingRef.current;
+    if(pending&&(pending.kind!==kind||pending.itemId!==currentItem.id||pending.targetIndex!==targetIndex))return toast.info("請先重試上一筆裝備操作，或重新登入確認結果");
+    const action=pending??{id:crypto.randomUUID(),kind,itemId:currentItem.id,...(targetIndex===undefined?{}:{targetIndex})};
+    equipmentPendingRef.current=action;equipmentBusyRef.current=true;setEquipmentBusy(true);
+    try{
+      const response=await fetch("/api/save",{method:"POST",headers:loginHeaders(loginId,true),body:JSON.stringify({playerId,action:"equipment",equipmentAction:action})});
+      const result=await response.json();
+      if(response.status===401){equipmentPendingRef.current=null;pauseSupersededSession(result.error==="session_replaced"?"replaced":"expired");return;}
+      if(response.status>=500||response.status===429)throw new Error("equipment_pending");
+      if(!response.ok||!result.ok){equipmentPendingRef.current=null;requestPrioritySave();toast.error("裝備操作未完成",{description:"請確認雲端進度已同步、資源充足，且裝備尚有可操作空間。"});return;}
+      const updated=result.item as Item;
+      setItems(old=>old.map(i=>i.id!==action.itemId?i:kind==="reforge"?{...i,affixes:updated.affixes,affixSchemaVersion:7,reforgeCount:updated.reforgeCount}:{...i,sockets:{socketCount:updated.sockets!.socketCount,gems:Array.from({length:updated.sockets!.socketCount},(_,index)=>normalizeEquipmentSockets(i.sockets).gems[index]??null)}}));
+      if(kind==="reforge"){setGold(v=>Math.max(0,v-result.receipt.gold));setReforgeStones(v=>Math.max(0,v-result.receipt.stones));}else setDrillingStones(v=>Math.max(0,v-result.receipt.stones));
+      setAdminRevision(result.adminRevision);setSaveUpdatedAt(result.updatedAt);equipmentPendingRef.current=null;
+      pushLog("裝備",`${currentItem.name}完成${kind==="drill"?"打孔":targetIndex===undefined?"一般洗鍊":"定向洗鍊"}`);
+      toast.success(kind==="drill"?"裝備新增 1 個孔位":"洗鍊完成",{description:kind==="reforge"?`${currentItem.quality}裝備只會產生${currentItem.quality}數值區間・可繼續洗鍊`:"已消耗 1 顆打孔石"});requestPrioritySave();
+    }catch{setSaveStatus("等待裝備操作確認");toast.error("連線中斷，請重試相同裝備操作",{description:"重試沿用同一筆操作，不會重複扣費；也可重新登入確認結果。"});}
+    finally{equipmentBusyRef.current=false;setEquipmentBusy(false);}
   };
-
-  const drillCurrentItem = () => {
-    if (!currentItem) return;
-    if (drillingStones <= 0) return toast.error("沒有打孔石");
-    const nextSockets = drillSocket(normalizeEquipmentSockets(currentItem.sockets));
-    if (!nextSockets) return toast.info("這件裝備已達 2 孔上限");
-    setItems((old) => old.map((item) => item.id === currentItem.id ? { ...item, sockets: nextSockets } : item));
-    setDrillingStones((value) => value - 1);
-    pushLog("裝備", `${currentItem.name}新增 1 個寶石孔`);
-    toast.success("打孔成功", { description: `${currentItem.name}目前有 ${nextSockets.socketCount} 個孔位` });
+  const reforge = (targeted:boolean) => {
+    if(targeted&&targetedAffix===null)return toast.info("請先點選要定向替換的詞綴");
+    void submitEquipmentAction("reforge",targeted?targetedAffix??undefined:undefined);
   };
+  const drillCurrentItem = () => { void submitEquipmentAction("drill"); };
 
   const socketSelectedGem = (socketIndex: number) => {
     if (!currentItem || !selectedGem) return toast.info("請先選擇一顆寶石");
@@ -5471,6 +6348,7 @@ function Game({
       setGold((value) => value + reward.gold);
       setEnhanceStones((value) => value + reward.stones);
       setItems((old) => old.filter((existing) => existing.id !== item.id));
+      setLoadouts(old=>({1:old[1].filter(id=>id!==item.id),2:old[2].filter(id=>id!==item.id)}));
       setUnseenItemIds((old) => old.filter((id) => id !== item.id));
       pushLog(
         "裝備",
@@ -5495,10 +6373,10 @@ function Game({
       const actualDifference = powerDifferenceForItem(item);
       pushLog(
         "裝備",
-        `戰場即時穿上${item.name}，實際戰力 ${actualDifference >= 0 ? "+" : ""}${actualDifference}`,
+        `戰場即時穿上${item.name}，綜合戰力 ${actualDifference >= 0 ? "+" : ""}${formatAssessedPower(actualDifference)}`,
       );
       toast.success(`已穿上${item.name}`, {
-        description: `實際戰力 ${actualDifference >= 0 ? "+" : ""}${actualDifference}，下一輪生效。`,
+        description: `綜合戰力 ${actualDifference >= 0 ? "+" : ""}${formatAssessedPower(actualDifference)}，下一輪生效。`,
       });
     } else {
       setUnseenItemIds((old) => old.filter((id) => id !== item.id));
@@ -5515,6 +6393,7 @@ function Game({
       return toast.error(`需要通過第 ${selectedBoss.baseFloor} 層才能挑戰`);
     bossMarkedRemainingRef.current = 0;
     bossMarkExplosionPendingRef.current = false;
+    setBloodBrandVisual(null);
     worldBossBurnRef.current = { until: 0, nextAt: 0, damagePerSecond: 0 };
     resetCombatPerks();
     if (bossMode === "world") {
@@ -5557,6 +6436,7 @@ function Game({
     }
     setBattleOn(false);
     setBossEnemyHp(100);
+    setPresentedEnemyHealth((current)=>({...current,percent:100}));
     setBossPlayerHp(100);
     setLastBossDamage(0);
     setLastBossCounterDamage(0);
@@ -5580,9 +6460,10 @@ function Game({
     ) return;
 
     const updateCountdown = () => {
+      if (skyRainKeyRef.current !== null || astralKeyRef.current !== null) return;
       const remainingMs = Math.max(0, worldBossDeadlineRef.current! - Date.now());
       setWorldBossSecondsLeft(Math.ceil(remainingMs / 1_000));
-      if (remainingMs > 0 || bossRoundEndedRef.current) return;
+      if (remainingMs > 0 || bossRoundEndedRef.current || bossEnemyHpRef.current<=0) return;
 
       bossRoundEndedRef.current = true;
       worldBossDeadlineRef.current = null;
@@ -5621,15 +6502,68 @@ function Game({
     updateCountdown();
     const countdownTimer = window.setInterval(updateCountdown, 100);
     return () => window.clearInterval(countdownTimer);
-  }, [activeBossBattle, bossOutcome, requestPrioritySave, worldDamage, worldRoundDamage]);
+  }, [activeBossBattle, bossOutcome, pushLog, requestPrioritySave, worldDamage, worldRoundDamage]);
+
+  // Presentation clock only: never settle DOT damage or mutate the combat session here.
+  // It stays independent of attack cadence and ultimate animation locks.
+  useEffect(() => {
+    if (!saveReady || sessionSuperseded) return;
+    const timer = window.setInterval(() => {
+      const active = activeBossBattle ? !bossOutcome : battleOn && !runSummary;
+      const mage = active && liveCombatRef.current?.characterClass === "法師" ? liveCombatRef.current : null;
+      updateOverload(mage);
+      const sigilSnapshot = mage ? { target: mage.target,
+        expiresAt: mage.combat.session.enemy.elementSigil?.expiresAt ?? 0,
+        ascended: (mage.combat as MageCombat).sigil.markedAscended,
+        firstAnomalyUsed: (mage.combat as MageCombat).sigil.firstAnomalyUsed } : null;
+      const sigilNow = Date.now();
+      setElementSigilVisual(previous => {
+        if (!sigilSnapshot) return previous.target ? emptyElementSigilVisual() : previous;
+        if (previous.target === sigilSnapshot.target &&
+          (previous.expiresAt === sigilSnapshot.expiresAt || (!sigilSnapshot.expiresAt && previous.expiresAt <= sigilNow)) &&
+          previous.ascended === sigilSnapshot.ascended && previous.firstAnomalyUsed === sigilSnapshot.firstAnomalyUsed) return previous;
+        return updateElementSigilVisual(previous, sigilSnapshot, sigilNow);
+      });
+      setManaShieldVisual(previous => {
+        if (!mage) return previous.target ? emptyManaShieldVisual() : previous;
+        const shield = (mage.combat as MageCombat).shield;
+        if (previous.target === mage.target && previous.value === shield.value && previous.ascended === shield.ascended) return previous;
+        return updateManaShieldVisual(previous, mage.target, shield.value, shield.ascended, Date.now());
+      });
+      const paralysisExpiry = active ? liveCombatRef.current?.combat.session.enemy.paralysis?.expiresAt : undefined;
+      setLightningParalysis(current => {
+        const next = paralysisExpiry !== undefined && paralysisExpiry > Date.now()
+          ? lightningParalysisGateRef.current === paralysisExpiry ? current : paralysisExpiry : undefined;
+        return next !== undefined && next > Date.now() ? next : undefined;
+      });
+      setFrostfireStatuses(current => {
+        const next: FrostfireStatusVisual = {};
+        for (const kind of ["burn", "freeze"] as const) {
+          const expiresAt = active ? liveCombatRef.current?.combat.session.enemy[kind]?.expiresAt : undefined;
+          if (expiresAt !== undefined && expiresAt > Date.now()) {
+            const visibleExpiry = frostfireGatesRef.current[kind] === expiresAt ? current[kind] : expiresAt;
+            if (visibleExpiry !== undefined && visibleExpiry > Date.now()) next[kind] = visibleExpiry;
+          }
+        }
+        return current.burn === next.burn && current.freeze === next.freeze ? current : next;
+      });
+      setCombatStatuses((current) => {
+        const next = refreshCombatStatusCountdowns(current, active ? liveCombatRef.current : null, Date.now());
+        return JSON.stringify(current) === JSON.stringify(next) ? current : next;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [saveReady, sessionSuperseded, activeBossBattle, bossOutcome, battleOn, runSummary, updateOverload]);
+
+  const addBossLoot = useEffectEvent(addLoot);
 
   useEffect(() => {
-    if (!activeBossBattle || bossOutcome) return;
+    if (!saveReady || sessionSuperseded || !activeBossBattle || bossOutcome) return;
     const cutoverRoute = beginSkillBattleCutover({
       battleId: `boss:${activeBossBattle.mode}:${activeBossBattle.name}:${worldBossDeadlineRef.current ?? "personal"}`,
       encounter: activeBossBattle.mode === "world" ? "world-boss" : "personal-boss",
-      enableRework: false,
-      reworkReady: false,
+      enableRework: true,
+      reworkReady: true,
     });
     let actionSequence = 0;
     liveCombatRef.current = syncLiveCombat(liveCombatRef.current, activeBossBattle,
@@ -5641,8 +6575,8 @@ function Game({
     const bossAttackSpeed = activeBossBattle.mode === "world"
       ? balanceConfig.combat.worldBoss.attacksPerSecond * 100
       : activeBossBattle.name.endsWith("・真身") ? 125 : 100;
-    let playerClock = 0;
-    let bossClock = 0;
+    const cadence=retainCombatCadence(bossCadenceRef.current,activeBossBattle);
+    bossCadenceRef.current=cadence;
     let bossSkillCooldown = 0;
     let warriorBossAttackCount = 0;
     let bossPlayerAttackCount = 0;
@@ -5656,6 +6590,8 @@ function Game({
       setAbyssBossEffect(null);
       setAbyssImpactPulse(false);
       setDeadlyMarkEffect((current) => current?.detonationKey === null ? null : current);
+      setHunterMarkVisual(null);
+      setBloodBrandVisual(null);
       setBossOutcome("win");
       setBossPlayerHp(100);
       const report = [
@@ -5680,7 +6616,7 @@ function Game({
             index,
           ) ?? createDrop(bossMapId, "首領", index, bossParts ? 3 : 4),
         );
-        addLoot(
+        addBossLoot(
           bossDrops,
           `擊敗${activeBossBattle.name}`,
         );
@@ -5699,7 +6635,7 @@ function Game({
         const worldDrops = Array.from({ length: dropCount }, (_, index) =>
           rollCatalogDrop(9, "world", playerClass, index) ?? createDrop(9, "首領", index, 4),
         );
-        addLoot(worldDrops, `擊敗${activeBossBattle.name}`);
+        addBossLoot(worldDrops, `擊敗${activeBossBattle.name}`);
         setBattleReport((lines) => [
           ...lines,
           `世界首領獎勵：${worldDrops.some((item) => findEquipmentDefinition(item)) ? "神話／特殊傳奇／高階" : "傳奇"}裝備 ${dropCount} 件`,
@@ -5710,38 +6646,46 @@ function Game({
       return 0;
     };
     let bossDamageLedger = createBossDamageLedger(activeBossBattle.hp, bossEnemyHpRef.current);
-    const settleBossHit = (rawDamage: number, source: "attack" | "burn") => {
+    let skillDamageLedger = createSkillDamageLedger(cutoverRoute.battleId, activeBossBattle.name,
+      activeBossBattle.hp, healthFromPercent(bossEnemyHpRef.current, activeBossBattle.hp));
+    const settleBossHit = (rawDamage: number, source: "attack" | "burn", volleyKey?:number) => {
       if (bossRoundEndedRef.current) return settleBossDamageEvent(bossDamageLedger, 0);
-      const settled = settleBossDamageEvent(bossDamageLedger, rawDamage);
+      const sequence = ++actionSequence;
+      const cutover = settleCutoverAction(cutoverRoute, {
+        battleId: cutoverRoute.battleId,
+        sequence,
+        rework: {
+          ledger: skillDamageLedger,
+          segments: [{ key: `boss-${source}-${sequence}`, source: source === "burn" ? "dot" : "original",
+            hit: rawDamage > 0, damage: rawDamage }],
+        },
+      });
+      if (cutover.mode !== "rework") throw new Error("Boss battle left the reworked damage route");
+      skillDamageLedger = cutover.ledger;
+      const settled = settleBossDamageEvent(bossDamageLedger, cutover.damage);
       bossDamageLedger = settled.ledger;
       bossEnemyHpRef.current = settled.remainingPercent;
-      if (settled.newVictory) resolveBossVictory(source);
+      if (settled.newVictory) {
+        const skyKey = skyRainKeyRef.current;
+        const astralKey = astralKeyRef.current;
+        if (astralKey !== null && ultimateAnimationLockRef.current === astralKey)
+          pendingAstralVictoryRef.current.set(astralKey, () => resolveBossVictory(source));
+        else if (skyKey !== null && ultimateAnimationLockRef.current === skyKey)
+          pendingSkyVictoryRef.current.set(skyKey, () => resolveBossVictory(source));
+        else pendingEnemyDefeatRef.current={token:activeBossBattle,queuedAt:performance.now(),volleyKey,finish:()=>resolveBossVictory(source)};
+      }
       setBossEnemyHp(settled.remainingPercent);
       return settled;
     };
     const timer = setInterval(
       () => {
-        if (bossCinematicLockRef.current || bossRoundEndedRef.current) return;
+        if (ultimateAnimationLockRef.current !== null) return;
+        if (bossCinematicLockRef.current || bossRoundEndedRef.current || bossEnemyHpRef.current<=0) return;
         const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
         const liveTickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
         if (liveTickDamage > 0) {
           const settled = settleBossHit(liveTickDamage, "burn");
-          let visibleDotDamage = settled.actualDamage;
-          const dotKey = Date.now();
-          const byKind = new Map<"bleed" | "burn", number>();
-          for (const event of dotTicks) {
-            const applied = Math.min(visibleDotDamage, Math.max(0, Math.round(event.damage)));
-            visibleDotDamage -= applied;
-            if (applied > 0) byKind.set(event.kind, (byKind.get(event.kind) ?? 0) + applied);
-          }
-          const dotGroups = [...byKind].map(([kind, damage], index) => ({
-            key: dotKey + index, kind, damage,
-          }));
-          if (dotGroups.length) {
-            setDotDamageGroups((current) => [...current, ...dotGroups]);
-            window.setTimeout(() => setDotDamageGroups((current) =>
-              current.filter((event) => event.key < dotKey || event.key >= dotKey + dotGroups.length)), 1_200);
-          }
+          showDotDamage(dotTicks, settled.actualDamage);
           if (activeBossBattle.mode === "world" && settled.actualDamage > 0) {
             setWorldDamage((value) => value + settled.actualDamage);
             setWorldRoundDamage((value) => value + settled.actualDamage);
@@ -5749,8 +6693,9 @@ function Game({
           setLastBossDamage(settled.actualDamage);
           if (settled.defeated) return;
         }
-        playerClock += tickMs;
-        bossClock += tickMs;
+        cadence.player += tickMs;
+        const enemyControl = liveEnemyControl(liveCombatRef.current, Date.now());
+        cadence.enemy = enemyControl.frozen ? 0 : cadence.enemy + tickMs * enemyControl.speedMultiplier;
         const activeWorldBurn = worldBossBurnRef.current;
         if (
           activeBossBattle.mode === "world" &&
@@ -5765,7 +6710,10 @@ function Game({
             setWorldRoundDamage((value) => value + burnSettlement.actualDamage);
             setLastBossDamage(burnSettlement.actualDamage);
             const burnKey = Date.now();
-            setBattleHitGroups((current) => [...current, { key: burnKey, hits: [{ damage: burnSettlement.actualDamage, critical: false }] }]);
+            setBattleHitGroups((current) => [...current, {
+              key: burnKey,
+              hits: [{ damage: burnSettlement.actualDamage, critical: false }],
+            }]);
             window.setTimeout(() => {
               setBattleHitGroups((current) => current.filter((group) => group.key !== burnKey));
             }, 1_200);
@@ -5774,11 +6722,11 @@ function Game({
         }
         const playerInterval = 100000 / Math.max(1, combatAttackSpeed);
         const bossInterval = 100000 / bossAttackSpeed;
-        const playerActs = playerClock >= playerInterval;
-        const bossActs = bossClock >= bossInterval;
+        const playerActs = cadence.player >= playerInterval;
+        let bossActs = !enemyControl.frozen && cadence.enemy >= bossInterval;
         if (!playerActs && !bossActs) return;
-        if (playerActs) playerClock %= playerInterval;
-        if (bossActs) bossClock %= bossInterval;
+        if (playerActs) cadence.player %= playerInterval;
+        if (bossActs) cadence.enemy %= bossInterval;
         const next = Date.now();
         setBattlePulse((value) => value + 1);
         setEnemyHitFeedback(null);
@@ -5791,6 +6739,38 @@ function Game({
           criticalChance: characterStats.crit,
           criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
         }) : null;
+        if (liveEnemyControl(liveCombat, Date.now()).frozen) { bossActs = false; cadence.enemy = 0; }
+        if (liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+          skill.category === "ultimate" && skill.name === liveAction.name)) {
+          beginUltimateAnimation(next);
+          // If the boss was due on this same tick, hold its attack until the
+          // ultimate's animation reports completion.
+          if (bossActs) {
+            bossActs = false;
+            cadence.enemy += bossInterval;
+          }
+        }
+        if (liveAction && liveCombat) {
+          updateLiveBloodRoar(liveCombat, liveAction, next);
+          updateBloodBrandVisual(liveAction, next);
+          updateBerserkerStanceVisual(liveCombat, liveAction, next);
+          updateArmorSmashVisual(liveCombat, liveAction, next);
+          updateTitanVisuals(liveCombat, liveAction, next);
+          updateGroundSplitVisuals(liveAction, next);
+          updatePiercingVisual(liveAction, next);
+            updateStarbreakVisual(liveCombat, liveAction, next);
+            updateElementSigil(liveCombat, liveAction);
+          updateFrostfireVisual(liveCombat, liveAction, next);
+          updateMeteorVisual(liveAction, next);
+          updateOverload(liveCombat);
+          updateVolleyVisual(liveAction, next);
+            updateAstralVisual(liveCombat, liveAction, next);
+            updateSkyRainVisual(liveCombat, liveAction, next);
+            updateWindDomainVisual(liveCombat, liveAction, next);
+          updateTailwindVisual(liveAction, next);
+            updatePhantomStepVisual(liveCombat, next);
+            updateHunterVisual(liveCombat, liveAction, next);
+        }
         const actionDotDamage = liveAction?.ticks.reduce((sum, event) => sum + event.damage, 0) ?? 0;
         let bossSkillMultiplier = liveAction?.damagePercent ? liveAction.damagePercent / 100 : 1;
         if (liveAction?.name === "泰坦斷界斬" && hasPerk("skill-warrior-executioner")
@@ -5800,7 +6780,7 @@ function Game({
         let bossDefenseIgnore = (hasPerk("special-blackfang") ? 8 : 0) + (liveAction?.defenseIgnore ?? 0);
         if (liveAction?.name) queueSkillVisual({ name: liveAction.name, key: next });
         let bossGuaranteedCritical = false;
-        let bossCritDamageBonus = 0;
+        const bossCritDamageBonus = 0;
         let bossExecutionDamageMultiplier = 1;
         let bossExecutionTriggered = false;
         let bossGroundSplitTriggered = false;
@@ -5882,8 +6862,8 @@ function Game({
                     Math.round(
                       characterStats.attack *
                         (0.35 + candidate.skill.level * 0.1) *
-                        (1 + characterStats.skillDamage / 100) *
-                        (1 + characterStats.bossDamage / 100),
+                        additiveDamageMultiplier({ skillDamage: characterStats.skillDamage,
+                          bossDamage: characterStats.bossDamage, skillTriggered: true, bossTarget: true }),
                     ),
                   );
                   const currentBurn = worldBossBurnRef.current;
@@ -5916,19 +6896,10 @@ function Game({
                 }
                 queueSkillVisual({ name: candidate.skill.name, key: next });
                 if (candidate.skill.name === "穿雲箭") {
-                  setRangerPiercingEffect({ key: next });
-                  window.setTimeout(triggerRangerImpact, 140);
+                  setRangerPiercingEffect({ key: next, hit: true });
                 }
-                if (candidate.skill.name === "疾風連射") {
-                  const shotCount = hasPerk("skill-ranger-thousand-feathers") ? 7 : 5;
-                  setRangerWindVolleyEffect((current) => [...current, { key: next, shotCount }]);
-                  window.setTimeout(() => {
-                    setRangerWindVolleyEffect((current) => current.filter((effect) => effect.key !== next));
-                  }, 250 + (shotCount - 1) * 250 + 1_700);
-                  Array.from({ length: shotCount }, (_, index) => 495 + index * 250).forEach((impactDelay) => {
-                    window.setTimeout(triggerRangerImpact, impactDelay);
-                  });
-                }
+                if (candidate.skill.name === "疾風連射")
+                  setRangerWindVolleyEffect((current) => [...current, { key: next, shotCount: 5 }]);
                 if (candidate.skill.name === "處決") {
                   setExecutionEffect({ key: next });
                   window.setTimeout(() => {
@@ -5936,7 +6907,7 @@ function Game({
                     window.setTimeout(() => setExecutionImpactPulse(false), 360);
                   }, 750);
                 }
-                if (candidate.skill.name === "裂地斬") setGroundSplitEffect({ key: next });
+                if (candidate.skill.name === "裂地斬") setGroundSplitEffect({ key: next, hit: true });
                 if (["裂地斬", "致命標記", "霜火新星"].includes(candidate.skill.name)) {
                   showCombatStatus({
                     name: candidate.skill.name === "裂地斬" ? `破防 ${20 + candidate.skill.level * 5}%` : candidate.skill.name === "致命標記" ? `致命標記 +${deadlyMarkBonusPct(candidate.skill.level)}%／爆炸 ${Math.round(deadlyMarkExplosionMultiplier(candidate.skill.level) * 100)}%` : activeBossBattle.mode === "world" ? "灼燒・魔法傷害" : `灼燒 ${1.5 + candidate.skill.level * 0.5}%`,
@@ -5955,6 +6926,9 @@ function Game({
           }
         }
         const bossBaseline = towerCombatValues({
+          calibrateMonsterStats: false,
+          firstChapterTuning: false,
+          secondChapterTuning: false,
           combatPower: activeBossBattle.recommendedPower,
           recommendedPower: activeBossBattle.recommendedPower,
           mapId: activeBossBattle.mapId,
@@ -5967,6 +6941,8 @@ function Game({
           playerDefense: 0,
         });
         const bossValues = personalBossCombatValues({
+          mapId: activeBossBattle.mapId,
+          localFloor: activeBossBattle.baseFloor,
           attack: characterStats.attack,
           speed: characterStats.speed,
           crit: characterStats.crit,
@@ -6007,8 +6983,6 @@ function Game({
           monsterMultiplier: activeBossBattle.multiplier,
         });
         if (liveAction?.damagePercent === 0) bossValues.playerDamage = 0;
-        for (const status of liveAction?.statuses ?? [])
-          showCombatStatus({ name: status, target: "enemy", remaining: 3, unit: "秒", tone: "red" });
         const bossElementalDamage = playerActs && activeSetCount >= 6
           ? bossValues.playerDamage * SET_ELEMENTAL_DAMAGE_PCT / 100 : 0;
         const bossResonanceDamage = playerActs && setResonanceTriggered
@@ -6016,27 +6990,15 @@ function Game({
         const calculatedPlayerDamage = playerActs
           ? bossValues.playerDamage + bossElementalDamage + bossResonanceDamage + frostfireDetonationDamage + actionDotDamage : 0;
         const bossHealthSettlement = playerActs
-          ? settleBossHit(calculatedPlayerDamage, "attack")
+          ? settleBossHit(calculatedPlayerDamage, "attack",liveAction?.name==="疾風連射"?next:undefined)
           : settleCombatHealth(bossEnemyHpRef.current, activeBossBattle.hp, 0);
-        const playerDamage = playerActs
-          ? settleCutoverAction(cutoverRoute, {
-              battleId: cutoverRoute.battleId,
-              sequence: ++actionSequence,
-              legacyDamage: bossHealthSettlement.actualDamage,
-            }).damage
-          : 0;
-        const shownBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
-        const shownBossElemental = Math.min(playerDamage - shownBossMain, bossElementalDamage);
-        const shownBossResonance = Math.min(playerDamage - shownBossMain - shownBossElemental, bossResonanceDamage);
-        const shownBossDot = Math.min(playerDamage - shownBossMain - shownBossElemental - shownBossResonance, actionDotDamage);
-        const bossDotGroups: { key: number; kind: "bleed" | "burn"; damage: number }[] = [];
-        let bossDotRemaining = shownBossDot;
-        const bossDotKey = Date.now() * 10;
-        for (const [index, event] of (liveAction?.ticks ?? []).entries()) {
-          const damage = Math.min(bossDotRemaining, Math.max(0, Math.round(event.damage)));
-          bossDotRemaining -= damage;
-          if (damage > 0) bossDotGroups.push({ key: bossDotKey + index, kind: event.kind, damage });
-        }
+        const playerDamage = playerActs ? bossHealthSettlement.actualDamage : 0;
+        const settledBossMain = Math.min(playerDamage, bossValues.playerDamage + frostfireDetonationDamage);
+        const mythicDisplay = splitMythicDamage(liveAction, settledBossMain);
+        const shownBossMain = mythicDisplay.remaining;
+        const shownBossElemental = Math.min(playerDamage - settledBossMain, bossElementalDamage);
+        const shownBossResonance = Math.min(playerDamage - settledBossMain - shownBossElemental, bossResonanceDamage);
+        const shownBossDot = Math.min(playerDamage - settledBossMain - shownBossElemental - shownBossResonance, actionDotDamage);
         if (activeBossBattle.mode === "world" && playerActs) {
           setWorldDamage((value) => value + playerDamage);
           setWorldRoundDamage((value) => value + playerDamage);
@@ -6050,15 +7012,24 @@ function Game({
           healthFromPercent(bossPlayerHpRef.current, characterStats.hp),
           calculatedBossDamage,
         );
+        let unyieldingBlocked = false;
         if (bossActs && liveCombatRef.current && !bossHealthSettlement.defeated) {
           const defense = resolveLiveEnemyAttack(liveCombatRef.current, {
             healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,
              defense: characterStats.defense, equippedItems: equippedGearRef.current,
           });
+          updateManaShield(liveCombatRef.current, defense.manaShield);
+          updatePhantomStepVisual(liveCombatRef.current, next, defense.phantomStep);
+          if (defense.unyielding) {
+            updateUnyieldingVisual(defense.unyielding, next);
+            setUnyieldingCounterFeedback(defense.unyielding.countered ? next : null);
+          }
+          unyieldingBlocked = Boolean(defense.unyielding?.blocked);
           bossDamage = defense.damage;
-          if (defense.counterDamagePercent > 0) {
-            const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100);
+          if (defense.counterDamagePercent > 0 || (defense.equipmentDamage ?? 0) > 0) {
+            const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100 + (defense.equipmentDamage ?? 0));
             const counterSettlement = settleBossHit(counter, "attack");
+            showCounterDamage(counterSettlement.actualDamage, defense.equipmentDamage ? "過載爆炸" : "反擊");
             if (activeBossBattle.mode === "world" && counterSettlement.actualDamage > 0) {
               setWorldDamage((value) => value + counterSettlement.actualDamage);
               setWorldRoundDamage((value) => value + counterSettlement.actualDamage);
@@ -6075,41 +7046,90 @@ function Game({
         }
         if (playerActs) {
           setEnemyHitFeedback({ damage: playerDamage, dodged: playerDamage <= 0, key: next });
-          setMissFeedback(playerDamage <= 0 ? next : null);
+          setMissFeedback(liveAction?.name!=="蒼穹箭雨" && liveAction?.name!=="星界寂滅" && liveAction?.name!=="霜火新星" && liveAction?.name!=="閃電鏈" && liveAction?.name!=="隕星術" && liveAction?.name!=="虛空崩解" && playerDamage <= 0 ? next : null);
         }
         if (bossActs)
-          setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0, key: next });
+          setPlayerHitFeedback({ damage: bossDamage, dodged: bossDamage <= 0 && !unyieldingBlocked,
+            blocked: unyieldingBlocked, label: unyieldingBlocked ? "格擋成功！" : undefined, key: next });
         if (playerActs) {
+          const groundShockDisplayed = liveAction && liveAction.damagePercent > 0
+            ? Math.min(shownBossMain, Math.round(shownBossMain * liveAction.groundShockDamagePercent / liveAction.damagePercent)) : 0;
+          queueGroundShockNumber(next, groundShockDisplayed);
+          const tailwindEchoDisplayed = liveAction && liveAction.damagePercent > 0
+            ? Math.min(shownBossMain - groundShockDisplayed,
+              Math.round(shownBossMain * (liveAction.tailwindEcho?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+          queueTailwindEchoNumber(next, tailwindEchoDisplayed, liveAction?.tailwindEcho?.critical ?? false);
+          const hunterBurstDisplayed = liveAction && liveAction.damagePercent > 0
+            ? Math.min(shownBossMain - groundShockDisplayed - tailwindEchoDisplayed,
+              Math.round(shownBossMain * (liveAction.hunterExplosion?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+          queueHunterBurstNumber(next, hunterBurstDisplayed, liveAction?.hunterExplosion?.critical ?? false);
+          const frostfireAfterburstDisplayed = liveAction && liveAction.damagePercent > 0
+            ? Math.min(shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed,
+              Math.round(shownBossMain * (liveAction.frostfireAfterburst?.damagePercent ?? 0) / liveAction.damagePercent)) : 0;
+          queueFrostfireAfterburstNumber(next, frostfireAfterburstDisplayed, liveAction?.frostfireAfterburst ?? null);
           const publishBossDamage = () => {
+            showMythicDamage(mythicDisplay.hits);
+              if (liveAction?.name === "霜火新星" && liveAction.hits.every(part => !part.hit))
+                publishFrostfireNumber(next, 0, false, undefined, true);
+            triggerHunterBurst(next);
+            if (shownBossDot > 0) showDotDamage(liveAction?.ticks ?? [], shownBossDot);
             setLastBossDamage(playerDamage);
             const groupKey = Date.now();
-            if (shownBossMain > 0) setBattleHitGroups((current) => [...current, { key: groupKey, hits: [{ damage: shownBossMain, critical: liveAction?.critical ?? bossValues.critical }] }]);
+            const titan = liveAction?.name === "泰坦斷界斬";
+            const ultimate = Boolean(liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+              skill.category === "ultimate" && skill.name === liveAction.name));
+            if (liveAction?.name !== "疾風連射" && liveAction?.name !== "星界寂滅" && liveAction?.name !== "蒼穹箭雨" && liveAction?.name !== "閃電鏈" && liveAction?.name !== "隕星術" && liveAction?.name !== "虛空崩解" && shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed - frostfireAfterburstDisplayed > 0) {
+              setBattleHitGroups((current) => [...current, {
+                key: groupKey,
+                titan, ultimate, skillName: liveAction?.name ?? undefined,
+                hits: [{ damage: shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed - frostfireAfterburstDisplayed, critical: liveAction?.critical ?? bossValues.critical,
+                  label: liveAction?.name === "破星狙擊" ? (liveCombat?.ascended.has("破星狙擊") ? "星隕" : "破星") : undefined }],
+              }]);
+            }
             const elementalHits = [
               ...(shownBossElemental > 0 ? [{ damage: shownBossElemental, label: "元素" }] : []),
               ...(shownBossResonance > 0 ? [{ damage: shownBossResonance, label: "元素爆發" }] : []),
             ];
-            if (bossDotGroups.length) {
-              setDotDamageGroups((current) => [...current, ...bossDotGroups]);
-              window.setTimeout(() => setDotDamageGroups((current) =>
-                current.filter((event) => event.key < bossDotKey || event.key >= bossDotKey + bossDotGroups.length)), 1_200);
-            }
             if (elementalHits.length)
-              setSetElementalHits((current) => [...current, { key: groupKey, hits: elementalHits, volley: false }]);
-            window.setTimeout(() => {
+              setSetElementalHits((current) => [...current, { key: groupKey,
+                hits: liveAction?.name==="疾風連射"?elementalHits.map((hit)=>({...hit,delayMs:0})):elementalHits,volley: false }]);
+            const timer = window.setTimeout(() => {
               setBattleHitGroups((current) => current.filter((group) => group.key !== groupKey));
               setSetElementalHits((current) => current.filter((group) => group.key !== groupKey));
-            }, 1_200);
+              titanDamageTimersRef.current.delete(groupKey);
+            }, titan ? 1_500 : 1_200);
+            if (titan) titanDamageTimersRef.current.set(groupKey, timer);
           };
           const bossDamageDisplayDelay = bossExecutionTriggered
             ? 750
             : bossGroundSplitTriggered
               ? 540
-              : bossSkill?.name === "霜火新星"
-                ? (frostfireDetonationDamage > 0 ? 520 : 680)
               : 0;
-          if (bossDamageDisplayDelay > 0) window.setTimeout(publishBossDamage, bossDamageDisplayDelay);
+          if (liveAction?.name === "疾風連射") queueVolleyNumbers(next, liveAction,
+            shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed, publishBossDamage);
+          else if (liveAction?.name === "星界寂滅") queueAstralNumbers(next, liveAction, shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed - frostfireAfterburstDisplayed, publishBossDamage);
+          else if (liveAction?.name === "蒼穹箭雨") queueSkyRainNumbers(next, liveAction,
+            shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed, publishBossDamage, liveCombat?.ascended.has("蒼穹箭雨") ?? false);
+          else if (liveAction?.name === "閃電鏈") queueLightningNumbers(next, liveAction, shownBossMain, publishBossDamage, liveCombat?.ascended.has("閃電鏈") ?? false);
+          else if (liveAction?.name === "虛空崩解") queueVoidNumbers(next, liveAction, shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed - frostfireAfterburstDisplayed, publishBossDamage, liveCombat?.ascended.has("虛空崩解") ?? false);
+          else if (liveAction?.name === "隕星術") queueMeteorNumbers(next, liveAction, shownBossMain, publishBossDamage);
+          else if (liveAction?.name === "泰坦斷界斬") pendingTitanDamageRef.current.set(next, publishBossDamage);
+          else if (liveAction?.name === "裂地斬") pendingGroundDamageRef.current.set(next, publishBossDamage);
+          else if (liveAction?.name === "霜火新星") pendingFrostfireDamageRef.current.set(next, publishBossDamage);
+          else if (liveAction?.name === "穿雲箭") pendingPiercingDamageRef.current.set(next, publishBossDamage);
+          else if (liveAction?.name === "破星狙擊") pendingStarbreakDamageRef.current.set(next, publishBossDamage);
+          else if (liveAction?.name === "追風箭") pendingTailwindDamageRef.current.set(next, publishBossDamage);
+          else if (bossDamageDisplayDelay > 0) window.setTimeout(publishBossDamage, bossDamageDisplayDelay);
           else publishBossDamage();
         }
+        if (playerActs && liveAction?.currentHealthCostPercent) setBossPlayerHp(health => {
+          const nextHealth = Math.max(healthPercentFromDamage(1, characterStats.hp),
+            health * (1 - liveAction.currentHealthCostPercent / 100));
+          bossPlayerHpRef.current = nextHealth;
+          return nextHealth;
+        });
+        if (playerActs && liveAction?.bloodRoarEmpowered) setBloodRoarSlashKey(next);
+        if (playerActs && liveAction?.bloodRoarEmpowered && playerDamage > 0 && bossPlayerHpRef.current < 100 && characterStats.lifesteal + liveAction.lifestealPercent > 0) setBloodReturnKey(next);
         if (playerActs && playerDamage > 0 && characterStats.lifesteal + (liveAction?.lifestealPercent ?? 0) > 0)
           setBossPlayerHp((health) => {
             const nextHealth = Math.min(
@@ -6122,6 +7142,8 @@ function Game({
             bossPlayerHpRef.current = nextHealth;
             return nextHealth;
           });
+        if (bossActs)
+          setLastBossCounterDamage(bossRoundEndedRef.current ? 0 : bossDamage);
         if (bossActs) setBossPlayerHp((hp) => {
           if (bossRoundEndedRef.current) return hp;
           const healthSettlement = settleCombatHealth(hp, characterStats.hp, bossDamage);
@@ -6134,7 +7156,7 @@ function Game({
               `首領壓制了你的防禦。`,
               `生命歸零｜可立即再次挑戰。`,
               activeBossBattle.mode === "world"
-                ? "本次累積傷害已列入今日世界排行。"
+                ? "本次傷害存入雲端後列入本期世界排行。"
                 : "個人首領失敗不扣門票。",
             ]);
             pushLog("首領", `挑戰 ${activeBossBattle.name} 失敗`);
@@ -6158,6 +7180,34 @@ function Game({
     return () => clearInterval(timer);
   }, [
     activeBossBattle,
+    characterStats.critDamage,
+    beginUltimateAnimation,
+    saveReady,
+    sessionSuperseded,
+    characterStats.hp,
+    combatAttackSpeed,
+    pushLog,
+    updateManaShield,
+    updateOverload,
+    queueSkillVisual,
+    triggerHunterBurst,
+    updateHunterVisual,
+    updateVolleyVisual,
+    updateAstralVisual,
+    queueAstralNumbers,
+    updateSkyRainVisual,
+    updateWindDomainVisual,
+    updateStarbreakVisual,
+    queueLightningNumbers,
+    queueVoidNumbers,
+    queueMeteorNumbers,
+    updateMeteorVisual,
+    updateElementSigil,
+    updateFrostfireVisual,
+    queueFrostfireAfterburstNumber,
+    publishFrostfireNumber,
+    showDotDamage,
+    skills,
     bossOutcome,
     characterStats.attack,
     characterStats.speed,
@@ -6179,7 +7229,6 @@ function Game({
     equippedCatalogKey,
     activeSetCount,
     playerClass,
-    skills,
     skillReworkBuild,
     skillAscensions,
   ]);
@@ -6192,6 +7241,7 @@ function Game({
     worldBossDeadlineRef.current = null;
     setAbyssBossEffect(null);
     setAbyssImpactPulse(false);
+    setBloodBrandVisual(null);
     setActiveBossBattle(null);
     setBossOutcome(null);
     setBattleOn(true);
@@ -6201,12 +7251,29 @@ function Game({
 
   const hours = Math.floor(storedSeconds / 3600),
     mins = Math.floor((storedSeconds % 3600) / 60),
-    secs = storedSeconds % 60;
+    secs = Math.floor(storedSeconds % 60);
   const stats = [
-    { label: "戰力", value: combatPower.toLocaleString() },
+    { label: "綜合戰力", value: formatAssessedPower(assessedCombatPower) },
     { label: "攻擊", value: characterStats.attack.toLocaleString() },
     { label: "防禦", value: characterStats.defense.toLocaleString() },
-    { label: "每秒攻擊", value: `${(combatAttackSpeed / 100).toFixed(2)} 次` },
+    { label: "每秒攻擊", value: `${(characterStats.speed / 100).toFixed(2)} 次` },
+  ];
+  const setNumericBonuses: [string, string][] = [
+    ...(equippedSetCountAtThreshold(equippedGear, 2) > 0
+      ? [["套裝攻擊加成", `+${activeSetAttackBonusPct}%（${equippedSetCountAtThreshold(equippedGear, 2)} 套）`] as [string, string]]
+      : []),
+    ...(equippedSetCountAtThreshold(equippedGear, 4) > 0
+      ? [["套裝離線收益", `+${Math.round((offlineSetMultiplier - 1) * 100)}%`] as [string, string]]
+      : []),
+    ...(activeSetCount >= 6
+      ? [["套裝元素傷害", `+${SET_ELEMENTAL_DAMAGE_PCT}%`] as [string, string]]
+      : []),
+    ...(activeSetCount >= 8
+      ? [["套裝技能傷害", `+${SET_SKILL_DAMAGE_PCT}%`] as [string, string]]
+      : []),
+    ...(activeSetCount >= 10
+      ? [["套裝元素爆發", `每 ${SET_RESONANCE_ATTACKS} 次攻擊 +${SET_RESONANCE_DAMAGE_PCT}%`] as [string, string]]
+      : []),
   ];
 
   return (
@@ -6249,10 +7316,9 @@ function Game({
             </DialogDescription>
           </DialogHeader>
           <div className="rebirth-summary">
-            <div>升級三圍+<strong>3%</strong> EXP+<strong>20%</strong> GOLD+<strong>20%</strong></div>
-            <div>強化石掉落+<strong>20%</strong> 洗鍊石掉落+<strong>10%</strong></div>
-            <div>裝備掉落+<strong>5%</strong> 高品質掉落+<strong>3%</strong></div>
-            <div>輪迴天賦+<strong>2</strong> 點</div>
+            <div>三圍屬性 +<strong>{REBIRTH_REWARD_PER_TURN.coreStats}%</strong>・經驗值 +<strong>{REBIRTH_REWARD_PER_TURN.experience}%</strong>・金幣 +<strong>{REBIRTH_REWARD_PER_TURN.gold}%</strong></div>
+            <div>資源掉落率 +<strong>{REBIRTH_REWARD_PER_TURN.resourceDrop}%</strong>・裝備掉落率 +<strong>{REBIRTH_REWARD_PER_TURN.equipmentDrop}%</strong></div>
+            <div>高品質掉落 +<strong>{REBIRTH_REWARD_PER_TURN.highQualityDrop}%</strong>・輪迴天賦 +<strong>{REBIRTH_REWARD_PER_TURN.talentPoints}</strong> 點</div>
           </div>
           <div className="rebirth-talent-actions">
             <span>可用天賦點：<strong>{rebirthPoints}</strong></span>
@@ -6295,7 +7361,8 @@ function Game({
             </button>
           </DialogHeader>
           <div className="mail-list">
-            {mails.map((mail) => (
+            <GmInboxMessages inbox={gmInbox} />
+            {mails.filter(mail=>!mail.expiresAt||Date.parse(mail.expiresAt)>Date.now()).map((mail) => (
               <article key={mail.id} className={mail.claimed ? "claimed" : ""}>
                 <div className="mail-mark">
                   <Mail />
@@ -6321,6 +7388,7 @@ function Game({
                         <Gem /> {mail.rewards.yuanbao} 元寶
                       </span>
                     )}
+                    {(mail.rewards.reforgeStones??0)>0&&<span><RefreshCw />{mail.rewards.reforgeStones} 洗鍊石</span>}
                     {mail.rewards.items.length > 0 && (
                       <span><PackageOpen /> {mail.rewards.items.length} 件裝備</span>
                     )}
@@ -6341,6 +7409,7 @@ function Game({
       <Dialog
         open={offlineReportOpen}
         onOpenChange={(open) => {
+          if (offlineClaimPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
           setOfflineReportOpen(open);
           if (!open && !offlineClaimPending) setBattleOn(true);
         }}
@@ -6449,65 +7518,6 @@ function Game({
                   </button>
                 ))}
           </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!runSummary && runDialogOpen}
-        onOpenChange={setRunDialogOpen}
-      >
-        <DialogContent className="mail-dialog run-dialog">
-          <DialogHeader>
-            <DialogTitle>
-              {runSummary?.outcome === "complete"
-                ? "長夜輪迴完成"
-                : "本次挑戰結束"}
-            </DialogTitle>
-            <DialogDescription>
-              {restartCountdown} 秒後自動從第 1 層重新挑戰；所有祝福將重置。
-            </DialogDescription>
-          </DialogHeader>
-          {runSummary && (
-            <>
-              <div className="run-result">
-                <span>
-                  {runSummary.outcome === "complete" ? <Crown /> : <Skull />}
-                </span>
-                <div>
-                  <small>最高抵達</small>
-                  <h3>第 {runSummary.highestFloor} 層</h3>
-                  <p>
-                    {Math.floor(runSummary.duration / 60)} 分{" "}
-                    {runSummary.duration % 60} 秒 · 擊敗 {runSummary.kills}{" "}
-                    隻怪物
-                  </p>
-                </div>
-                <b>{restartCountdown}</b>
-              </div>
-              <div className="run-stats">
-                <span>
-                  精英 <b>{runSummary.elites}</b>
-                </span>
-                <span>
-                  守關者 <b>{runSummary.guardians}</b>
-                </span>
-                <span>
-                  金幣 <b>+{runSummary.gold}</b>
-                </span>
-                <span>
-                  強化石 <b>+{runSummary.enhance}</b>
-                </span>
-                <span>
-                  洗鍊石 <b>+{runSummary.reforge}</b>
-                </span>
-                <span>
-                  裝備 <b>{runSummary.gear}</b>
-                </span>
-              </div>
-              <button className="btn btn-primary" onClick={beginNewRun}>
-                立即重新挑戰
-              </button>
-            </>
-          )}
         </DialogContent>
       </Dialog>
       <Dialog
@@ -6625,6 +7635,7 @@ function Game({
               <div className="reforge-actions">
                 <button
                   className="btn btn-ghost"
+                  disabled={equipmentBusy}
                   onClick={() => reforge(false)}
                 >
                   <RefreshCw />
@@ -6641,7 +7652,7 @@ function Game({
                 ) : (
                   <button
                     className="btn btn-primary"
-                    disabled={targetedAffix === null}
+                    disabled={equipmentBusy || targetedAffix === null}
                     onClick={() => reforge(true)}
                   >
                     <Sparkles />
@@ -6675,7 +7686,7 @@ function Game({
                 {currentItem && (
                   <button
                     className="btn btn-ghost"
-                    disabled={normalizeEquipmentSockets(currentItem.sockets).socketCount >= 2 || drillingStones <= 0}
+                    disabled={equipmentBusy || normalizeEquipmentSockets(currentItem.sockets).socketCount >= 2 || drillingStones <= 0}
                     onClick={drillCurrentItem}
                   >
                     新增孔位
@@ -6701,7 +7712,7 @@ function Game({
                           disabled={Boolean(definition)}
                           onClick={() => socketSelectedGem(index)}
                         >
-                          {definition ? <img src={definition.icon} alt="" /> : <Gem />}
+                          {definition ? <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" /> : <Gem />}
                           <span>{definition ? `${definition.tierLabel}${definition.name}` : selectedGem ? "鑲嵌所選寶石" : "空孔位"}</span>
                           <small>{definition ? gemEffectLabel(definition) : "先從下方選擇寶石"}</small>
                         </button>
@@ -6736,7 +7747,7 @@ function Game({
                     return (
                       <div key={key} className={`gem-stack-card socket-gem-card ${selectedGemKey === key ? "selected" : ""}`}>
                         <button className="gem-select" onClick={() => setSelectedGemKey(key)}>
-                          <img src={definition.icon} alt="" />
+                          <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
                           <span><b>{definition.tierLabel}{definition.name}</b><small>{gemEffectLabel(definition)} · 持有 {stack.quantity}</small></span>
                         </button>
                       </div>
@@ -6812,6 +7823,9 @@ function Game({
                 {item === "背包" && unseenItemIds.length > 0 && (
                   <em>{unseenItemIds.length}</em>
                 )}
+                {item === "技能" && availableSkillPoints > 0 && (
+                  <em>{availableSkillPoints}</em>
+                )}
               </button>
             );
           })}
@@ -6846,9 +7860,9 @@ function Game({
             <div className="player-block">
               <div className="avatar">
                 {rebirthCount > 0 ? (
-                  <img src={characterAvatarPath(playerClass, rebirthCount)} alt={`${playerClass}頭像`} />
+                  <NextImage unoptimized width={256} height={256} loading="eager" src={characterAvatarPath(playerClass, rebirthCount)} alt={`${playerClass}頭像`} />
                 ) : (
-                  <img src={`/characters/${characterSlug(playerClass)}-head.png`} alt={`${playerClass}頭像`} />
+                  <NextImage unoptimized width={256} height={256} loading="eager" src={`/characters/${characterSlug(playerClass)}-head.webp`} alt={`${playerClass}頭像`} />
                 )}
               </div>
               <div>
@@ -6888,11 +7902,11 @@ function Game({
           <div className="topbar-actions">
             <button
               title="郵件"
-              aria-label={`系統郵件，${unclaimedMail} 封未領取`}
+              aria-label={`系統郵件，${unclaimedMail} 封未領取，${gmInbox.unread} 封 GM 未讀訊息`}
               onClick={() => setMailOpen(true)}
             >
               <Mail />
-              {unclaimedMail > 0 && <i>{unclaimedMail}</i>}
+              {unclaimedMail + gmInbox.unread > 0 && <i>{unclaimedMail + gmInbox.unread}</i>}
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -6956,6 +7970,8 @@ function Game({
                               ? "挑戰結算"
                               : "挑戰失敗"
                           : "◆ 首領戰鬥中"
+                        : runSummary
+                          ? runSummary.outcome === "complete" ? "通關完成" : "你已死亡"
                         : battleOn
                           ? currentWaveBoss
                             ? "◆ 地圖首領戰鬥中"
@@ -6968,7 +7984,7 @@ function Game({
                     </span>
                   </div>
                   <div
-                    className={`battle-stage ${activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "elite-stage" : ""} ${setTier > 0 ? "set-awakened" : ""} ${rangerImpactPulse ? "ranger-impact" : ""} ${executionImpactPulse ? "execution-impact" : ""} ${abyssImpactPulse ? "abyss-impact" : ""} ${frostfireImpactPulse ? `frostfire-${frostfireImpactPulse}` : ""} ${meteorImpactPulse ? "meteor-impact" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-impact" : ""} ${skillEffect && !["裂地斬", "處決"].includes(normalizeCombatEffectName(skillEffect.name)) ? `impact-${impactTier(skillEffect.name)}` : ""}`}
+                    className={`battle-stage ${astralVisual ? "astral-active" : ""} ${skyRainVisual ? "sky-queen-active" : ""} ${overloadVisual.enabled && (overloadVisual.phase !== "idle" || overloadVisual.charge > 0) ? "overload-active" : ""} ${activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "elite-stage" : ""} ${setTier > 0 ? "set-awakened" : ""} ${rangerImpactPulse ? "ranger-impact" : ""} ${executionImpactPulse ? "execution-impact" : ""} ${abyssImpactPulse ? "abyss-impact" : ""} ${voidVisuals.length ? "void-active" : ""} ${meteorVisuals.length ? "meteor-active" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-impact" : ""} ${skillEffect && !["星界寂滅", "虛空崩解", "奧術超載", "隕星術", "霜火新星", "元素蝕印", "裂地斬", "處決", "泰坦斷界斬", "穿雲箭", "追風箭", "獵殺標記", "疾風連射", "風行領域", "破星狙擊", "蒼穹箭雨"].includes(normalizeCombatEffectName(skillEffect.name)) ? `impact-${impactTier(skillEffect.name)}` : ""}`}
                     style={
                       { "--map-tone": currentMap.tone } as React.CSSProperties
                     }
@@ -6978,7 +7994,7 @@ function Game({
                         <Clock3 />
                         <span>本回合</span>
                         <strong>{String(Math.floor(worldBossSecondsLeft / 60)).padStart(2, "0")}:{String(worldBossSecondsLeft % 60).padStart(2, "0")}</strong>
-                        <small>{worldRoundDamage.toLocaleString()} 傷害</small>
+                        <small>{presentedWorldRoundDamage.toLocaleString()} 傷害</small>
                       </div>
                     )}
                     <div
@@ -6990,8 +8006,8 @@ function Game({
                       />
                       <div className={`fighter-frame player-frame ${battleOn && battlePulse > 0 ? `attack-pulse-${battlePulse % 2}` : ""} ${playerHitFeedback && !playerHitFeedback.dodged ? `player-hit-impact-${playerHitFeedback.key % 2}` : ""}`}>
                         <BloodRoarBuffVfx active={bloodRoarVisualActive} />
-                        <img className="battle-character-backdrop" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt="" aria-hidden="true" />
-                        <img className="battle-character" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt={playerClass} />
+                        <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-character-backdrop" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt="" aria-hidden="true" />
+                        <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-character" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt={playerClass} />
                         {selectedTitle !== "none" && (
                           <span
                             className="equipped-title"
@@ -7003,7 +8019,31 @@ function Game({
                       </div>
                       <div className="fighter-meta">
                         <b>{playerName}</b>
+                        {liveCombatRef.current?.characterClass === "法師" && (() => {
+                          const shield = (liveCombatRef.current.combat as MageCombat).shield.value;
+                          return shield > 0 ? (
+                            <Meter
+                              value={shield / characterStats.hp * 100}
+                              color="#ffffff"
+                              className="shield-meter"
+                              ariaLabel={`護盾 ${Math.ceil(shield).toLocaleString()}`}
+                            />
+                          ) : null;
+                        })()}
                         <Meter value={activeBossBattle ? bossPlayerHp : playerHp} color="#58ad71" />
+                        {liveCombatRef.current?.combat.session.charge.ultimate && (
+                          <>
+                            <Meter
+                              value={liveCombatRef.current.combat.session.charge.ultimateEnergy}
+                              color={playerClass === "戰士" ? "#f1aa42" : playerClass === "遊俠" ? "#65d88d" : "#a78bfa"}
+                              className={`ultimate-energy-meter${liveCombatRef.current.combat.session.charge.ultimateEnergy >= 100 ? " ready" : ""}`}
+                              ariaLabel={`奧義蓄能 ${liveCombatRef.current.combat.session.charge.ultimateEnergy}／100`}
+                            />
+                            <small className="ultimate-energy-label">
+                              奧義蓄能 {liveCombatRef.current.combat.session.charge.ultimateEnergy}／100
+                            </small>
+                          </>
+                        )}
                         <small className="player-health-label">
                           {healthFromPercent(
                             activeBossBattle ? bossPlayerHp : playerHp,
@@ -7039,7 +8079,7 @@ function Game({
                           const monsterImage = monsterImages[currentMonsterName]
                             ?? monsterImages[baseMonsterName(currentMonsterName)];
                           return monsterImage ? (
-                            <img className="battle-monster" src={monsterImage} alt={currentMonsterName} />
+                            <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-monster" src={monsterImage} alt={currentMonsterName} />
                           ) : (
                             <span className="monster-placeholder">
                               {activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? <Crown /> : <Skull />}
@@ -7049,8 +8089,8 @@ function Game({
                       </div>
                       <div className="fighter-meta">
                         <b>{activeBossBattle?.name ?? currentEnemyBaseName}</b>
-                        <Meter value={activeBossBattle ? bossEnemyHp : enemyHp} color={activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "#dc8d32" : "#b9474b"} />
-                        <small className="enemy-health-label">{activeBossBattle ? `${healthFromPercent(bossEnemyHp, activeBossBattle.hp).toLocaleString()}／${activeBossBattle.hp.toLocaleString()} HP` : `${currentEnemyHealth.toLocaleString()}／${currentEnemyMaximumHealth.toLocaleString()} HP`}</small>
+                        <Meter className="enemy-synced-health" value={presentedEnemyPercent} color={activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "#dc8d32" : "#b9474b"} />
+                        <small className="enemy-health-label">{activeBossBattle ? `${healthFromPercent(presentedEnemyPercent, activeBossBattle.hp).toLocaleString()}／${activeBossBattle.hp.toLocaleString()} HP` : `${healthFromPercent(presentedEnemyPercent,currentEnemyMaximumHealth).toLocaleString()}／${currentEnemyMaximumHealth.toLocaleString()} HP`}</small>
                         <div className="combat-statuses" aria-label="敵方戰鬥狀態">
                           {combatStatuses.filter((status) => status.target === "enemy").map((status) => (
                             <span key={`${status.name}-${status.target}`} className={`combat-status ${status.tone}`}>
@@ -7070,14 +8110,74 @@ function Game({
                         <span>技能發動</span>
                       </div>
                     )}
+                    {!sessionSuperseded && (hunterBursts.length > 0 || hunterMarkVisual && (activeBossBattle ? !bossOutcome : battleOn && !runSummary)) && (
+                      <RangerHunterMarkVfx mark={(activeBossBattle ? bossOutcome : runSummary) ? null : hunterMarkVisual} bursts={hunterBursts}
+                        onImpact={publishHunterImpact} onComplete={finishHunterBurst} onExpire={expireHunterMark} />
+                    )}
+                    {windDomainVisual && !sessionSuperseded && (activeBossBattle ? !bossOutcome : battleOn && !runSummary) && (
+                      <RangerWindDomainVfx visual={windDomainVisual} onComplete={finishWindDomain} />
+                    )}
+                    {phantomStepVisual && !sessionSuperseded && (activeBossBattle ? !bossOutcome : battleOn && !runSummary) && (
+                      <RangerPhantomStepVfx visual={phantomStepVisual}
+                        portraitSrc={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))}
+                        onComplete={finishPhantomStepBurst} />
+                    )}
+                    {!sessionSuperseded && (activeBossBattle ? !bossOutcome : battleOn && !runSummary) && (
+                      <MageFrostfireNovaVfx effects={frostfireVisuals} statuses={frostfireStatuses}
+                        onImpact={publishFrostfireImpact} onComplete={finishFrostfireVisual} />
+                    )}
+                    {!sessionSuperseded && (activeBossBattle ? !bossOutcome : battleOn && !runSummary) && (
+                      <>
+                        {playerClass === "法師" && <>
+                          <MageArcaneOverloadVfx visual={overloadVisual} />
+                          <MageManaShieldVfx visual={manaShieldVisual} />
+                          <MageElementSigilVfx visual={elementSigilVisual} />
+                          {astralVisual && <MageAstralAnnihilationVfx key={`astral-${astralVisual.key}`} effectKey={astralVisual.key}
+                            ascended={astralVisual.ascended} segments={astralVisual.segments}
+                            onImpact={publishAstralImpact} onComplete={finishAstralVisual} />}
+                          <MageVoidCollapseVfx effects={voidVisuals} onImpact={publishVoidImpact} onComplete={finishVoidVisual} />
+                          <MageMeteorStrikeVfx effects={meteorVisuals} onImpact={publishMeteorImpact} onComplete={finishMeteorVisual} />
+                        </>}
+                      <MageLightningChainVfx effects={lightningVisuals} paralysisExpiresAt={lightningParalysis}
+                        onImpact={publishLightningImpact} onComplete={finishLightningVisual} />
+                      </>
+                    )}
                     {rangerPiercingEffect && (
-                      <RangerPiercingArrowVfx effectKey={rangerPiercingEffect.key} />
+                      <RangerPiercingArrowVfx key={`piercing-arrow-${rangerPiercingEffect.key}`}
+                        ascended={skillAscensions.choices.includes("穿雲箭")}
+                        effectKey={rangerPiercingEffect.key} hit={rangerPiercingEffect.hit}
+                        onImpact={publishPiercingImpactDamage} onComplete={finishPiercingVisual} />
+                    )}
+                    {starbreakVisuals.map((effect) => (
+                      <RangerStarbreakSnipeVfx key={`starbreak-${effect.key}`} effectKey={effect.key}
+                        hit={effect.hit} ascended={effect.ascended} chargeRecovered={effect.chargeRecovered} onImpact={publishStarbreakImpact} onComplete={finishStarbreakVisual} />
+                    ))}
+                    {tailwindVisuals.map((effect) => (
+                      <RangerTailwindArrowVfx key={`tailwind-main-${effect.key}`} kind="main"
+                        effectKey={effect.key} hit={effect.hit}
+                        onImpact={(eventKey) => publishTailwindImpactDamage(eventKey, effect.echo, effect.chargeRecovered)}
+                        onComplete={finishTailwindVisual} />
+                    ))}
+                    {tailwindEchoVisuals.map((effect) => (
+                      <RangerTailwindArrowVfx key={`tailwind-echo-${effect.key}`} kind="echo"
+                        effectKey={effect.key} hit={effect.hit} onImpact={publishTailwindEchoDamage}
+                        onComplete={finishTailwindEchoVisual} />
+                    ))}
+                    {tailwindChargeVisuals.map((effect) => (
+                      <RangerTailwindArrowVfx key={`tailwind-charge-${effect.key}`} kind="charge"
+                        effectKey={effect.key} hit onImpact={() => {}} onComplete={finishTailwindChargeVisual} />
+                    ))}
+                    {skyRainVisual && !sessionSuperseded && (
+                      <RangerSkyQueenRainVfx key={`sky-queen-${skyRainVisual.key}`}
+                        effectKey={skyRainVisual.key} ascended={skyRainVisual.ascended} arrows={skyRainVisual.arrows}
+                        onImpact={publishSkyRainImpact} onComplete={finishSkyRainVisual} />
                     )}
                     {rangerWindVolleyEffect.map((effect) => (
                       <RangerWindVolleyVfx
                         key={`wind-volley-vfx-${effect.key}`}
                         effectKey={effect.key}
-                        shotCount={effect.shotCount}
+                        shotCount={effect.shotCount} arrows={effect.arrows}
+                        onImpact={publishVolleyImpact} onComplete={finishVolleyVisual}
                       />
                     ))}
                     {deadlyMarkEffect && (
@@ -7089,14 +8189,80 @@ function Game({
                     {abyssBossEffect && activeBossBattle?.name === "深淵王" && (
                       <DeepAbyssBossVfx effectKey={abyssBossEffect.key} />
                     )}
-                    {skillVisualEffects.map((effect) => normalizeCombatEffectName(effect.name) === "泰坦斷界斬" ? (
-                      <TitanBoundaryVfx key={`${effect.name}-${effect.key}`} effectKey={effect.key} />
-                    ) : (
-                      <SkillEffectCanvas key={`${effect.name}-${effect.key}`} name={effect.name} effectKey={effect.key} />
+                    {unyieldingVisual.eventKey > 0 && (
+                      <WebGLUnyieldingWillVfx
+                        key="warrior-unyielding-will"
+                        eventKey={unyieldingVisual.eventKey}
+                        active={unyieldingVisual.active}
+                        activated={unyieldingVisual.activated}
+                        blocked={unyieldingVisual.blocked}
+                        countered={unyieldingVisual.countered}
+                        ascendedCounterStacks={unyieldingVisual.ascendedCounterStacks}
+                        onFadeComplete={() => finishUnyieldingVisual(unyieldingVisual.eventKey)}
+                      />
+                    )}
+                    {bloodBrandVisual && (
+                      <WebGLBloodBrandVfx
+                        key="warrior-blood-brand"
+                        {...bloodBrandVisual}
+                        onExpired={finishBloodBrandVisual}
+                      />
+                    )}
+                    {armorSmashVisual && (
+                      <WebGLArmorSmashVfx
+                        key={`armor-smash-${armorSmashVisual.key}`}
+                        effectKey={armorSmashVisual.key}
+                        hit={armorSmashVisual.hit}
+                        enhanced={armorSmashVisual.enhanced}
+                        ascended={armorSmashVisual.ascended}
+                        onComplete={finishArmorSmashVisual}
+                      />
+                    )}
+                    {titanUltimateVisual && (
+                      <WebGLTitanRiftVfx
+                        key={`titan-rift-${titanUltimateVisual.key}`}
+                        kind="ultimate"
+                        effectKey={titanUltimateVisual.key}
+                        hit={titanUltimateVisual.hit}
+                        ascended={titanUltimateVisual.ascended}
+                        onImpact={publishTitanImpactDamage}
+                        onComplete={finishTitanUltimateVisual}
+                      />
+                    )}
+                    {titanEchoVisuals.map((effect) => (
+                      <WebGLTitanEchoVfx
+                        key={`titan-echo-${effect.key}`}
+                        kind="echo"
+                        effectKey={effect.key}
+                        slashIndex={effect.slashIndex}
+                        onComplete={finishTitanEchoVisual}
+                      />
+                    ))}
+                    {!titanUltimateVisual && <WebGLBerserkerStanceVfx {...berserkerStanceVisual} targetKey={activeBossBattle?.name ?? `${runStartedAt}:${mapId}:${wave}`} active={berserkerStanceVisual.active && Boolean(battleOn || activeBossBattle)} />}
+                    {skillVisualEffects.map((effect) => (
+                      effect.name === "鮮血怒吼"
+                        ? <WebGLBloodRoarVfx key={`blood-roar-${effect.key}`} ascended={skillAscensions.choices.includes("鮮血怒吼")} />
+                        : effect.name === "血刃斬"
+                        ? <WebGLBloodBladeVfx key={`${effect.name}-${effect.key}`} effectKey={effect.key} />
+                        : <SkillEffectCanvas
+                            key={`${effect.name}-${effect.key}`}
+                            name={effect.name}
+                            effectKey={effect.key}
+                            onComplete={SKILL_REWORK_CATALOG[playerClass].some((skill) =>
+                              skill.category === "ultimate" && skill.name === effect.name.split("・")[0])
+                              ? finishUltimateAnimation
+                              : undefined}
+                          />
                     ))}
                     {groundSplitEffect && (
-                      <SkillEffectCanvas name="裂地斬" effectKey={groundSplitEffect.key} />
+                      <WebGLGroundSplitVfx key={`ground-split-${groundSplitEffect.key}`} kind="main"
+                        effectKey={groundSplitEffect.key} hit={groundSplitEffect.hit}
+                        onImpact={publishGroundImpactDamage} onComplete={finishGroundSplitVisual} />
                     )}
+                    {groundShockEffects.map((effect) => (
+                      <WebGLGroundSplitVfx key={`ground-shock-${effect.key}`} kind="shock"
+                        effectKey={effect.key} hit onImpact={publishGroundShockDamage} onComplete={finishGroundShockVisual} />
+                    ))}
                     {executionEffect && (
                       <SkillEffectCanvas
                         name="處決"
@@ -7105,8 +8271,9 @@ function Game({
                       />
                     )}
                     {bloodRoarSlashKey > 0 && (
-                      <SkillEffectCanvas name="鮮血怒吼・強化斬擊" effectKey={bloodRoarSlashKey} />
+                      <WebGLBloodRoarHitVfx key={`blood-slash-${bloodRoarSlashKey}`} kind="slash" />
                     )}
+                    {bloodReturnKey > 0 && <WebGLBloodRoarHitVfx key={`blood-return-${bloodReturnKey}`} kind="return" />}
                     {mythicVfxEffects.map((effect) => (
                       <MythicSkillVfx
                         key={`${effect.skill}-${effect.key}`}
@@ -7116,71 +8283,14 @@ function Game({
                         variant={effect.variant}
                       />
                     ))}
-                    {battleHitGroups.length > 0 && (
-                      <div
-                        className={`damage-float player-damage-float ${skillEffect?.name === "隕星術" ? "meteor-damage-float" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-damage-float" : ""}`}
-                      >
-                        {battleHitGroups.map((group) => (
-                          <div key={`damage-sequence-${group.key}`} className="damage-sequence">
-                            {group.hits.filter((hit) => hit.damage > 0).map((hit, index) => (
-                              <div
-                                key={`${group.key}-${index}`}
-                                className={`combo-hit ${hit.critical ? "critical-hit" : ""}`}
-                                style={{
-                                  "--hit-index": index,
-                                  "--hit-count": group.hits.length,
-                                  "--hit-delay": `${hit.delayMs ?? index * 110}ms`,
-                                } as React.CSSProperties}
-                              >
-                                {hit.critical && index === 0 && <small>暴擊!</small>}
-                                <b>-{hit.damage.toLocaleString()}</b>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {dotDamageGroups.map((event) => (
-                      <div key={`dot-damage-${event.key}`} className="damage-float player-damage-float dot-damage-float">
-                        <div className="combo-hit dot-damage-hit">
-                          <small>{event.kind === "bleed" ? "流血" : "灼燒"}</small>
-                          <b>-{event.damage.toLocaleString()}</b>
-                        </div>
-                      </div>
-                    ))}
-                    {setElementalHits.map((group) => (
-                      <div key={`set-elemental-${group.key}`} className={`damage-float set-elemental-float ${group.volley ? "volley-elemental-float" : ""}`}>
-                        {group.hits.map((hit, index) => (
-                          <div key={`${group.key}-${index}`} className="combo-hit set-elemental-hit"
-                            style={{ "--hit-index": index, "--hit-count": group.hits.length } as React.CSSProperties}>
-                            <small>{hit.label}</small><b>-{Math.round(hit.damage).toLocaleString()}</b>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                    {playerHitFeedback && (activeBossBattle || playerHitFeedback.dodged || playerHitFeedback.blocked) && (
-                      <div
-                        key={`player-hit-${playerHitFeedback.key}`}
-                        className={`player-hit-float ${playerHitFeedback.dodged || playerHitFeedback.blocked ? "dodged" : ""}`}
-                      >
-                        {playerHitFeedback.blocked ? "格擋！" : playerHitFeedback.dodged ? "閃避！" : `-${playerHitFeedback.damage}`}
-                      </div>
-                    )}
-                    {missFeedback !== null && (
-                      <div key={`miss-${missFeedback}`} className="damage-float player-damage-float missed-float">
-                        未命中！
-                      </div>
-                    )}
-                    {!activeBossBattle && enemyHitFeedback && (
-                      <div
-                        key={`enemy-hit-${enemyHitFeedback.key}`}
-                        className={`enemy-damage-float ${enemyHitFeedback.dodged ? "dodged" : ""}`}
-                      >
-                        {enemyHitFeedback.dodged
-                          ? "閃避!"
-                          : `-${enemyHitFeedback.damage}`}
-                      </div>
-                    )}
+                    <CombatDamageLayer
+                      resetToken={enemyPresentationToken}
+                      onDamageShown={onEnemyDamageShown}
+                      enabled={!sessionSuperseded}
+                      inputs={{ groups: battleHitGroups, elementals: setElementalHits, dots: dotDamageGroups,
+                        player: playerHitFeedback, enemy: enemyHitFeedback, miss: missFeedback,
+                        counter: unyieldingCounterFeedback, boss: Boolean(activeBossBattle) }}
+                    />
                     {resourceDrop && !activeBossBattle && (
                       <div key={resourceDrop.key} className="resource-float">
                         <CircleDollarSign /> +{resourceDrop.gold}
@@ -7225,6 +8335,17 @@ function Game({
                         ))}
                       </div>
                     )}
+                    {runSummary && !activeBossBattle && (
+                      <div className={`battle-run-overlay ${runSummary.outcome}`} role="status" aria-live="polite">
+                        <div className="battle-run-message">
+                          {runSummary.outcome === "complete" ? <Crown aria-hidden="true" /> : <Skull aria-hidden="true" />}
+                          <h3>{runSummary.outcome === "complete" ? "通關完成" : "你已死亡"}</h3>
+                          <p>第 {runSummary.highestFloor} 層 · 擊敗 {runSummary.kills} 隻怪物</p>
+                          <strong>{restartCountdown}</strong>
+                          <span>倒數完後從第 1 層重新開始</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="battle-actions">
                     <div>
@@ -7245,9 +8366,8 @@ function Game({
                             : `第 ${Math.min(30, Math.ceil(wave / 10) * 10)} 層里程碑`}{" "}
                       </span>
                     </div>
-                    <div className="battle-buttons">
-                      {activeBossBattle ? (
-                        <>
+                    {activeBossBattle && (
+                      <div className="battle-buttons">
                           {bossOutcome && (
                             <button
                               className="btn btn-primary"
@@ -7263,7 +8383,10 @@ function Game({
                                   const worldBoss = worldBosses.find((boss) => boss.name === activeBossBattle.name) ?? worldBosses[0];
                                   fightBoss(worldBoss);
                                 } else {
+                                  resetCombatPerks();
+                                  setActiveBossBattle({...activeBossBattle});
                                   setBossEnemyHp(100);
+                                  setPresentedEnemyHealth((current)=>({...current,percent:100}));
                                   setBossPlayerHp(100);
                                   setLastBossDamage(0);
                                   setLastBossCounterDamage(0);
@@ -7297,16 +8420,8 @@ function Game({
                               撤離
                             </button>
                           )}
-                        </>
-                      ) : (
-                        <button
-                          className="btn btn-ghost"
-                          onClick={() => setBattleOn((v) => !v)}
-                        >
-                          {battleOn ? "停止" : "繼續"}掛機
-                        </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                   <div className="combat-meta">
                     <div>
@@ -7316,7 +8431,11 @@ function Game({
                           ? `${activeSet.name} ${activeSet.count} 件`
                           : `追獵 ${currentMap.set}`}
                       </b>
-                      <span>{setEffect}</span>
+                      {equippedSetGroups.length ? equippedSetGroups.map((group) => (
+                        <span className={group.count >= 2 ? "set-meta-active" : ""} key={group.name}>
+                          {group.name} {group.count} 件：{setEffectDescription(group.count)}
+                        </span>
+                      )) : <span>{setEffectDescription(0)}</span>}
                     </div>
                     <div>
                       {activeBossBattle ? (
@@ -7452,7 +8571,7 @@ function Game({
                   <div className="section-head">
                     <h3>角色戰況</h3>
                     <span className="power">
-                      戰力 {combatPower.toLocaleString()}
+                      綜合戰力 {formatAssessedPower(assessedCombatPower)}
                     </span>
                   </div>
                   <div className="stat-grid">
@@ -7481,7 +8600,7 @@ function Game({
                       disabled={!canRebirth}
                       onClick={() => setRebirthOpen(true)}
                     >
-                      開始輪迴
+                      {rebirthCount >= MAX_REBIRTHS ? "輪迴已滿" : "開始輪迴"}
                     </button>
                     <button className="text-btn" onClick={() => setRebirthOpen(true)}>
                       天賦 {rebirthPoints} 點
@@ -7556,11 +8675,12 @@ function Game({
                   const reachedFloors = mapId === map.id
                     ? Math.max(localProgress, Math.min(wave, MAP_FLOORS))
                     : localProgress;
+                  const recommendedPower = map.recommendedAssessedPower;
                   const powerState = locked
                     ? { label: "尚未解鎖", tone: "locked" }
-                    : combatPower < map.power[0]
+                    : assessedCombatPower < recommendedPower[0]
                       ? { label: "極度危險", tone: "danger" }
-                      : combatPower <= map.power[1]
+                      : assessedCombatPower <= recommendedPower[1]
                         ? { label: "適合挑戰", tone: "suitable" }
                         : { label: "可輕鬆通關", tone: "easy" };
                   return (
@@ -7579,7 +8699,7 @@ function Game({
                       }}
                     >
                       <div className="map-art">
-                        <img src={map.sceneImage} alt="" loading="lazy" />
+                        <NextImage unoptimized width={640} height={360} src={map.sceneImage} alt="" loading="lazy" />
                         <span className="map-art-status">
                           {locked ? <><LockKeyhole /> 尚未解鎖</> : mapId === map.id ? "正在遠征" : reachedFloors >= MAP_FLOORS ? "區域已征服" : "可前往"}
                         </span>
@@ -7598,8 +8718,8 @@ function Game({
                         <p className="map-monster-line">遭遇：{map.monsters.slice(0, 3).join("・")}</p>
                         <div className="map-power-row">
                           <span>
-                            建議戰力 {map.power[0].toLocaleString()}～
-                            {map.power[1].toLocaleString()}
+                            建議戰力 {formatAssessedPower(recommendedPower[0])}～
+                            {formatAssessedPower(recommendedPower[1])}
                           </span>
                         </div>
                         <div className="map-route-head">
@@ -7640,7 +8760,7 @@ function Game({
                 sub="穿戴中的裝備不佔背包格數；可穿戴、強化、洗鍊與鑲嵌，滿格獎勵會寄往郵件保存 7 天。"
               >
                 <span className="bag-capacity">
-                  戰力 {combatPower.toLocaleString()} · 強化石 {enhanceStones} ·
+                  綜合戰力 {formatAssessedPower(assessedCombatPower)} · 強化石 {enhanceStones} ·
                   洗鍊石 {reforgeStones} · 打孔石 {drillingStones} · {bagItems.length} / 60 格
                 </span>
               </PageTitle>
@@ -7665,7 +8785,7 @@ function Game({
                     {equipFeedback && <span key={equipFeedback.id} className="paperdoll-equip-feedback" aria-hidden="true" />}
                     <div className="character-display">
                       <CharacterAppearanceVfx id={selectedAppearance} />
-                      <img
+                      <NextImage unoptimized width={1024} height={1536} loading="eager"
                         className="inventory-character"
                         src={characterFullbodyPath(playerClass, rebirthCount)}
                         alt={`${playerClass}角色立繪`}
@@ -7737,13 +8857,13 @@ function Game({
                   <div className="set-bonus">
                     {equippedSetGroups.length ? (
                       equippedSetGroups.map((group) => (
-                        <div key={group.name} className="set-bonus-row">
+                        <div key={group.name} className={`set-bonus-row ${group.count >= 2 ? "active" : ""}`}>
                           <b>{group.name} · {group.count} / 10</b>
-                          <span>2 件：攻擊 +{Math.round((SET_ATTACK_BONUS - 1) * 100)}%</span>
-                          <span>4 件：離線收益 +10%</span>
-                          <span>6 件：每次攻擊追加 {SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害</span>
-                          <span>8 件：技能傷害 +{SET_SKILL_DAMAGE_PCT}%</span>
-                          <span>10 件：每 {SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發（{SET_RESONANCE_DAMAGE_PCT}%）</span>
+                          <span className={group.count >= 2 ? "active" : ""}>2 件：攻擊 +{Math.round((SET_ATTACK_BONUS - 1) * 100)}%</span>
+                          <span className={group.count >= 4 ? "active" : ""}>4 件：離線收益 +10%</span>
+                          <span className={group.count >= 6 ? "active" : ""}>6 件：每次攻擊追加 {SET_ELEMENTAL_DAMAGE_PCT}% 元素傷害</span>
+                          <span className={group.count >= 8 ? "active" : ""}>8 件：技能傷害 +{SET_SKILL_DAMAGE_PCT}%</span>
+                          <span className={group.count >= 10 ? "active" : ""}>10 件：每 {SET_RESONANCE_ATTACKS} 次攻擊觸發元素爆發（{SET_RESONANCE_DAMAGE_PCT}%）</span>
                         </div>
                       ))
                     ) : (
@@ -7868,7 +8988,7 @@ function Game({
                       >
                         {equipped.includes(currentItem.id) ? "卸下後" : "穿上後"}
                         實際戰力 {powerDifferenceForItem(currentItem) >= 0 ? "+" : ""}
-                        {powerDifferenceForItem(currentItem).toLocaleString()}
+                        {formatAssessedPower(powerDifferenceForItem(currentItem))}
                       </p>
                       {currentItem.set && (
                         <p className="set-label">{currentItem.set} 套裝</p>
@@ -7903,7 +9023,7 @@ function Game({
                             const definition = gem ? getGemDefinition(gem.gemId, gem.tier) : null;
                             return definition ? (
                               <span key={index}>
-                                <img src={definition.icon} alt="" />
+                                <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
                                 <small>{definition.tierLabel}{definition.name}<br />{gemEffectLabel(definition)}</small>
                               </span>
                             ) : <span key={index} className="empty"><Gem /><small>空孔位</small></span>;
@@ -7933,6 +9053,7 @@ function Game({
                         <button
                           className="btn btn-ghost"
                           onClick={() => {
+                            setMobileItemDetailOpen(false);
                             setTargetedAffix(null);
                             setReforgeMode("idle");
                             setReforgeOpen(true);
@@ -7991,58 +9112,45 @@ function Game({
                       <h3>角色數值</h3>
                       <span>裝備與技能即時計算</span>
                     </div>
-                    <div>
+                    <div className="character-stat-grid">
                       {[
-                        ["生命", characterStats.hp.toLocaleString()],
-                        ["攻擊", characterStats.attack.toLocaleString()],
-                        ["防禦", characterStats.defense.toLocaleString()],
-                        ["每秒攻擊", `${(combatAttackSpeed / 100).toFixed(2)} 次`],
-                        [
-                          "閃避值",
-                          `${characterStats.dodge}${characterStats.dodge > DODGE_CAP ? "（上限）" : ""}`,
-                        ],
-                        ...(playerClass === "戰士" && skillPassiveStats.blockChancePoints > 0
-                          ? [["格擋率", `${skillPassiveStats.blockChancePoints}%`]] : []),
-                        ...(playerClass === "戰士" && skillPassiveStats.lowHealthDamageReductionPercent > 0
-                          ? [["低血額外減傷", `+${skillPassiveStats.lowHealthDamageReductionPercent}%`]] : []),
-                        ...(playerClass === "法師" && skillPassiveStats.initialShieldBonusPercent > 0
-                          ? [["護盾強度", `+${skillPassiveStats.initialShieldBonusPercent}%`]] : []),
-                        ["暴擊", `${Math.min(100, characterStats.crit)}%`],
-                        ["暴擊傷害", `+${characterStats.critDamage}%`],
-                        ["吸血", `${Math.min(100, characterStats.lifesteal)}%`],
-                        ["首領傷害", `+${characterStats.bossDamage}%`],
-                        [
-                          "傷害減免",
-                          `${Math.min(balanceConfig.progression.damageReductionCap, characterStats.damageReduction)}%`,
-                        ],
-                        ["經驗加成", `+${characterStats.expBonus}%`],
-                        ["金幣加成", `+${characterStats.goldBonus}%`],
-                        ["裝備掉落率", `+${characterStats.equipmentDrop}%`],
-                        ["資源掉落率", `+${characterStats.resourceDrop}%`],
-                        ["強化石掉落率", `+${characterStats.enhanceDrop}%`],
-                        ["洗鍊石掉落率", `+${characterStats.reforgeDrop}%`],
-                        ["高品質掉落率", `+${characterStats.highQualityDrop}%`],
-                      ].map(([label, value]) => (
-                        <span key={label}>
+                        { label: "生命", value: characterStats.hp.toLocaleString(), icon: Heart },
+                        { label: "攻擊", value: characterStats.attack.toLocaleString(), icon: Swords },
+                        { label: "防禦", value: characterStats.defense.toLocaleString(), icon: Shield },
+                        { label: "每秒攻擊", value: `${(characterStats.speed / 100).toFixed(2)} 次`, icon: Gauge },
+                        { label: "命中值", value: characterStats.hit, icon: Target, hint: `目前地圖估算命中率 ${effectiveHit.toFixed(1)}%（已計入當前樓層壓制）` },
+                        { label: "閃避值", value: characterStats.dodge, icon: Activity, hint: `目前地圖估算閃避率 ${effectiveDodge.toFixed(1)}%；地圖怪物命中評等 ${monsterAccuracyRating}，你的閃避評等 ${playerEvasionRating}` },
+                        { label: "暴擊", value: `${Math.min(100, characterStats.crit)}%`, icon: Zap },
+                        { label: "暴擊傷害", value: `+${characterStats.critDamage}%`, icon: Sparkles },
+                        { label: "吸血", value: `${Math.min(100, characterStats.lifesteal)}%`, icon: Droplets },
+                        { label: "傷害減免", value: `${Math.min(balanceConfig.progression.damageReductionCap, characterStats.damageReduction)}%`, icon: ShieldCheck },
+                      ].map(({ label, value, icon: Icon, hint }) => (
+                        <span className="character-stat" key={label} title={hint || `${label} ${value}`} aria-label={`${label} ${value}${hint ? `，${hint}` : ""}`}>
+                          <Icon aria-hidden="true" />
                           <small>{label}</small>
                           <b>{value}</b>
                         </span>
                       ))}
-                      <span className="hit-value">
-                        <small>命中值</small>
-                        <b>{characterStats.hit}</b>
-                        <em>
-                          對目前怪物：實際命中 {effectiveHit.toFixed(1)}%
-                        </em>
-                      </span>
-                      <span className="hit-value">
-                        <small>實際閃避</small>
-                        <b>{effectiveDodge.toFixed(1)}%</b>
-                        <em>
-                          對目前怪物命中值 {monsterAccuracyRating}，閃避值換算為 {playerEvasionRating} 評等
-                        </em>
-                      </span>
                     </div>
+                    <details className="character-stat-details">
+                      <summary>更多數值與掉落加成</summary>
+                      <div className="character-stat-extra">
+                        {[
+                          ["首領傷害", `+${characterStats.bossDamage}%`],
+                          ["經驗加成", `+${characterStats.expBonus}%`],
+                          ["金幣加成", `+${characterStats.goldBonus}%`],
+                          ["裝備掉落率", `+${characterStats.equipmentDrop}%`],
+                          ["資源掉落率", `+${characterStats.resourceDrop}%`],
+                          ["強化石掉落率", `+${characterStats.enhanceDrop}%`],
+                          ["洗鍊石掉落率", `+${characterStats.reforgeDrop}%`],
+                          ["高品質掉落率", `+${characterStats.highQualityDrop}%`],
+                          ...setNumericBonuses,
+                        ].map(([label, value]) => (
+                          <span key={label}><small>{label}</small><b>{value}</b></span>
+                        ))}
+                        <p className="character-stat-context">目前地圖估算：命中 {effectiveHit.toFixed(1)}%（已計入當前樓層壓制） · 閃避 {effectiveDodge.toFixed(1)}%<br />地圖怪物命中評等 {monsterAccuracyRating} · 角色閃避評等 {playerEvasionRating}</p>
+                      </div>
+                    </details>
                   </div>
                 </Panel>
               </div>
@@ -8082,7 +9190,7 @@ function Game({
                     <button className="btn btn-ghost" onClick={() => autoFillGemCircle("mixed")}>自動混合 ×3</button>
                   </div>
                   <div className={`gem-magic-circle ${gemFusionMaterials.length === 3 ? "ready" : ""}`}>
-                    <div className="magic-ring" aria-hidden="true" />
+                    <div className="gem-circle-backdrop" aria-hidden="true"><div className="magic-ring" /></div>
                     {gemFusionSlots.map((gem, index) => {
                       const definition = gem ? getGemDefinition(gem.gemId, gem.tier) : null;
                       return (
@@ -8094,7 +9202,7 @@ function Game({
                         >
                           {definition ? (
                             <>
-                              <img src={definition.icon} alt="" />
+                              <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
                               <small>{definition.tierLabel}</small>
                               <b>{definition.name}</b>
                             </>
@@ -8105,7 +9213,7 @@ function Game({
                       );
                     })}
                     <div className="magic-core">
-                      {gemFusionResult ? <img src={getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).icon} alt="合成結果" /> : fusionPreviewGem ? <img src={fusionPreviewGem.icon} alt="預計產物" /> : <Sparkles />}
+                      {gemFusionResult ? <NextImage unoptimized width={256} height={256} loading="eager" src={getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).icon} alt="合成結果" /> : fusionPreviewGem ? <NextImage unoptimized width={256} height={256} loading="eager" src={fusionPreviewGem.icon} alt="預計產物" /> : <Sparkles />}
                       <b>{gemFusionResult ? (gemFusionResult.success ? "成功" : "失敗") : gemFusionMaterials.length === 3 ? `${Math.round(gemFusionSuccessRate * 100)}%` : "待機"}</b>
                       <small>{gemFusionResult ? getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).name : gemFusionMaterials.length === 3 ? "成功率" : "升階法陣"}</small>
                     </div>
@@ -8153,7 +9261,7 @@ function Game({
                           const disabled = gemPageMode !== "寶石合成" || stack.tier === "advanced" || Boolean(gemFusionTier && gemFusionTier !== stack.tier) || selectedCount >= stack.quantity || gemFusionMaterials.length >= 3;
                           return (
                             <button key={gemStackKey(stack)} className={`${stack.tier === "advanced" ? "max-tier" : ""} ${gemPageMode === "寶石庫" ? "vault-readonly" : ""}`} disabled={disabled} onClick={() => addGemToFusionCircle(stack)}>
-                              <img src={definition.icon} alt="" />
+                              <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
                               <span><b>{definition.tierLabel} · {definition.name}</b><small>{gemEffectLabel(definition)} · 持有 {stack.quantity}</small></span>
                               <em>{stack.tier === "advanced" ? "已達最高階" : gemPageMode === "寶石庫" ? "可鑲嵌" : selectedCount ? `已放 ${selectedCount}` : "放入"}</em>
                             </button>
@@ -8193,7 +9301,7 @@ function Game({
             <div className="page-section">
               <PageTitle
                 title="首領戰"
-                sub="世界首領採 60 秒獨立單挑；每日 00:00（台灣時間）重置 3 次挑戰與今日傷害，依累積傷害排行。"
+                sub="世界首領採 60 秒獨立單挑；每日00:00重置3次挑戰；排行依上次中午至本次中午的傷害，每日12:00結算發獎。"
               />
               <div className="mode-tabs">
                 <button
@@ -8261,7 +9369,7 @@ function Game({
                           style={{ "--boss": b.accent } as React.CSSProperties}
                         >
                           {b.image ? (
-                            <img src={b.image} alt={`${b.name}世界首領`} />
+                            <NextImage unoptimized width={1024} height={1536} loading="eager" src={b.image} alt={`${b.name}世界首領`} />
                           ) : (
                             <Crown />
                           )}
@@ -8284,13 +9392,13 @@ function Game({
                           <>
                             <div className="world-stats">
                               <span>
-                                今日排名 <b>{worldRank ? `#${worldRank}` : worldDamage > 0 ? "更新中" : "—"}</b>
+                                本期排名 <b>{worldRank ? `#${worldRank}` : worldPeriodDamage > 0 ? "更新中" : "—"}</b>
                               </span>
                               <span>
-                                累積傷害 <b>{worldDamage.toLocaleString()}</b>
+                                本期傷害 <b>{worldPeriodDamage.toLocaleString()}</b>
                               </span>
                               <span>
-                                今日最高 <b>{worldLeaderDamage.toLocaleString()}</b>
+                                本期最高 <b>{worldLeaderDamage.toLocaleString()}</b>
                               </span>
                             </div>
                             <div className="world-top-rank" aria-label="世界首領前五名傷害排行">
@@ -8349,7 +9457,7 @@ function Game({
             <Ranking
               playerName={playerName}
               playerClass={playerClass}
-              combatPower={combatPower}
+              combatPower={assessedCombatPower}
               level={level}
               rebirthCount={rebirthCount}
               selectedAppearance={selectedAppearance}
@@ -8362,7 +9470,10 @@ function Game({
               gold={gold}
               idleSeconds={idleSeconds}
               selectedTitle={selectedTitle}
+              selectedTitleBonus={selectedTitleBonus}
               selectedAppearance={selectedAppearance}
+              ashCleared={(mapBestFloors[1] ?? 0) >= MAP_FLOORS}
+              abyssCleared={(mapBestFloors[9] ?? 0) >= MAP_FLOORS || finalBossDefeated}
               ownedTitles={ownedTitles}
               ownedAppearances={ownedAppearances}
               onSelectTitle={setSelectedTitle}
@@ -8392,6 +9503,12 @@ function Game({
               >
                 <Icon />
                 <span>{item}</span>
+                {item === "背包" && unseenItemIds.length > 0 && (
+                  <em>{unseenItemIds.length}</em>
+                )}
+                {item === "技能" && availableSkillPoints > 0 && (
+                  <em>{availableSkillPoints}</em>
+                )}
               </button>
             );
           })}
@@ -8448,7 +9565,7 @@ function BossDetail({
     <Panel className="boss-detail">
       <div className="boss-visual">
         {image ? (
-          <img className="boss-image" src={image} alt={name} />
+          <NextImage unoptimized width={1024} height={1536} loading="eager" className="boss-image" src={image} alt={name} />
         ) : (
           <div className="boss-sigil">
             <Skull />
@@ -8539,7 +9656,7 @@ function Ranking({
   const [selectedRank, setSelectedRank] = useState<PublicRank | null>(null);
   const [rankPage, setRankPage] = useState(0);
   useEffect(() => {
-    fetch("/api/ranking")
+    fetch("/api/ranking", { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => setRanks(Array.isArray(data.ranks) ? data.ranks : []))
       .catch(() => setRanks([]));
@@ -8578,13 +9695,13 @@ function Ranking({
               <Crown />
               <div className="rank-avatar">
                 <CharacterAppearanceVfx id={r.appearance ?? "none"} className="rank-appearance-vfx" />
-                <img src={r.portrait ?? `/characters/${r.cls === "戰士" ? "warrior" : r.cls === "遊俠" ? "ranger" : "mage"}-head.png`} alt={`${r.cls}角色`} />
+                <NextImage unoptimized width={256} height={256} loading="eager" src={r.portrait ?? `/characters/${r.cls === "戰士" ? "warrior" : r.cls === "遊俠" ? "ranger" : "mage"}-head.webp`} alt={`${r.cls}角色`} />
               </div>
               <b className={rankNameClass(r.name, true)}>{r.name}</b>
               <span className={r.rebirth > 0 ? "rank-level rebirth-level" : "rank-level"}>
                 {r.rebirth > 0 && <b>{r.rebirth}轉</b>} {r.level}等
               </span>
-              <span>{r.power.toLocaleString()} 戰力</span>
+              <span>{formatAssessedPower(r.power)} 綜合戰力</span>
               <em>#{i + 1}</em>
             </button>
           ))}
@@ -8594,7 +9711,7 @@ function Ranking({
             <span>名次</span>
             <span>冒險者</span>
             <span>等級</span>
-            <span>戰力</span>
+            <span>綜合戰力</span>
             <span>資料</span>
           </div>
           {visibleRanks.map((r, i) => {
@@ -8608,11 +9725,11 @@ function Ranking({
               <span className={`rank-cell-level ${r.rebirth > 0 ? "rank-level rebirth-level" : "rank-level"}`}>
                 {r.rebirth > 0 && <b>{r.rebirth}轉</b>} {r.level}等
               </span>
-              <strong className="rank-cell-power">{r.power.toLocaleString()}</strong>
+              <strong className="rank-cell-power">{formatAssessedPower(r.power)}</strong>
               <span className="rank-view-action">查看</span>
             </button>;
           })}
-          {!displayRanks.some((r) => r.name === playerName) && <div className="my-rank"><b className="rank-cell-rank">—</b><span className="rank-cell-player"><span>{playerName}（你）</span><small>{playerClass}</small></span><span className="rank-cell-level rank-level">{level}等</span><strong className="rank-cell-power">{combatPower.toLocaleString()}</strong><span /></div>}
+          {!displayRanks.some((r) => r.name === playerName) && <div className="my-rank"><b className="rank-cell-rank">—</b><span className="rank-cell-player"><span>{playerName}（你）</span><small>{playerClass}</small></span><span className="rank-cell-level rank-level">{level}等</span><strong className="rank-cell-power">{formatAssessedPower(combatPower)}</strong><span /></div>}
           {rankPageCount > 1 && <div className="rank-pagination">
             <button type="button" onClick={() => setRankPage((page) => Math.max(0, page - 1))} disabled={rankPage === 0}>上一頁</button>
             <span>第 {rankPage + 1} / {rankPageCount} 頁</span>
@@ -8627,7 +9744,7 @@ function Ranking({
               <DialogHeader>
                 <DialogTitle>{selectedRank.name} 的冒險資料</DialogTitle>
                 <DialogDescription>
-                  {selectedRank.cls} · {selectedRank.rebirth > 0 ? `${selectedRank.rebirth}轉 ` : ""}{selectedRank.level}等 · 戰力 {selectedRank.power.toLocaleString()}
+                  {selectedRank.cls} · {selectedRank.rebirth > 0 ? `${selectedRank.rebirth}轉 ` : ""}{selectedRank.level}等 · 綜合戰力 {formatAssessedPower(selectedRank.power)}
                 </DialogDescription>
               </DialogHeader>
               <div className="rank-detail-progress">
@@ -8648,7 +9765,7 @@ function Ranking({
                 <div className="rank-paperdoll paperdoll">
                   <div className="character-display">
                     <CharacterAppearanceVfx id={selectedRank.appearance ?? (selectedRank.name === playerName ? selectedAppearance : "none")} />
-                    <img className="inventory-character" src={characterFullbodyPath(selectedRank.cls, selectedRank.rebirth)} alt={`${selectedRank.cls}角色立繪`} />
+                    <NextImage unoptimized width={1024} height={1536} loading="eager" className="inventory-character" src={characterFullbodyPath(selectedRank.cls, selectedRank.rebirth)} alt={`${selectedRank.cls}角色立繪`} />
                   </div>
                   {["武器", "頭盔", "胸甲", "手套", "鞋子", "項鍊", "戒指", "腰帶", "護腕", "披風"].map((slot, index) => {
                     const item = selectedRank.equippedItems?.find((entry) => entry.slot === slot);
@@ -8678,7 +9795,10 @@ function Shop({
   gold,
   idleSeconds,
   selectedTitle,
+  selectedTitleBonus,
   selectedAppearance,
+  ashCleared,
+  abyssCleared,
   ownedTitles,
   ownedAppearances,
   onSelectTitle,
@@ -8693,7 +9813,10 @@ function Shop({
   gold: number;
   idleSeconds: number;
   selectedTitle: TitleId;
+  selectedTitleBonus: string;
   selectedAppearance: AppearanceId;
+  ashCleared: boolean;
+  abyssCleared: boolean;
   ownedTitles: TitleId[];
   ownedAppearances: AppearanceId[];
   onSelectTitle: (id: TitleId) => void;
@@ -8727,11 +9850,11 @@ function Shop({
         </div>
       ) : yuanbaoPage === 2 ? (
         <div className="shop-grid">
-          <Panel className="shop-card"><h3>灰燼征服者</h3><p>外型｜稱號：征服灰燼墓園。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("ash-conqueror")} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : "80 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵倖存者</h3><p>外型｜稱號：從時墟深淵生還。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("abyss-survivor")} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外型｜六格去背熔岩骨翼，展翼時彈射火星。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "120 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>奧術星翼</h3><p>外型｜六格去背紫色符文能量羽翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "180 元寶解鎖"}</button></Panel>
-          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外型｜六格去背黑紅破碎深淵蝠翼。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "300 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼征服者</h3><p>稱號｜通關灰燼墓園後解鎖。裝備時：經驗 +5%。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("ash-conqueror") || !ashCleared} onClick={() => onBuy("title-ash")}>{ownedTitles.includes("ash-conqueror") ? "已解鎖" : !ashCleared ? "通關灰燼墓園後解鎖" : "200 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵倖存者</h3><p>稱號｜通關時墟深淵後解鎖。裝備時：經驗／攻擊／防禦 +10%。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedTitles.includes("abyss-survivor") || !abyssCleared} onClick={() => onBuy("title-abyss")}>{ownedTitles.includes("abyss-survivor") ? "已解鎖" : !abyssCleared ? "通關時墟深淵後解鎖" : "2,000 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>灰燼熔翼</h3><p>外觀｜熔岩骨翼與火星彈射。裝備時：攻擊 +5%。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("ember-aura")} onClick={() => onBuy("appearance-ember")}>{ownedAppearances.includes("ember-aura") ? "已解鎖" : "500 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>奧術星翼</h3><p>外觀｜紫色符文能量羽翼。裝備時：攻擊／防禦 +10%。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("arcane-aura")} onClick={() => onBuy("appearance-arcane")}>{ownedAppearances.includes("arcane-aura") ? "已解鎖" : "1,500 元寶解鎖"}</button></Panel>
+          <Panel className="shop-card"><h3>深淵黑翼</h3><p>外觀｜黑紅破碎深淵蝠翼。裝備時：攻擊 +15%、防禦／命中／迴避 +10%。</p><button className="btn btn-primary" disabled={shopPurchaseBusy || ownedAppearances.includes("abyss-aura")} onClick={() => onBuy("appearance-abyss")}>{ownedAppearances.includes("abyss-aura") ? "已解鎖" : "4,500 元寶解鎖"}</button></Panel>
         </div>
       ) : (
         <div className="shop-grid">
@@ -8750,7 +9873,7 @@ function Shop({
           </Panel>
         </div>
       )}
-      <Panel className="shop-card cosmetic-loadout"><h3>目前裝備</h3><p>稱號：{TITLE_OPTIONS[selectedTitle].name}　外觀：{APPEARANCE_OPTIONS[selectedAppearance].name}</p><div className="cosmetic-actions"><select value={selectedTitle} onChange={(event) => onSelectTitle(event.target.value as TitleId)}>{ownedTitles.map((id) => <option key={id} value={id}>{TITLE_OPTIONS[id].name}</option>)}</select><select value={selectedAppearance} onChange={(event) => onSelectAppearance(event.target.value as AppearanceId)}>{ownedAppearances.map((id) => <option key={id} value={id}>{APPEARANCE_OPTIONS[id].name}</option>)}</select></div><small>金幣 {gold.toLocaleString()} · 元寶 {yuanbao.toLocaleString()}</small></Panel>
+      <Panel className="shop-card cosmetic-loadout"><h3>目前裝備</h3><p>稱號：{TITLE_OPTIONS[selectedTitle].name}　外觀：{APPEARANCE_OPTIONS[selectedAppearance].name}</p><small className="title-extra-bonus">額外加成：{selectedTitleBonus}</small><div className="cosmetic-actions"><select value={selectedTitle} onChange={(event) => onSelectTitle(event.target.value as TitleId)}>{ownedTitles.map((id) => <option key={id} value={id}>{TITLE_OPTIONS[id].name}</option>)}</select><select value={selectedAppearance} onChange={(event) => onSelectAppearance(event.target.value as AppearanceId)}>{ownedAppearances.map((id) => <option key={id} value={id}>{APPEARANCE_OPTIONS[id].name}</option>)}</select></div><small>金幣 {gold.toLocaleString()} · 元寶 {yuanbao.toLocaleString()}</small></Panel>
       <Panel>
         <h3>泡點模式</h3>
         <p>頁面開啟期間每 10 分鐘自動獲得 10 元寶。</p>
@@ -8845,7 +9968,7 @@ function AnnouncementModal({ open, onOpenChange }: { open: boolean; onOpenChange
 
 export default function Home() {
   const [stage, setStage] = useState<Stage>("welcome");
-  const [announcementOpen, setAnnouncementOpen] = useState(true);
+  const [announcementOpen, setAnnouncementOpen] = useState(MAINTENANCE_MODE);
   const [logoutReason, setLogoutReason] = useState<string | null>(null);
   const [accountName, setAccountName] = useState("");
   const [isGm, setIsGm] = useState(false);
@@ -8853,6 +9976,21 @@ export default function Home() {
   const [playerClass, setPlayerClass] = useState<GameClass>("戰士");
   const [characterId, setCharacterId] = useState("");
   const [loginId, setLoginId] = useState("");
+  const [gameLoading, setGameLoading] = useState(false);
+  const [gameLoadingProgress, setGameLoadingProgress] = useState({ loaded: 0, total: 0 });
+  const enterGame = async (cls: GameClass) => {
+    setGameLoading(true);
+    setGameLoadingProgress({ loaded: 0, total: 0 });
+    const startedAt = Date.now();
+    await preloadGameEntryImages(gameEntryImagePaths(cls), (loaded, total) => {
+      setGameLoadingProgress({ loaded, total });
+    });
+    const remainingTransition = Math.max(0, 750 - (Date.now() - startedAt));
+    if (remainingTransition > 0)
+      await new Promise((resolve) => window.setTimeout(resolve, remainingTransition));
+    setStage("game");
+    setGameLoading(false);
+  };
   useEffect(() => {
     if (!localStorage.getItem(LEGACY_DATA_RESET_KEY)) {
       [
@@ -8883,7 +10021,7 @@ export default function Home() {
           setPlayerName(characterResult.character.name);
           setPlayerClass(characterResult.character.cls);
           setCharacterId(characterResult.character.id);
-          setStage("game");
+          await enterGame(characterResult.character.cls);
         } else {
           setStage("create");
         }
@@ -8933,7 +10071,7 @@ export default function Home() {
       "dark-world-character",
       JSON.stringify({ id, name, cls, account: accountName }),
     );
-    setStage("game");
+    await enterGame(cls);
   };
   const exit = useCallback(() => {
     void fetch("/api/auth", {
@@ -8966,6 +10104,8 @@ export default function Home() {
           : "偵測到較新的登入；這個舊視窗已停止遊戲與存檔，最新登入不受影響。",
     );
   }, []);
+  if (gameLoading)
+    return <GameEntryLoading loaded={gameLoadingProgress.loaded} total={gameLoadingProgress.total} />;
   if (stage === "welcome")
     return (
       <>
@@ -8982,7 +10122,11 @@ export default function Home() {
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
               const message =
-                result.error === "account_already_exists"
+                result.error === "rate_limited"
+                  ? `嘗試次數過多，請等待 ${Math.max(1, Math.ceil(Number(result.retryAfter ?? 60) / 60))} 分鐘後再試`
+                  : result.error === "auth_temporarily_unavailable"
+                    ? "登入服務暫時無法使用，請稍後再試"
+                    : result.error === "account_already_exists"
                   ? "這個帳號已存在，請直接登入。"
                   : result.error === "maintenance"
                     ? result.message ?? MAINTENANCE_MESSAGE
@@ -9010,7 +10154,7 @@ export default function Home() {
               setPlayerName(characterResult.character.name);
               setPlayerClass(characterResult.character.cls);
               setCharacterId(characterResult.character.id);
-              setStage("game");
+              await enterGame(characterResult.character.cls);
             } else {
               setStage("create");
             }

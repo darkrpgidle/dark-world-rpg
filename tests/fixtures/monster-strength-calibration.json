@@ -1,0 +1,7571 @@
+{
+  "basisCommit": "8331dab8ac194c856dadcb292b13c10a1915c6e1",
+  "trialsPerScenario": 30,
+  "scenarios": 243,
+  "totalBattles": 14580,
+  "conditions": "Identical legal gear, level, skills, HP, suppression and seeds. Fit seeds 0-9; holdout seeds 10-29. No rebirth, ascensions, blessing, title, mythic or epithet. Formula simulation, not browser gameplay. Unified math retained; map/tier monster stats are fixed and do not depend on the entering player.",
+  "classes": [
+    {
+      "cls": "戰士",
+      "oldSeconds": 16.746460905349785,
+      "currentSeconds": 18.110987654320986,
+      "oldReceived": 15316.833744855969,
+      "currentReceived": 16738.720164609054,
+      "oldWinRate": 0.9888888888888888,
+      "currentWinRate": 0.9897119341563788
+    },
+    {
+      "cls": "遊俠",
+      "oldSeconds": 17.747263374485595,
+      "currentSeconds": 15.714650205761323,
+      "oldReceived": 16644.680658436217,
+      "currentReceived": 13656.87366255144,
+      "oldWinRate": 0.9905349794238681,
+      "currentWinRate": 0.9979423868312757
+    },
+    {
+      "cls": "法師",
+      "oldSeconds": 17.11777777777777,
+      "currentSeconds": 14.638641975308637,
+      "oldReceived": 10452.052576131688,
+      "currentReceived": 8863.25085185185,
+      "oldWinRate": 0.9880658436213992,
+      "currentWinRate": 0.9979423868312757
+    }
+  ],
+  "rows": [
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "普通",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 3.2666666666666666,
+        "received": 91.23333333333333,
+        "winRate": 1,
+        "hp": 93.03562340966921,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.2666666666666666,
+        "received": 88.73333333333333,
+        "winRate": 1,
+        "hp": 93.2264631043257,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "普通",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 6.033333333333333,
+        "received": 224.2,
+        "winRate": 1,
+        "hp": 82.88549618320609,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.033333333333333,
+        "received": 220.26666666666668,
+        "winRate": 1,
+        "hp": 83.18575063613231,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "普通",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.033333333333333,
+        "received": 908.4333333333333,
+        "winRate": 1,
+        "hp": 30.653944020356224,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.6,
+        "received": 858.2333333333333,
+        "winRate": 1,
+        "hp": 34.486005089058516,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "普通",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.6,
+        "received": 717.4,
+        "winRate": 1,
+        "hp": 45.23664122137405,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.6,
+        "received": 703.3333333333334,
+        "winRate": 1,
+        "hp": 46.31043256997459,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 2127,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.996666666666665,
+        "received": 274.4,
+        "winRate": 1,
+        "hp": 99.03621559302492,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.294999999999999,
+        "received": 243.6,
+        "winRate": 1,
+        "hp": 99.2264879665658,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 2127,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.378333333333329,
+        "received": 554.7333333333333,
+        "winRate": 1,
+        "hp": 97.89035884133163,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.616666666666662,
+        "received": 489.6,
+        "winRate": 1,
+        "hp": 99.38465196714225,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 2127,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 13.361666666666666,
+        "received": 991.2333333333333,
+        "winRate": 1,
+        "hp": 91.91491569390408,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 11.443333333333333,
+        "received": 873.3666666666667,
+        "winRate": 1,
+        "hp": 94.63434212422544,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 2127,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.52166666666666,
+        "received": 2627.5,
+        "winRate": 1,
+        "hp": 60.52983138780798,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 21.066666666666666,
+        "received": 2577.133333333333,
+        "winRate": 1,
+        "hp": 62.03705144833544,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "戰士",
+        "level": 1,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 1,
+        "affixSeed": 2127,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 30.828333333333337,
+        "received": 3326.5333333333333,
+        "winRate": 0.9333333333333333,
+        "hp": 42.53108517077393,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 27.676666666666677,
+        "received": 2916.8333333333335,
+        "winRate": 1,
+        "hp": 59.30410722006054,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 2.7000000000000006,
+        "received": 78.6,
+        "winRate": 1,
+        "hp": 92.89330922242313,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 2.7000000000000006,
+        "received": 76.13333333333334,
+        "winRate": 1,
+        "hp": 93.1163351416516,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 4.913333333333331,
+        "received": 188.8,
+        "winRate": 1,
+        "hp": 82.92947558770344,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.913333333333331,
+        "received": 185.6,
+        "winRate": 1,
+        "hp": 83.21880650994574,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 8.38333333333333,
+        "received": 727.6666666666666,
+        "winRate": 0.9333333333333333,
+        "hp": 34.207353827606994,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 8.184999999999995,
+        "received": 701.9333333333333,
+        "winRate": 0.9333333333333333,
+        "hp": 36.534056660638946,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.504999999999997,
+        "received": 823.9333333333333,
+        "winRate": 0.9333333333333333,
+        "hp": 25.50331525015071,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 10.416666666666664,
+        "received": 807.5666666666667,
+        "winRate": 0.9333333333333333,
+        "hp": 26.98312236286921,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.353333333333334,
+        "received": 187.73333333333332,
+        "winRate": 1,
+        "hp": 99.2544048903272,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.353333333333334,
+        "received": 189.86666666666667,
+        "winRate": 1,
+        "hp": 98.5382596188422,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.5766666666666636,
+        "received": 463.3,
+        "winRate": 1,
+        "hp": 99.76278317152104,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.351666666666663,
+        "received": 456,
+        "winRate": 1,
+        "hp": 99.48741459906506,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.751666666666669,
+        "received": 787.6666666666666,
+        "winRate": 1,
+        "hp": 96.01736785329018,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.103333333333333,
+        "received": 748.3666666666667,
+        "winRate": 1,
+        "hp": 96.62847896440128,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 15.663333333333327,
+        "received": 2091.9333333333334,
+        "winRate": 1,
+        "hp": 83.02887450557351,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 14.866666666666664,
+        "received": 2042.8,
+        "winRate": 1,
+        "hp": 83.90104279036315,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "遊俠",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 23.26166666666667,
+        "received": 2753.4,
+        "winRate": 0.9666666666666667,
+        "hp": 72.3746494066882,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 22.595000000000006,
+        "received": 2693.3333333333335,
+        "winRate": 1,
+        "hp": 74.30622078389068,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 2.898333333333332,
+        "received": 88.9,
+        "winRate": 1,
+        "hp": 91.24999999999999,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 2.898333333333332,
+        "received": 86.56666666666666,
+        "winRate": 1,
+        "hp": 91.47965879265094,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 4.871666666666668,
+        "received": 190,
+        "winRate": 1,
+        "hp": 81.29921259842517,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.871666666666668,
+        "received": 183.66666666666666,
+        "winRate": 1,
+        "hp": 81.9225721784777,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 8.508333333333333,
+        "received": 810.9666666666667,
+        "winRate": 0.9333333333333333,
+        "hp": 20.180446194225706,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 8.353333333333332,
+        "received": 788.4,
+        "winRate": 0.9333333333333333,
+        "hp": 22.40157480314961,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "良好",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.076666666666666,
+        "received": 828.4333333333333,
+        "winRate": 0.9666666666666667,
+        "hp": 18.461286089238868,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 10.076666666666666,
+        "received": 815.3,
+        "winRate": 0.9666666666666667,
+        "hp": 19.753937007874022,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.686666666666668,
+        "received": 246.23333333333332,
+        "winRate": 1,
+        "hp": 99.0215419501134,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.633333333333335,
+        "received": 240.3,
+        "winRate": 1,
+        "hp": 98.82993197278911,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.910000000000002,
+        "received": 565,
+        "winRate": 1,
+        "hp": 98.58692365835226,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.536666666666667,
+        "received": 540.5,
+        "winRate": 1,
+        "hp": 98.02649281934997,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.543333333333335,
+        "received": 931.3,
+        "winRate": 1,
+        "hp": 94.0793650793651,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.865000000000002,
+        "received": 872.3,
+        "winRate": 1,
+        "hp": 95.71455026455027,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 16.665000000000003,
+        "received": 2365.9,
+        "winRate": 1,
+        "hp": 75.28699924414208,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 15.853333333333333,
+        "received": 2312.366666666667,
+        "winRate": 1,
+        "hp": 76.59803476946337,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 1,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 1,
+        "cls": "法師",
+        "level": 1,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 874,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 23.629999999999995,
+        "received": 3083.866666666667,
+        "winRate": 1,
+        "hp": 57.08420256991694,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.789999999999996,
+        "received": 2997.633333333333,
+        "winRate": 1,
+        "hp": 61.18994708994705,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 22,
+        "quality": "傳奇",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 3.606666666666666,
+        "received": 290.6666666666667,
+        "winRate": 1,
+        "hp": 96.7952091254753,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.5516666666666663,
+        "received": 283.8666666666667,
+        "winRate": 1,
+        "hp": 96.82951837769329,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 22,
+        "quality": "傳奇",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 8.973333333333331,
+        "received": 789.6,
+        "winRate": 1,
+        "hp": 97.52519645120405,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.949999999999998,
+        "received": 770.8333333333334,
+        "winRate": 1,
+        "hp": 97.59041825095056,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 22,
+        "quality": "傳奇",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 13.140000000000004,
+        "received": 2361.4333333333334,
+        "winRate": 1,
+        "hp": 81.4512927756654,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 13.281666666666665,
+        "received": 2358.766666666667,
+        "winRate": 1,
+        "hp": 81.02556400506974,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 22,
+        "quality": "傳奇",
+        "enhance": 0,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 19.111666666666665,
+        "received": 3752.3333333333335,
+        "winRate": 0.9,
+        "hp": 43.24183776932829,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 20.783333333333335,
+        "received": 3616.733333333333,
+        "winRate": 0.9,
+        "hp": 46.07873257287702,
+        "holdoutWinRate": 0.9
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 15.671666666666669,
+        "received": 2278.733333333333,
+        "winRate": 1,
+        "hp": 98.05139609587347,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.138333333333332,
+        "received": 2367.4,
+        "winRate": 1,
+        "hp": 97.5802075611564,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.770000000000003,
+        "received": 4389.066666666667,
+        "winRate": 1,
+        "hp": 82.82633226258132,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.026666666666664,
+        "received": 4224,
+        "winRate": 1,
+        "hp": 84.60054361255249,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 21.011666666666667,
+        "received": 3604.7,
+        "winRate": 1,
+        "hp": 97.2840210855778,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.091666666666672,
+        "received": 3867.5,
+        "winRate": 1,
+        "hp": 95.316366032452,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.59333333333333,
+        "received": 4115.833333333333,
+        "winRate": 1,
+        "hp": 95.31874639650772,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 19.961666666666666,
+        "received": 4400.133333333333,
+        "winRate": 1,
+        "hp": 92.52746890700931,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "戰士",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 34.669999999999995,
+        "received": 6645.333333333333,
+        "winRate": 1,
+        "hp": 83.72067375010299,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 37.32000000000001,
+        "received": 7235.2,
+        "winRate": 1,
+        "hp": 73.18119594761546,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 2.746666666666668,
+        "received": 219.2,
+        "winRate": 1,
+        "hp": 98.02645379023885,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 2.640000000000001,
+        "received": 199.33333333333334,
+        "winRate": 1,
+        "hp": 98.53208722741432,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.599999999999998,
+        "received": 767.6,
+        "winRate": 1,
+        "hp": 98.51307113187953,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.466666666666665,
+        "received": 745.8,
+        "winRate": 1,
+        "hp": 97.64665109034267,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.978333333333333,
+        "received": 2006.7333333333333,
+        "winRate": 1,
+        "hp": 94.781230529595,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.31166666666667,
+        "received": 1904.4,
+        "winRate": 1,
+        "hp": 94.41374610591903,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 21.593333333333327,
+        "received": 5045.966666666666,
+        "winRate": 0.9666666666666667,
+        "hp": 52.269742990654194,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 20.758333333333333,
+        "received": 4290.066666666667,
+        "winRate": 1,
+        "hp": 74.2778946002077,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 15.52333333333333,
+        "received": 2240,
+        "winRate": 1,
+        "hp": 98.01019030079804,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 14.536666666666665,
+        "received": 2081.3333333333335,
+        "winRate": 1,
+        "hp": 97.45035516969216,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.43333333333333,
+        "received": 5133.633333333333,
+        "winRate": 1,
+        "hp": 78.28814347101637,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.174999999999997,
+        "received": 4177.666666666667,
+        "winRate": 1,
+        "hp": 89.16819258089974,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 23.605000000000004,
+        "received": 4165.166666666667,
+        "winRate": 1,
+        "hp": 95.22504604051565,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.838333333333328,
+        "received": 3683.8,
+        "winRate": 1,
+        "hp": 97.10284135753749,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.759999999999998,
+        "received": 4060,
+        "winRate": 1,
+        "hp": 96.06180829606245,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 18.49,
+        "received": 3998.266666666667,
+        "winRate": 1,
+        "hp": 95.34540910286768,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "遊俠",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 41.34999999999999,
+        "received": 8203.066666666668,
+        "winRate": 1,
+        "hp": 73.62469525563446,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 37.001666666666665,
+        "received": 7405.2,
+        "winRate": 1,
+        "hp": 82.3488731035692,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 3.013333333333334,
+        "received": 274.3666666666667,
+        "winRate": 1,
+        "hp": 97.56403237674762,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.045000000000001,
+        "received": 273.46666666666664,
+        "winRate": 1,
+        "hp": 96.74797645327448,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.7449999999999966,
+        "received": 745.2,
+        "winRate": 1,
+        "hp": 98.26366445916113,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.298333333333331,
+        "received": 693.6,
+        "winRate": 1,
+        "hp": 98.92825607064017,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.529999999999998,
+        "received": 1883.9666666666667,
+        "winRate": 1,
+        "hp": 95.45671817512878,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.574999999999996,
+        "received": 1724.6,
+        "winRate": 1,
+        "hp": 97.48319352465047,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 1,
+        "affixSeed": 975,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 20.241666666666664,
+        "received": 4186.033333333334,
+        "winRate": 0.9,
+        "hp": 56.33724797645325,
+        "holdoutWinRate": 0.85
+      },
+      "current": {
+        "seconds": 18.584999999999994,
+        "received": 3435.8,
+        "winRate": 1,
+        "hp": 79.77445180279615,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 15.919999999999996,
+        "received": 1848.9333333333334,
+        "winRate": 1,
+        "hp": 94.45948212983225,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 14.340000000000002,
+        "received": 1645,
+        "winRate": 1,
+        "hp": 95.71934719183079,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 22.26833333333333,
+        "received": 4906.966666666666,
+        "winRate": 0.8,
+        "hp": 38.45509664478481,
+        "holdoutWinRate": 0.8
+      },
+      "current": {
+        "seconds": 19.13666666666666,
+        "received": 3818,
+        "winRate": 1,
+        "hp": 67.5835886214442,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 23.400000000000002,
+        "received": 3346.2,
+        "winRate": 1,
+        "hp": 85.3413293216631,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.268333333333327,
+        "received": 3018.4,
+        "winRate": 1,
+        "hp": 90.28737235594456,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 19.980000000000004,
+        "received": 3921.8,
+        "winRate": 1,
+        "hp": 84.14546863603212,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.973333333333333,
+        "received": 3644.0666666666666,
+        "winRate": 1,
+        "hp": 87.36833515681987,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 2,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 2,
+        "cls": "法師",
+        "level": 12,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 2,
+        "affixSeed": 975,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 37.38166666666667,
+        "received": 5726.933333333333,
+        "winRate": 0.8666666666666667,
+        "hp": 48.5453318745442,
+        "holdoutWinRate": 0.85
+      },
+      "current": {
+        "seconds": 33.01,
+        "received": 5025.866666666667,
+        "winRate": 1,
+        "hp": 69.09857768052515,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 2329,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 3.8016666666666663,
+        "received": 556.6,
+        "winRate": 1,
+        "hp": 98.09429214673557,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.7066666666666648,
+        "received": 569.5333333333333,
+        "winRate": 1,
+        "hp": 97.71818302211628,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 2329,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.286666666666667,
+        "received": 1643.9666666666667,
+        "winRate": 1,
+        "hp": 98.01549463647198,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.258333333333333,
+        "received": 1755,
+        "winRate": 1,
+        "hp": 97.30466163422061,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 2329,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.081666666666666,
+        "received": 1674.0666666666666,
+        "winRate": 1,
+        "hp": 86.61154151767975,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.0233333333333325,
+        "received": 1798.1333333333334,
+        "winRate": 1,
+        "hp": 84.21914315984641,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 2329,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.21333333333333,
+        "received": 7334.8,
+        "winRate": 0.9,
+        "hp": 36.8605151635545,
+        "holdoutWinRate": 0.85
+      },
+      "current": {
+        "seconds": 19.185,
+        "received": 7443.2,
+        "winRate": 0.9,
+        "hp": 32.91600450271488,
+        "holdoutWinRate": 0.85
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 3,
+        "affixSeed": 1076,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.884999999999998,
+        "received": 2818.8,
+        "winRate": 1,
+        "hp": 95.74590240850794,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.759999999999998,
+        "received": 3010,
+        "winRate": 1,
+        "hp": 93.9906474820144,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 3,
+        "affixSeed": 1076,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.21833333333333,
+        "received": 8068.166666666667,
+        "winRate": 0.9666666666666667,
+        "hp": 46.83299968720678,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 18.409999999999993,
+        "received": 7994.3,
+        "winRate": 0.9666666666666667,
+        "hp": 47.29527160879993,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 3,
+        "affixSeed": 1076,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 11.376666666666665,
+        "received": 3414.4,
+        "winRate": 1,
+        "hp": 90.26667187988737,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 11.214999999999998,
+        "received": 3705.6,
+        "winRate": 1,
+        "hp": 86.32228651861124,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 3,
+        "affixSeed": 1076,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.471666666666669,
+        "received": 2010.7,
+        "winRate": 1,
+        "hp": 88.90276822020641,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.28666666666667,
+        "received": 2188.633333333333,
+        "winRate": 1,
+        "hp": 86.1804399958294,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "戰士",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 3,
+        "affixSeed": 1076,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 12.453333333333335,
+        "received": 5685.266666666666,
+        "winRate": 1,
+        "hp": 51.503696173495975,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.763333333333332,
+        "received": 6285.3,
+        "winRate": 1,
+        "hp": 41.33057553956831,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 29,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 2.9633333333333325,
+        "received": 400.93333333333334,
+        "winRate": 1,
+        "hp": 94.45841971895877,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.018333333333332,
+        "received": 435.6666666666667,
+        "winRate": 1,
+        "hp": 93.97834600322507,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 29,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 7.509999999999999,
+        "received": 1385.3666666666666,
+        "winRate": 1,
+        "hp": 80.8518774475927,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.429999999999998,
+        "received": 1450.6666666666667,
+        "winRate": 1,
+        "hp": 79.9493204330799,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 29,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 4.471666666666666,
+        "received": 1004.5,
+        "winRate": 1,
+        "hp": 86.1161022805805,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.394999999999999,
+        "received": 1074.1,
+        "winRate": 1,
+        "hp": 85.15411195577059,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 29,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 16.720000000000002,
+        "received": 5949.566666666667,
+        "winRate": 0.9,
+        "hp": 17.76687399216773,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 16.276666666666667,
+        "received": 5566.466666666666,
+        "winRate": 0.9666666666666667,
+        "hp": 23.06196728864315,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.635000000000003,
+        "received": 2520,
+        "winRate": 1,
+        "hp": 97.03353253652058,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.553333333333338,
+        "received": 2689.2,
+        "winRate": 1,
+        "hp": 96.0902543671468,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 20.733333333333334,
+        "received": 10547.033333333333,
+        "winRate": 0.9666666666666667,
+        "hp": 30.488941669220573,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 18.933333333333334,
+        "received": 9415.4,
+        "winRate": 1,
+        "hp": 47.12560016344877,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.983333333333336,
+        "received": 3766,
+        "winRate": 1,
+        "hp": 89.44657268362445,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.128333333333336,
+        "received": 3795.6666666666665,
+        "winRate": 1,
+        "hp": 89.42946164061699,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.601666666666668,
+        "received": 1614.5666666666666,
+        "winRate": 1,
+        "hp": 93.9039993870671,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.321666666666668,
+        "received": 1727.2333333333333,
+        "winRate": 1,
+        "hp": 91.69871794871796,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "遊俠",
+        "level": 24,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 11.511666666666672,
+        "received": 5283.6,
+        "winRate": 1,
+        "hp": 60.986566554295614,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 11.068333333333333,
+        "received": 5506.933333333333,
+        "winRate": 1,
+        "hp": 57.27947185616505,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 24,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 3.225,
+        "received": 478.9,
+        "winRate": 1,
+        "hp": 98.99873123281877,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.1966666666666663,
+        "received": 500.76666666666665,
+        "winRate": 1,
+        "hp": 98.54091774159441,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 24,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.526666666666666,
+        "received": 1480.4840000000002,
+        "winRate": 1,
+        "hp": 98.14759286670895,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.1983333333333315,
+        "received": 1534.9840000000002,
+        "winRate": 1,
+        "hp": 97.80537816310708,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 24,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.954999999999999,
+        "received": 1416.3086666666668,
+        "winRate": 1,
+        "hp": 91.29448791146822,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.651666666666667,
+        "received": 1480.3086666666666,
+        "winRate": 1,
+        "hp": 89.8646577852964,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 24,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.948333333333334,
+        "received": 6899.184999999998,
+        "winRate": 0.9,
+        "hp": 46.96969761048847,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 17.37333333333333,
+        "received": 6248.327666666665,
+        "winRate": 0.9666666666666667,
+        "hp": 60.74106576443224,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 29,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.030000000000003,
+        "received": 2807.2866666666664,
+        "winRate": 1,
+        "hp": 93.73453399904899,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.828333333333335,
+        "received": 2935.3866666666663,
+        "winRate": 1,
+        "hp": 91.86711245839277,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 29,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.396666666666665,
+        "received": 7871.807999999999,
+        "winRate": 0.9666666666666667,
+        "hp": 43.08152044698052,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 16.86833333333333,
+        "received": 6832.14,
+        "winRate": 1,
+        "hp": 61.94016286257725,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 29,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.280000000000003,
+        "received": 3313.4040000000005,
+        "winRate": 1,
+        "hp": 87.39488231098427,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.320000000000002,
+        "received": 3292.2373333333335,
+        "winRate": 1,
+        "hp": 88.52867926771279,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 29,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.703333333333333,
+        "received": 1799.7666666666667,
+        "winRate": 1,
+        "hp": 90.11932358535427,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.29,
+        "received": 1938.5333333333333,
+        "winRate": 1,
+        "hp": 87.61991797432238,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 3,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 3,
+        "cls": "法師",
+        "level": 29,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 3,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.530000000000001,
+        "received": 4288.109333333335,
+        "winRate": 1,
+        "hp": 63.48800523062297,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.696666666666667,
+        "received": 4279.514666666668,
+        "winRate": 1,
+        "hp": 64.86704113171659,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.3983333333333325,
+        "received": 1362.5333333333333,
+        "winRate": 1,
+        "hp": 95.1476052377186,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.298333333333333,
+        "received": 1432.9666666666667,
+        "winRate": 1,
+        "hp": 94.10385358994641,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.966666666666667,
+        "received": 2761.2,
+        "winRate": 1,
+        "hp": 98.36754987257227,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.1,
+        "received": 2973.3,
+        "winRate": 1,
+        "hp": 97.3696590210036,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.13,
+        "received": 3008.766666666667,
+        "winRate": 1,
+        "hp": 81.73885666578785,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.0633333333333335,
+        "received": 3174.8333333333335,
+        "winRate": 1,
+        "hp": 79.56662712013357,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 21.348333333333336,
+        "received": 11362.433333333332,
+        "winRate": 0.9666666666666667,
+        "hp": 54.50237279198522,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 22.986666666666668,
+        "received": 11705.966666666667,
+        "winRate": 0.9666666666666667,
+        "hp": 49.72963353546003,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 1177,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.888333333333334,
+        "received": 3974.6,
+        "winRate": 1,
+        "hp": 97.40929603218139,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 11.211666666666668,
+        "received": 4383.3,
+        "winRate": 1,
+        "hp": 96.31664655330043,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 1177,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 20.091666666666672,
+        "received": 11557.666666666666,
+        "winRate": 0.9666666666666667,
+        "hp": 67.59194002559884,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 21.448333333333334,
+        "received": 12012.4,
+        "winRate": 0.9666666666666667,
+        "hp": 61.08285244103124,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 1177,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 13.624999999999998,
+        "received": 6138.8,
+        "winRate": 1,
+        "hp": 87.16893399158897,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 13.953333333333335,
+        "received": 6785.533333333334,
+        "winRate": 1,
+        "hp": 81.97898336076062,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 1177,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.4283333333333355,
+        "received": 3362.5333333333333,
+        "winRate": 1,
+        "hp": 86.36596452733589,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.425000000000001,
+        "received": 3704.6,
+        "winRate": 1,
+        "hp": 82.94406289998172,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "戰士",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 1177,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 13.556666666666672,
+        "received": 7990.5,
+        "winRate": 0.9666666666666667,
+        "hp": 61.99870177363319,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 15.140000000000002,
+        "received": 8635.933333333332,
+        "winRate": 0.9666666666666667,
+        "hp": 51.89906747120131,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "普通",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 3.314999999999999,
+        "received": 991.7,
+        "winRate": 1,
+        "hp": 96.77013245313358,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.316666666666665,
+        "received": 1059.4666666666667,
+        "winRate": 1,
+        "hp": 96.23354915153821,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "普通",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.613333333333335,
+        "received": 2529.3333333333335,
+        "winRate": 1,
+        "hp": 98.66594727265031,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.476666666666668,
+        "received": 2635.8,
+        "winRate": 1,
+        "hp": 98.6581185730608,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "普通",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.638333333333334,
+        "received": 2121.1666666666665,
+        "winRate": 1,
+        "hp": 91.5479666539715,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.4783333333333335,
+        "received": 2230.133333333333,
+        "winRate": 1,
+        "hp": 90.14874529220089,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "普通",
+        "enhance": 10,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.9,
+        "received": 13076.4,
+        "winRate": 0.9333333333333333,
+        "hp": 45.268714823748496,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 21.506666666666664,
+        "received": 11772.933333333332,
+        "winRate": 1,
+        "hp": 60.133193686259595,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 9.67,
+        "received": 3145.8333333333335,
+        "winRate": 1,
+        "hp": 96.72018156841668,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.180000000000001,
+        "received": 3322.2,
+        "winRate": 1,
+        "hp": 95.64544884429317,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 24.694999999999997,
+        "received": 13520.4,
+        "winRate": 0.9666666666666667,
+        "hp": 34.938123394851544,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.399999999999995,
+        "received": 11941.6,
+        "winRate": 1,
+        "hp": 48.77811622767727,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 13.250000000000002,
+        "received": 5097.133333333333,
+        "winRate": 1,
+        "hp": 84.89198471002801,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.030000000000001,
+        "received": 5041.4,
+        "winRate": 1,
+        "hp": 85.24027951979936,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 5.154999999999999,
+        "received": 2384.5666666666666,
+        "winRate": 1,
+        "hp": 89.69091560652214,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.881666666666664,
+        "received": 2528.1666666666665,
+        "winRate": 1,
+        "hp": 88.34483067550619,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "遊俠",
+        "level": 36,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 14.955,
+        "received": 7839,
+        "winRate": 1,
+        "hp": 55.35226661888556,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 14.113333333333333,
+        "received": 7204.6,
+        "winRate": 1,
+        "hp": 60.859702562264864,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 3.716666666666667,
+        "received": 1176.552,
+        "winRate": 1,
+        "hp": 95.32470309983896,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 3.6616666666666666,
+        "received": 1248.6186666666665,
+        "winRate": 1,
+        "hp": 94.52546296296296,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.860000000000003,
+        "received": 2220.037333333333,
+        "winRate": 1,
+        "hp": 98.83969907407408,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.63166666666667,
+        "received": 2310.504,
+        "winRate": 1,
+        "hp": 98.36324476650562,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.793333333333334,
+        "received": 2543.2706666666663,
+        "winRate": 1,
+        "hp": 85.32652979066025,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.578333333333334,
+        "received": 2638.8039999999996,
+        "winRate": 1,
+        "hp": 83.74113325281802,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 36,
+        "quality": "良好",
+        "enhance": 5,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.804999999999993,
+        "received": 10784.793333333331,
+        "winRate": 0.9,
+        "hp": 41.11094504830917,
+        "holdoutWinRate": 0.85
+      },
+      "current": {
+        "seconds": 20.755,
+        "received": 9440.074666666662,
+        "winRate": 0.9666666666666667,
+        "hp": 60.55967190016097,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 41,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.865000000000002,
+        "received": 2728.012,
+        "winRate": 1,
+        "hp": 77.42833029952013,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.72666666666667,
+        "received": 2658.512,
+        "winRate": 1,
+        "hp": 78.0033758067185,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 41,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 24.413333333333323,
+        "received": 8361.902666666667,
+        "winRate": 0.9666666666666667,
+        "hp": 30.813183297479195,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.826666666666668,
+        "received": 6936.775999999999,
+        "winRate": 1,
+        "hp": 42.604865133211966,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 41,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 14.138333333333337,
+        "received": 4289.974666666666,
+        "winRate": 1,
+        "hp": 64.50459484803353,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.045,
+        "received": 4255.424,
+        "winRate": 1,
+        "hp": 64.79046831044187,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 41,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 5.796666666666668,
+        "received": 2788.0946666666664,
+        "winRate": 1,
+        "hp": 76.93120414805007,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.498333333333333,
+        "received": 3066.6279999999997,
+        "winRate": 1,
+        "hp": 74.62660930001655,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 4,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 4,
+        "cls": "法師",
+        "level": 41,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 14.861666666666668,
+        "received": 5280.272,
+        "winRate": 1,
+        "hp": 56.31083898725796,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 13.071666666666667,
+        "received": 4767.9039999999995,
+        "winRate": 1,
+        "hp": 60.550190302829726,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.321666666666668,
+        "received": 2702.9,
+        "winRate": 1,
+        "hp": 91.86759970728137,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.361666666666668,
+        "received": 2923.6,
+        "winRate": 1,
+        "hp": 89.55228686425173,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 11.526666666666667,
+        "received": 3927,
+        "winRate": 1,
+        "hp": 99.10634833516283,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.10833333333333,
+        "received": 4271.266666666666,
+        "winRate": 1,
+        "hp": 98.6733077204537,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.826666666666668,
+        "received": 5584.1,
+        "winRate": 1,
+        "hp": 69.64935967800952,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.806666666666668,
+        "received": 6044.266666666666,
+        "winRate": 1,
+        "hp": 64.61480058543724,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 8,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 27.088333333333335,
+        "received": 17333.433333333334,
+        "winRate": 0.9333333333333333,
+        "hp": 57.72934504207831,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 31.514999999999997,
+        "received": 17257.133333333335,
+        "winRate": 0.9666666666666667,
+        "hp": 54.16489206000734,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 12.761666666666665,
+        "received": 5280.5,
+        "winRate": 1,
+        "hp": 97.88817301378859,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 13.406666666666665,
+        "received": 5940.366666666667,
+        "winRate": 1,
+        "hp": 96.97944024950756,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 27.316666666666663,
+        "received": 18693.133333333335,
+        "winRate": 0.9666666666666667,
+        "hp": 65.80607080323922,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 31.268333333333327,
+        "received": 19198.266666666666,
+        "winRate": 0.9666666666666667,
+        "hp": 57.592429962792735,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 16.663333333333338,
+        "received": 8444.866666666667,
+        "winRate": 1,
+        "hp": 92.4367066097614,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.65666666666667,
+        "received": 9849.4,
+        "winRate": 1,
+        "hp": 86.68473681330708,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.415000000000001,
+        "received": 6859.466666666666,
+        "winRate": 1,
+        "hp": 73.32597395491355,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.156666666666667,
+        "received": 7391.966666666666,
+        "winRate": 0.9666666666666667,
+        "hp": 68.48116382140512,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "戰士",
+        "level": 60,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 2531,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 16.53666666666667,
+        "received": 10698.7,
+        "winRate": 0.9666666666666667,
+        "hp": 73.05314346684175,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 18.735000000000003,
+        "received": 11832.733333333334,
+        "winRate": 0.9333333333333333,
+        "hp": 59.341349310571246,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.205,
+        "received": 2295.2,
+        "winRate": 1,
+        "hp": 95.30240648538232,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.07,
+        "received": 2439.5,
+        "winRate": 1,
+        "hp": 93.57342333716325,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 11.078333333333331,
+        "received": 4105.066666666667,
+        "winRate": 1,
+        "hp": 97.27147963743138,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.559999999999999,
+        "received": 4147,
+        "winRate": 1,
+        "hp": 97.25983020554068,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.536666666666667,
+        "received": 4511.133333333333,
+        "winRate": 1,
+        "hp": 83.83433869526363,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.535,
+        "received": 4918.566666666667,
+        "winRate": 1,
+        "hp": 79.71809970637047,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 30.295000000000005,
+        "received": 21729.7,
+        "winRate": 0.9333333333333333,
+        "hp": 36.533655687476056,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 30.11333333333334,
+        "received": 18337.5,
+        "winRate": 1,
+        "hp": 66.67592237967571,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 12.513333333333332,
+        "received": 5588.266666666666,
+        "winRate": 1,
+        "hp": 97.79724954081513,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 11.431666666666665,
+        "received": 5452,
+        "winRate": 1,
+        "hp": 98.12437515984284,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 34.845,
+        "received": 27865.6,
+        "winRate": 0.9333333333333333,
+        "hp": 31.25665527423218,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 31.63166666666667,
+        "received": 21888,
+        "winRate": 1,
+        "hp": 71.61493571411967,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 17.8,
+        "received": 9362.533333333333,
+        "winRate": 1,
+        "hp": 93.34513264048731,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 15.520000000000001,
+        "received": 8883.766666666666,
+        "winRate": 1,
+        "hp": 93.76874520471507,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.993333333333333,
+        "received": 4971.733333333334,
+        "winRate": 1,
+        "hp": 90.20128571760712,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.721666666666667,
+        "received": 5431.233333333334,
+        "winRate": 1,
+        "hp": 86.56442537955405,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "遊俠",
+        "level": 50,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.39666666666666,
+        "received": 14497.933333333332,
+        "winRate": 1,
+        "hp": 58.39645672037386,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 18.255,
+        "received": 13047.5,
+        "winRate": 1,
+        "hp": 67.92279881890677,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.436666666666667,
+        "received": 2308.5313333333334,
+        "winRate": 1,
+        "hp": 94.66996455995276,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.308333333333334,
+        "received": 2474.6313333333333,
+        "winRate": 1,
+        "hp": 92.71477324932728,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 11.073333333333332,
+        "received": 3389.494,
+        "winRate": 1,
+        "hp": 98.42890660891251,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.145000000000003,
+        "received": 3395.096,
+        "winRate": 1,
+        "hp": 98.69405066614164,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.421666666666668,
+        "received": 4145.625333333333,
+        "winRate": 1,
+        "hp": 85.4991730655641,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.236666666666667,
+        "received": 4445.89,
+        "winRate": 1,
+        "hp": 82.1510106976439,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 50,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 4,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 30.404999999999994,
+        "received": 16681.602,
+        "winRate": 0.9333333333333333,
+        "hp": 49.428181400538186,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 28.738333333333333,
+        "received": 13924.972000000002,
+        "winRate": 1,
+        "hp": 75.64162892957934,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 55,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 14.701666666666666,
+        "received": 4433.678666666666,
+        "winRate": 1,
+        "hp": 75.9861416526747,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 13.263333333333334,
+        "received": 4377.678666666666,
+        "winRate": 1,
+        "hp": 76.28945097402014,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 55,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 32.00333333333334,
+        "received": 12545.306,
+        "winRate": 0.9333333333333333,
+        "hp": 32.05162216324539,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 28.18166666666667,
+        "received": 9627.134666666667,
+        "winRate": 1,
+        "hp": 47.85714853129684,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 55,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 19.384999999999998,
+        "received": 6616.034,
+        "winRate": 1,
+        "hp": 64.16598602610625,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.296666666666667,
+        "received": 6463.972666666667,
+        "winRate": 1,
+        "hp": 64.98958637996716,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 55,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 6.683333333333335,
+        "received": 4813.1393333333335,
+        "winRate": 1,
+        "hp": 73.93089241546153,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.131666666666667,
+        "received": 5227.972666666667,
+        "winRate": 1,
+        "hp": 71.68405640109047,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 5,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 5,
+        "cls": "法師",
+        "level": 55,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 20.813333333333325,
+        "received": 8222.057333333332,
+        "winRate": 1,
+        "hp": 55.46738161006702,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 18.59666666666666,
+        "received": 7473.827666666665,
+        "winRate": 1,
+        "hp": 59.51997147448047,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.87,
+        "received": 4275.5,
+        "winRate": 1,
+        "hp": 97.18705606168291,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.158333333333332,
+        "received": 4941.533333333334,
+        "winRate": 1,
+        "hp": 92.63635286769616,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 14.633333333333333,
+        "received": 8903.4,
+        "winRate": 1,
+        "hp": 93.16081281902179,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 15.601666666666667,
+        "received": 9963.6,
+        "winRate": 1,
+        "hp": 90.36220628459434,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.031666666666667,
+        "received": 6725.733333333334,
+        "winRate": 1,
+        "hp": 85.75151945898216,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.193333333333333,
+        "received": 7413.366666666667,
+        "winRate": 1,
+        "hp": 81.11826796752172,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "傳奇",
+        "enhance": 10,
+        "gearMapId": 5,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 28.491666666666667,
+        "received": 26786.966666666667,
+        "winRate": 0.9,
+        "hp": 51.86978096530338,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 32.958333333333336,
+        "received": 25948.366666666665,
+        "winRate": 0.9,
+        "hp": 53.81952144041699,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 14.346666666666666,
+        "received": 8768.733333333334,
+        "winRate": 1,
+        "hp": 95.40415742259094,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 15.32,
+        "received": 9871.2,
+        "winRate": 1,
+        "hp": 92.91408314845178,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 28.553333333333327,
+        "received": 27567.3,
+        "winRate": 1,
+        "hp": 62.30664930388094,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 31.988333333333326,
+        "received": 26839.5,
+        "winRate": 1,
+        "hp": 60.64297289476226,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 19.1,
+        "received": 14918.666666666666,
+        "winRate": 1,
+        "hp": 81.64565448056331,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.84500000000001,
+        "received": 17436.333333333332,
+        "winRate": 1,
+        "hp": 71.74389247934145,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 8.211666666666664,
+        "received": 8852.8,
+        "winRate": 1,
+        "hp": 80.63730105141317,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.391666666666667,
+        "received": 10228.366666666667,
+        "winRate": 1,
+        "hp": 73.98366612006043,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "戰士",
+        "level": 69,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 19.455,
+        "received": 20446.766666666666,
+        "winRate": 0.9,
+        "hp": 49.183852609240866,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 22.634999999999994,
+        "received": 19193.333333333332,
+        "winRate": 0.9666666666666667,
+        "hp": 53.25990482621136,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 84,
+        "quality": "優秀",
+        "enhance": 8,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 4.536666666666667,
+        "received": 3400.233333333333,
+        "winRate": 1,
+        "hp": 97.23731969401261,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.560000000000001,
+        "received": 3571.766666666667,
+        "winRate": 1,
+        "hp": 96.47742109159431,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 84,
+        "quality": "優秀",
+        "enhance": 8,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 12.791666666666673,
+        "received": 8138.166666666667,
+        "winRate": 1,
+        "hp": 96.96700989299414,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.373333333333337,
+        "received": 8028.533333333334,
+        "winRate": 1,
+        "hp": 97.3979226955605,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 84,
+        "quality": "優秀",
+        "enhance": 8,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.1466666666666665,
+        "received": 4694.566666666667,
+        "winRate": 1,
+        "hp": 96.20095564977451,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.1466666666666665,
+        "received": 5125.766666666666,
+        "winRate": 1,
+        "hp": 93.7130358705162,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 84,
+        "quality": "優秀",
+        "enhance": 8,
+        "gearMapId": 5,
+        "affixSeed": 1379,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 32.385,
+        "received": 32476.5,
+        "winRate": 0.9333333333333333,
+        "hp": 60.218623954057044,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 32.586666666666666,
+        "received": 27096.3,
+        "winRate": 1,
+        "hp": 84.55880835408398,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 74,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 13.680000000000001,
+        "received": 8707.5,
+        "winRate": 1,
+        "hp": 98.11897386675973,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.613333333333333,
+        "received": 8742.733333333334,
+        "winRate": 1,
+        "hp": 98.24109622907669,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 74,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 35.27666666666667,
+        "received": 41102.36666666667,
+        "winRate": 0.9666666666666667,
+        "hp": 51.41696842778811,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 31.51666666666666,
+        "received": 31844.1,
+        "winRate": 1,
+        "hp": 84.85708157003042,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 74,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.241666666666667,
+        "received": 17071.8,
+        "winRate": 1,
+        "hp": 90.45249625525352,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.366666666666667,
+        "received": 16671.6,
+        "winRate": 1,
+        "hp": 89.47569914052615,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 74,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.453333333333333,
+        "received": 7169.7,
+        "winRate": 1,
+        "hp": 94.32056483864872,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.1066666666666665,
+        "received": 7978.1,
+        "winRate": 1,
+        "hp": 91.28906534037198,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "遊俠",
+        "level": 74,
+        "quality": "普通",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.97166666666667,
+        "received": 29588.3,
+        "winRate": 0.9333333333333333,
+        "hp": 38.59982839608509,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 20.25,
+        "received": 20790.4,
+        "winRate": 1,
+        "hp": 75.22363044078936,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 69,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 1379,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 4.784999999999998,
+        "received": 2884.7573333333335,
+        "winRate": 1,
+        "hp": 88.18497160332024,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 4.663333333333331,
+        "received": 3151.824,
+        "winRate": 1,
+        "hp": 87.09115334207077,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 69,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 1379,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 11.783333333333337,
+        "received": 4581.024,
+        "winRate": 1,
+        "hp": 81.23761467889908,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.948333333333334,
+        "received": 4636.181333333333,
+        "winRate": 1,
+        "hp": 81.01170816950629,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 69,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 1379,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 5.3083333333333345,
+        "received": 3887.5,
+        "winRate": 1,
+        "hp": 84.07806356487549,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.171666666666667,
+        "received": 4231.257333333333,
+        "winRate": 1,
+        "hp": 82.67014525993882,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 69,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 1379,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 29.446666666666665,
+        "received": 13259.332000000004,
+        "winRate": 1,
+        "hp": 45.694085845347345,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 26.811666666666667,
+        "received": 10851.730666666665,
+        "winRate": 1,
+        "hp": 55.55483835736127,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 64,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 14.818333333333333,
+        "received": 7666.745333333333,
+        "winRate": 1,
+        "hp": 95.08937446443875,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.750000000000004,
+        "received": 7596.759,
+        "winRate": 1,
+        "hp": 95.88433283454194,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 64,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 32.78833333333333,
+        "received": 21968.534000000003,
+        "winRate": 1,
+        "hp": 60.359023647827726,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 27.38,
+        "received": 18449.11466666667,
+        "winRate": 1,
+        "hp": 74.88032587704156,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 64,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 18.058333333333334,
+        "received": 10493.73,
+        "winRate": 1,
+        "hp": 87.27158679609661,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 15.178333333333335,
+        "received": 10354.225666666667,
+        "winRate": 1,
+        "hp": 89.44734041872894,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 64,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 6.468333333333335,
+        "received": 6103.866666666667,
+        "winRate": 1,
+        "hp": 89.60129941551881,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.2683333333333335,
+        "received": 6992.533333333334,
+        "winRate": 1,
+        "hp": 86.73908094488998,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 6,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 6,
+        "cls": "法師",
+        "level": 64,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 6,
+        "affixSeed": 0,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 22.640000000000004,
+        "received": 17647.634666666672,
+        "winRate": 1,
+        "hp": 56.7046707337349,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 19.011666666666663,
+        "received": 13852.895000000006,
+        "winRate": 1,
+        "hp": 73.81024824463796,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 76,
+        "quality": "史詩",
+        "enhance": 5,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.955,
+        "received": 7630.566666666667,
+        "winRate": 1,
+        "hp": 94.54125497115334,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.03,
+        "received": 8207.1,
+        "winRate": 1,
+        "hp": 92.26433512574914,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 76,
+        "quality": "史詩",
+        "enhance": 5,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 17.016666666666666,
+        "received": 12600,
+        "winRate": 1,
+        "hp": 96.94591805298829,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 19.366666666666667,
+        "received": 15000,
+        "winRate": 1,
+        "hp": 93.40101103456003,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 76,
+        "quality": "史詩",
+        "enhance": 5,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.3,
+        "received": 11129.3,
+        "winRate": 1,
+        "hp": 85.30319274071584,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.263333333333334,
+        "received": 11682.233333333334,
+        "winRate": 1,
+        "hp": 83.87954545454544,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 76,
+        "quality": "史詩",
+        "enhance": 5,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 34.56333333333334,
+        "received": 41385.9,
+        "winRate": 0.9333333333333333,
+        "hp": 72.17249901977259,
+        "holdoutWinRate": 0.9
+      },
+      "current": {
+        "seconds": 40.013333333333335,
+        "received": 40038.76666666667,
+        "winRate": 0.9666666666666667,
+        "hp": 72.88991486024763,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 86,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 17.845000000000002,
+        "received": 13889,
+        "winRate": 1,
+        "hp": 95.9807307123723,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 19.756666666666668,
+        "received": 16667.933333333334,
+        "winRate": 1,
+        "hp": 93.70330787955585,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 86,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 34.89666666666667,
+        "received": 43027.3,
+        "winRate": 1,
+        "hp": 77.35402869941201,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 42.71833333333333,
+        "received": 45340.13333333333,
+        "winRate": 1,
+        "hp": 70.27460402147452,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 86,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 26.64,
+        "received": 28557.2,
+        "winRate": 1,
+        "hp": 81.39620305223028,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 28.816666666666666,
+        "received": 32930.3,
+        "winRate": 1,
+        "hp": 70.98100192292728,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 86,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 10.384999999999998,
+        "received": 17301.866666666665,
+        "winRate": 1,
+        "hp": 76.1675669967877,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.291666666666666,
+        "received": 19579.5,
+        "winRate": 1,
+        "hp": 69.34159636311091,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "戰士",
+        "level": 86,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 24.93166666666667,
+        "received": 36118.5,
+        "winRate": 0.9333333333333333,
+        "hp": 55.158264697055614,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 30.13666666666667,
+        "received": 31097.6,
+        "winRate": 0.9666666666666667,
+        "hp": 65.32237153623,
+        "holdoutWinRate": 0.95
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 81,
+        "quality": "傳奇",
+        "enhance": 8,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.546666666666666,
+        "received": 5821.366666666667,
+        "winRate": 1,
+        "hp": 97.58163529455273,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.4399999999999995,
+        "received": 6061.833333333333,
+        "winRate": 1,
+        "hp": 97.06442685798108,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 81,
+        "quality": "傳奇",
+        "enhance": 8,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 17.793333333333344,
+        "received": 13895.166666666666,
+        "winRate": 1,
+        "hp": 98.15958482797728,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.57833333333334,
+        "received": 14459.4,
+        "winRate": 1,
+        "hp": 97.35081296303146,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 81,
+        "quality": "傳奇",
+        "enhance": 8,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.693333333333333,
+        "received": 8087.9,
+        "winRate": 1,
+        "hp": 96.3231142832489,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.346666666666667,
+        "received": 8431.833333333334,
+        "winRate": 1,
+        "hp": 94.94113876459203,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 81,
+        "quality": "傳奇",
+        "enhance": 8,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 45.916666666666664,
+        "received": 55768.9,
+        "winRate": 0.9666666666666667,
+        "hp": 56.69732998040006,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 41.288333333333334,
+        "received": 42059.5,
+        "winRate": 1,
+        "hp": 89.88375676441943,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 86,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.505000000000003,
+        "received": 15042.5,
+        "winRate": 1,
+        "hp": 98.24842828893367,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.338333333333342,
+        "received": 15444.5,
+        "winRate": 1,
+        "hp": 97.68489758226998,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 86,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 47.995,
+        "received": 62152.8,
+        "winRate": 1,
+        "hp": 72.00003731064844,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 43.789999999999985,
+        "received": 50914.666666666664,
+        "winRate": 1,
+        "hp": 89.64132807253192,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 86,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 25.856666666666676,
+        "received": 23744.9,
+        "winRate": 1,
+        "hp": 97.33497033803447,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.455,
+        "received": 23826,
+        "winRate": 1,
+        "hp": 96.98446011491681,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 86,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.746666666666668,
+        "received": 13497.3,
+        "winRate": 1,
+        "hp": 92.37869375419744,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.440000000000001,
+        "received": 13397.866666666667,
+        "winRate": 1,
+        "hp": 92.19666442802779,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "遊俠",
+        "level": 86,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 33.20666666666666,
+        "received": 50449.4,
+        "winRate": 1,
+        "hp": 41.93383422878897,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 29.649999999999995,
+        "received": 33635,
+        "winRate": 1,
+        "hp": 84.35035165286178,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 81,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 6,
+        "affixSeed": 1480,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.635000000000002,
+        "received": 5083.2266666666665,
+        "winRate": 1,
+        "hp": 98.11542885403419,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.436666666666667,
+        "received": 5163.526666666667,
+        "winRate": 1,
+        "hp": 97.97094248975556,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 81,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 6,
+        "affixSeed": 1480,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 17.335000000000004,
+        "received": 9617.466666666667,
+        "winRate": 1,
+        "hp": 97.96889925109507,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 14.729999999999999,
+        "received": 8463.973333333333,
+        "winRate": 1,
+        "hp": 99.14499081531723,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 81,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 6,
+        "affixSeed": 1480,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.7600000000000025,
+        "received": 8072.713333333332,
+        "winRate": 1,
+        "hp": 94.15172954641797,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.300000000000002,
+        "received": 8115.819999999999,
+        "winRate": 1,
+        "hp": 93.86319626960578,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 81,
+        "quality": "優秀",
+        "enhance": 12,
+        "gearMapId": 6,
+        "affixSeed": 1480,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 48.773333333333326,
+        "received": 39516.57333333334,
+        "winRate": 1,
+        "hp": 71.85025575808957,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 37.393333333333345,
+        "received": 27406.960000000003,
+        "winRate": 1,
+        "hp": 93.37225377985018,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.71833333333333,
+        "received": 12240.416666666666,
+        "winRate": 1,
+        "hp": 97.28626142821842,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.196666666666665,
+        "received": 11934.766666666666,
+        "winRate": 1,
+        "hp": 97.26016802569805,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 43.04833333333334,
+        "received": 37097.975,
+        "winRate": 1,
+        "hp": 77.151272547566,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 36.43833333333334,
+        "received": 27683.316666666666,
+        "winRate": 1,
+        "hp": 93.05366938472943,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 27.536666666666665,
+        "received": 20715.666666666668,
+        "winRate": 1,
+        "hp": 90.8040523844823,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.75833333333333,
+        "received": 19427.366666666665,
+        "winRate": 1,
+        "hp": 92.84358784284657,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.725,
+        "received": 12780.316666666668,
+        "winRate": 1,
+        "hp": 89.5686187299234,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.785000000000001,
+        "received": 13174.216666666667,
+        "winRate": 1,
+        "hp": 88.13012107734122,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 7,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 7,
+        "cls": "法師",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 7,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 31.448333333333334,
+        "received": 33919.083333333336,
+        "winRate": 0.9666666666666667,
+        "hp": 48.40652335063013,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 25.803333333333335,
+        "received": 23797.383333333335,
+        "winRate": 1,
+        "hp": 80.28534717074375,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 88,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 8.506666666666664,
+        "received": 9473,
+        "winRate": 1,
+        "hp": 95.45910767153171,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 8.844999999999997,
+        "received": 10352.5,
+        "winRate": 1,
+        "hp": 93.83074758912032,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 88,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 17.271666666666665,
+        "received": 13843.766666666666,
+        "winRate": 1,
+        "hp": 98.98535206634463,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.623333333333335,
+        "received": 18360.8,
+        "winRate": 1,
+        "hp": 95.09937931750893,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 88,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 9.926666666666666,
+        "received": 14583.833333333334,
+        "winRate": 1,
+        "hp": 88.92893315327483,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.623333333333333,
+        "received": 16328.2,
+        "winRate": 1,
+        "hp": 84.91246732111013,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 88,
+        "quality": "良好",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 40.79,
+        "received": 56893.2,
+        "winRate": 1,
+        "hp": 66.73254211464877,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 43.74166666666667,
+        "received": 57020.6,
+        "winRate": 1,
+        "hp": 64.22089198220186,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 98,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 17.446666666666665,
+        "received": 15151.4,
+        "winRate": 1,
+        "hp": 98.5767614190952,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.198333333333334,
+        "received": 20687.4,
+        "winRate": 1,
+        "hp": 97.38009203003926,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 98,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 35.93166666666668,
+        "received": 48059.6,
+        "winRate": 1,
+        "hp": 88.8241801292139,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 43.15999999999999,
+        "received": 57304.5,
+        "winRate": 1,
+        "hp": 79.37220042097434,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 98,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 24.651666666666664,
+        "received": 27764.8,
+        "winRate": 1,
+        "hp": 94.5728371944782,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 28.638333333333332,
+        "received": 38216.53333333333,
+        "winRate": 1,
+        "hp": 83.34672948082049,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 98,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 11.398333333333333,
+        "received": 22476.533333333333,
+        "winRate": 1,
+        "hp": 85.13684322357457,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.225,
+        "received": 27131.733333333334,
+        "winRate": 1,
+        "hp": 76.0606462022669,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "戰士",
+        "level": 98,
+        "quality": "良好",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 27.725,
+        "received": 51328.933333333334,
+        "winRate": 1,
+        "hp": 60.0686971707071,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 34.24666666666667,
+        "received": 52376.833333333336,
+        "winRate": 0.9666666666666667,
+        "hp": 47.22169213096683,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 88,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.741666666666665,
+        "received": 7131.733333333334,
+        "winRate": 1,
+        "hp": 99.02735697445813,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.666666666666666,
+        "received": 7618.7,
+        "winRate": 1,
+        "hp": 98.9433722457437,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 88,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.975,
+        "received": 16587,
+        "winRate": 1,
+        "hp": 99.61845688227568,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.103333333333335,
+        "received": 19501.3,
+        "winRate": 1,
+        "hp": 98.72208136527904,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 88,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.576666666666666,
+        "received": 9550.566666666668,
+        "winRate": 1,
+        "hp": 98.76062015124447,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.759999999999999,
+        "received": 10550.533333333333,
+        "winRate": 1,
+        "hp": 98.97897098292584,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 88,
+        "quality": "優秀",
+        "enhance": 10,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 51.50833333333333,
+        "received": 67321,
+        "winRate": 1,
+        "hp": 97.47273439220773,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 39.269999999999996,
+        "received": 50482.333333333336,
+        "winRate": 1,
+        "hp": 98.40261210771476,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 91,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 20.240000000000002,
+        "received": 17971.666666666668,
+        "winRate": 1,
+        "hp": 99.45861070192122,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 17.711666666666662,
+        "received": 19206.6,
+        "winRate": 1,
+        "hp": 99.15967418125766,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 91,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 53.69000000000001,
+        "received": 71310.5,
+        "winRate": 1,
+        "hp": 94.20582458495717,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 42.51,
+        "received": 55288.8,
+        "winRate": 1,
+        "hp": 97.88513055747202,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 91,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 30.576666666666664,
+        "received": 32706.3,
+        "winRate": 1,
+        "hp": 98.70906288264436,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 25.389999999999997,
+        "received": 32793,
+        "winRate": 1,
+        "hp": 97.6386221385196,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 91,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 10.391666666666664,
+        "received": 17946.9,
+        "winRate": 1,
+        "hp": 97.3112184328131,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.366666666666665,
+        "received": 18306.333333333332,
+        "winRate": 1,
+        "hp": 96.99116460621434,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "遊俠",
+        "level": 91,
+        "quality": "史詩",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 1581,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 43.15666666666667,
+        "received": 66813.3,
+        "winRate": 1,
+        "hp": 73.12498834585773,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 35.160000000000004,
+        "received": 45452.4,
+        "winRate": 1,
+        "hp": 95.43880176770031,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 93,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.5850000000000035,
+        "received": 7932.970666666667,
+        "winRate": 1,
+        "hp": 98.48251160671053,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.435000000000002,
+        "received": 8681.470666666666,
+        "winRate": 1,
+        "hp": 97.85204648380757,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 93,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.06,
+        "received": 14079.305333333332,
+        "winRate": 1,
+        "hp": 98.4454484605087,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.985,
+        "received": 15405.770666666667,
+        "winRate": 1,
+        "hp": 98.53630550571077,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 93,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.931666666666669,
+        "received": 10160.668000000001,
+        "winRate": 1,
+        "hp": 97.98694779116467,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.855000000000002,
+        "received": 10975.068000000001,
+        "winRate": 1,
+        "hp": 96.95441339827394,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 93,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 8,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 48.559999999999995,
+        "received": 52436.69600000002,
+        "winRate": 1,
+        "hp": 81.28359323820104,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 36.96000000000001,
+        "received": 38617.352,
+        "winRate": 1,
+        "hp": 95.50200803212851,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 98,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 20.310000000000002,
+        "received": 12230.293333333335,
+        "winRate": 1,
+        "hp": 82.5670030598476,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.693333333333328,
+        "received": 13572.28,
+        "winRate": 1,
+        "hp": 80.65414219738865,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 98,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 47.07333333333334,
+        "received": 31181.47333333334,
+        "winRate": 1,
+        "hp": 55.554088982648224,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 37.156666666666666,
+        "received": 27844.793333333335,
+        "winRate": 1,
+        "hp": 60.310175418590966,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 98,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 27.098333333333336,
+        "received": 16117.360000000002,
+        "winRate": 1,
+        "hp": 77.02639831233249,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.868333333333332,
+        "received": 16794.08,
+        "winRate": 1,
+        "hp": 76.06180512001825,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 98,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 10.578333333333335,
+        "received": 13624.24,
+        "winRate": 1,
+        "hp": 80.58007868179483,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.043333333333331,
+        "received": 14360.586666666668,
+        "winRate": 1,
+        "hp": 79.53049394682327,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 8,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 8,
+        "cls": "法師",
+        "level": 98,
+        "quality": "史詩",
+        "enhance": 15,
+        "gearMapId": 8,
+        "affixSeed": 2834,
+        "gemTier": null
+      },
+      "old": {
+        "seconds": 33.89000000000001,
+        "received": 30438.41333333333,
+        "winRate": 1,
+        "hp": 56.61324286827448,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 27.70333333333333,
+        "received": 24967.220000000005,
+        "winRate": 1,
+        "hp": 64.41185358344265,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.85,
+        "received": 17059.433333333334,
+        "winRate": 1,
+        "hp": 97.09953443939942,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 9.278333333333334,
+        "received": 19176.533333333333,
+        "winRate": 1,
+        "hp": 95.2783810691205,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 22.708333333333332,
+        "received": 28554.133333333335,
+        "winRate": 1,
+        "hp": 97.91343968141614,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 28.473333333333336,
+        "received": 40043.5,
+        "winRate": 1,
+        "hp": 95.67155821809413,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 9.988333333333333,
+        "received": 21396.9,
+        "winRate": 1,
+        "hp": 94.26821239691776,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 10.595,
+        "received": 24964.766666666666,
+        "winRate": 1,
+        "hp": 89.90207689518846,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "良好",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 0,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 47.58833333333334,
+        "received": 91420.83333333333,
+        "winRate": 1,
+        "hp": 85.9154768687165,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 48.711666666666666,
+        "received": 82966.1,
+        "winRate": 1,
+        "hp": 91.71551600112792,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 21.984999999999992,
+        "received": 25463.733333333334,
+        "winRate": 1,
+        "hp": 99.4479187276463,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 26.369999999999997,
+        "received": 37416.4,
+        "winRate": 1,
+        "hp": 98.21851203612104,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 46.141666666666666,
+        "received": 84351.66666666667,
+        "winRate": 1,
+        "hp": 95.9637965147249,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 45.98499999999999,
+        "received": 79861.86666666667,
+        "winRate": 1,
+        "hp": 97.27362537943165,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 29.944999999999986,
+        "received": 43416.5,
+        "winRate": 1,
+        "hp": 99.02891459300407,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 36.25333333333332,
+        "received": 67364.4,
+        "winRate": 1,
+        "hp": 93.82664434467192,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 11.573333333333332,
+        "received": 31400,
+        "winRate": 1,
+        "hp": 94.12172251393012,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 12.179999999999998,
+        "received": 38478.8,
+        "winRate": 1,
+        "hp": 90.66306344012379,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "戰士",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "戰士",
+        "level": 96,
+        "quality": "優秀",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "intermediate"
+      },
+      "old": {
+        "seconds": 37.561666666666675,
+        "received": 96946.5,
+        "winRate": 0.9666666666666667,
+        "hp": 64.8079429098073,
+        "holdoutWinRate": 0.95
+      },
+      "current": {
+        "seconds": 42.40333333333333,
+        "received": 103042.63333333333,
+        "winRate": 0.9,
+        "hp": 49.37768941988179,
+        "holdoutWinRate": 0.85
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 96,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 9,
+        "affixSeed": 1682,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 5.873333333333333,
+        "received": 11318.366666666667,
+        "winRate": 1,
+        "hp": 99.56544497002069,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 5.746666666666668,
+        "received": 12198.866666666667,
+        "winRate": 1,
+        "hp": 99.4956827664618,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 96,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 9,
+        "affixSeed": 1682,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 23.249999999999996,
+        "received": 29232,
+        "winRate": 1,
+        "hp": 99.2662097371046,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 21.459999999999997,
+        "received": 31565.8,
+        "winRate": 1,
+        "hp": 99.4788053329901,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 96,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 9,
+        "affixSeed": 1682,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 7.365000000000003,
+        "received": 16147.433333333332,
+        "winRate": 1,
+        "hp": 98.47838701719388,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.958333333333337,
+        "received": 16787.966666666667,
+        "winRate": 1,
+        "hp": 98.95966470380021,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 96,
+        "quality": "史詩",
+        "enhance": 8,
+        "gearMapId": 9,
+        "affixSeed": 1682,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 62.65666666666665,
+        "received": 132698.66666666666,
+        "winRate": 1,
+        "hp": 94.05541075393377,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 36.588333333333324,
+        "received": 70789.1,
+        "winRate": 1,
+        "hp": 97.78167669551974,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 100,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 18.578333333333333,
+        "received": 19093.8,
+        "winRate": 1,
+        "hp": 99.80423164113485,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 18.264999999999997,
+        "received": 22265.366666666665,
+        "winRate": 1,
+        "hp": 99.47984856464628,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 100,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 50.59333333333334,
+        "received": 83763.5,
+        "winRate": 1,
+        "hp": 97.93781036996329,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 30.801666666666673,
+        "received": 46354,
+        "winRate": 1,
+        "hp": 99.55393052597833,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 100,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 26.448333333333334,
+        "received": 33964.86666666667,
+        "winRate": 1,
+        "hp": 99.41733034126383,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 23.278333333333325,
+        "received": 35466.2,
+        "winRate": 1,
+        "hp": 99.56478173921671,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 100,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.008333333333333,
+        "received": 16138.666666666666,
+        "winRate": 1,
+        "hp": 99.3613836031539,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.926666666666667,
+        "received": 16353,
+        "winRate": 1,
+        "hp": 99.24167716180837,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "遊俠",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "遊俠",
+        "level": 100,
+        "quality": "傳奇",
+        "enhance": 12,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 37.47166666666667,
+        "received": 79664.83333333333,
+        "winRate": 1,
+        "hp": 98.03258607924403,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 30.026666666666664,
+        "received": 56816.4,
+        "winRate": 1,
+        "hp": 98.0423114500088,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 1,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.236666666666667,
+        "received": 7439.9,
+        "winRate": 1,
+        "hp": 99.55678118805936,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.011666666666668,
+        "received": 8334.613333333333,
+        "winRate": 1,
+        "hp": 99.63527789456823,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "elite",
+      "floor": 5,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.718333333333337,
+        "received": 12672.926666666668,
+        "winRate": 1,
+        "hp": 99.57862684445512,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 18.541666666666668,
+        "received": 15010.453333333335,
+        "winRate": 1,
+        "hp": 99.88164254109356,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "normal",
+      "floor": 9,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 6.661666666666664,
+        "received": 9240.2,
+        "winRate": 1,
+        "hp": 99.72390784231285,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 6.441666666666667,
+        "received": 10532.613333333335,
+        "winRate": 1,
+        "hp": 99.46270296514304,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "entry",
+      "tier": "guardian",
+      "floor": 10,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 5,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 51.13333333333333,
+        "received": 49153.786666666674,
+        "winRate": 1,
+        "hp": 98.12295583318314,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 34.095,
+        "received": 30705.480000000007,
+        "winRate": 1,
+        "hp": 99.33593358960499,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 15,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 19.526666666666664,
+        "received": 14218.666666666666,
+        "winRate": 1,
+        "hp": 99.75809942999764,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 16.490000000000002,
+        "received": 14705.533333333333,
+        "winRate": 1,
+        "hp": 99.91232048298426,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "guardian",
+      "floor": 20,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 48.64166666666666,
+        "received": 52609.433333333334,
+        "winRate": 1,
+        "hp": 98.509377719316,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 29.37166666666667,
+        "received": 26143.233333333334,
+        "winRate": 1,
+        "hp": 99.50149549731863,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "elite",
+      "floor": 25,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 26.191666666666663,
+        "received": 21582.3,
+        "winRate": 1,
+        "hp": 99.47319673513441,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 20.823333333333334,
+        "received": 20648.9,
+        "winRate": 1,
+        "hp": 99.81397416439003,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "normal",
+      "floor": 29,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 8.056666666666667,
+        "received": 14228.866666666667,
+        "winRate": 1,
+        "hp": 99.21141792303281,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 7.115000000000001,
+        "received": 14054.566666666668,
+        "winRate": 1,
+        "hp": 99.35732233802152,
+        "holdoutWinRate": 1
+      }
+    },
+    {
+      "mapId": 9,
+      "cls": "法師",
+      "kind": "clear",
+      "tier": "boss",
+      "floor": 30,
+      "fixtureInput": {
+        "mapId": 9,
+        "cls": "法師",
+        "level": 96,
+        "quality": "傳奇",
+        "enhance": 15,
+        "gearMapId": 9,
+        "affixSeed": 2935,
+        "gemTier": "advanced"
+      },
+      "old": {
+        "seconds": 30.17166666666667,
+        "received": 40097.566666666666,
+        "winRate": 1,
+        "hp": 97.90015987048467,
+        "holdoutWinRate": 1
+      },
+      "current": {
+        "seconds": 22.888333333333332,
+        "received": 25393,
+        "winRate": 1,
+        "hp": 99.45963877365173,
+        "holdoutWinRate": 1
+      }
+    }
+  ]
+}

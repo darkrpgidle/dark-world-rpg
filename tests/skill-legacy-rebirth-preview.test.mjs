@@ -83,3 +83,4 @@ test("SQLite UTC timestamps compare correctly with ISO cutoffs", () => {
   assert.deepEqual(preview.entries[0].evidence.map(row => row.rebirthCount), [3, 5]);
   assert.deepEqual(preview.rejected, []);
 });
+

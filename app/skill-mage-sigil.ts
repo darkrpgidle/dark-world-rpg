@@ -51,3 +51,4 @@ export function recordMageSigilStatuses(
     enhancedCastsRemaining: MAGE_ACTIVE_RULES.元素蝕印.followingActiveCasts,
   };
 }
+

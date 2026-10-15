@@ -93,3 +93,4 @@ test("new mark and next normal monster each start with an unused blood burst", (
   mark(combat, 9000);
   assert.deepEqual(turn(combat, "normal", 300).ascensionDamageEvents, [{ id: "血祭印記", percent: 100 }]);
 });
+

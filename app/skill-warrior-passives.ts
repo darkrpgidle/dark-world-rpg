@@ -25,10 +25,14 @@ function value(build: SkillBuild, name: WarriorPassiveName, key: string): number
   return warriorSkillRankValue(values, rank);
 }
 
+export function warriorPassiveBleedDamageBonusPercent(build: SkillBuild): number {
+  return value(build, "過度失血", "bleedDamageBonus");
+}
+
 // These values are consumed by the eventual incoming-damage and character-stat adapters.
 export function warriorPassiveDefenses(build: SkillBuild, healthPercent: number) {
   return {
-    maxHealthBonusPercent: value(build, "鐵骨", "maxHealthBonus"),
+    defenseBonusFlat: value(build, "鐵骨", "defenseBonus"),
     blockChancePoints: value(build, "格擋精通", "blockChancePoints"),
     incomingDamageReductionPercent: healthPercent < 40 ? value(build, "逆境鋼心", "damageReductionBelow40Hp") : 0,
   };
@@ -66,18 +70,16 @@ export function resolveWarriorPassiveAttack(
 ) {
   const statuses: StatusApplication[] = [];
   // A skill with multiple damage segments still makes only one passive roll.
-  const passiveBleedChance = value(build, "裂傷本能", "basicBleedChance");
-  if (input.kind === "normal" && input.hit && passiveBleedChance > 0 &&
+  const passiveBleedChance = value(build, "裂傷本能", "extraBleedChance");
+  if (input.hit && passiveBleedChance > 0 &&
       input.roll() * 100 < passiveBleedChance) {
-    statuses.push({ kind: "bleed", ascendedBleed: input.ascendedBleed });
+    statuses.push({ kind: "bleed", durationSeconds: 5, ascendedBleed: input.ascendedBleed });
   }
 
   const damageBonusPercent = (input.hit && input.targetArmorBroken ? value(build, "破鎧追擊", "damageVsArmorBreak") : 0)
     + (input.kind === "skill" && (input.category === "basic" || input.category === "burst")
       ? value(build, "重刃專精", "basicAndBurstDamage") : 0)
     + (input.hit ? state.bloodTraceStacks * value(build, "血痕累積", "damagePerStack") : 0)
-    + (input.kind === "skill" && input.category === "burst" && input.targetArmorBroken
-      ? value(build, "戰慄重擊", "burstDamageVsArmorBreak") : 0)
     + (input.healthPercent < 40 && input.hit ? value(build, "絕境怒火", "directDamageBelow40Hp") : 0);
 
   const damageCandidates: { id: "堅盾反射" | "泰坦餘震"; percent: number }[] = [];
@@ -108,6 +110,7 @@ export function resolveWarriorPassiveAttack(
     statuses,
     damageBonusPercent,
     lifestealPercent: input.hit && input.targetBleeding ? value(build, "血氣汲取", "lifestealVsBleed") : 0,
+    bleedDamageBonusPercent: warriorPassiveBleedDamageBonusPercent(build),
     damageCandidates,
   };
 }

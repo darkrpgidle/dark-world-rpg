@@ -23,3 +23,4 @@ jobs:
       - run: SITES_ENV_READY=1 SITES_PROJECT_ROOT="$PWD" npm run build
       - if: always()
         run: node --test tests/*.test.mjs
+

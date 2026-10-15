@@ -84,3 +84,4 @@ test("mark expiry drops unfinished critical progress and a new enemy clears pend
   assert.deepEqual(combat.session.enemy, {});
   assert.ok(combat.session.charge.charges["穿雲箭"] > 0);
 });
+

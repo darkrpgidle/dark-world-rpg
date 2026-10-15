@@ -20,3 +20,4 @@ test("the guard keeps a bounded number of defeated targets", () => {
   assert.equal(guard.claim("run-40"), false);
   assert.throws(() => guard.claim(""), RangeError);
 });
+

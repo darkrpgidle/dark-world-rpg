@@ -1,6 +1,12 @@
+import { affectedRows } from "../../d1-write-result";
+import {damageEventStatement,deliverWorldBossMail,worldBossClaimStatements} from "../../world-boss-rewards";
+import {isDuplicateSaveSnapshot} from "../../save-sync-disposition";
+import {finalizePendingRebirth} from "../../rebirth-save";
+import {applyEquipmentAction,preserveEquipmentSave,repairInheritedLoadout,type EquipmentAction} from "../../equipment-save-policy";
+import { invalidSaveField, saveDisplay } from "../../save-field-schema";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { gameSaves, saveSnapshots, sessions } from "../../../db/schema";
+import { gameSaves, saveSnapshots, sessions, gmActionLogs } from "../../../db/schema";
 import { activeSaveSession } from "../../save-session-guard";
 import { applyDailyHuntClaim, preserveServerDailyHuntClaim, taipeiDailyDate } from "../../daily-hunt-claim";
 import { advanceOnlineYuanbao, preserveServerOnlineYuanbao } from "../../online-yuanbao";
@@ -8,6 +14,10 @@ import { buyYuanbaoCosmetic, buyYuanbaoReforgeBundle, cosmeticSku, preserveServe
 import { preserveServerResourceRevision } from "../../server-resource-revision";
 import { currentLogin } from "../auth-utils";
 import { applySkillSaveActionOnce, preserveServerSkillSave, type SkillSaveAction } from "../../skill-save-policy";
+import { prepareIdleClaim, preserveServerIdleClaim, settleIdleSave } from "../../idle-claim";
+
+import { SaveIntegrityError, validateSaveTransition } from "../../save-integrity";
+import { integrityAuditDetail } from "../../save-integrity-audit";
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{20,80}$/.test(value);
 const normalize = (value: string) => value.trim().toLocaleLowerCase("zh-TW");
@@ -35,6 +45,14 @@ function resetPersonalBossTicketsIfNeeded(save: Record<string, unknown>) {
   };
 }
 
+function snapshotResponse(save: {payload:string;updatedAt:string},incoming:Record<string,unknown>,sessionId:string){
+  try{
+    if(isDuplicateSaveSnapshot(incoming,JSON.parse(save.payload),sessionId))
+      return jsonNoStore({ok:true,accepted:false,reason:"already_applied",updatedAt:save.updatedAt});
+  }catch{ /* canonical response retains malformed-save handling */ }
+  return authoritativeResponse(save);
+}
+
 function authoritativeResponse(save: { payload: string; updatedAt: string }) {
   try {
     const payload = JSON.parse(save.payload) as Record<string, unknown>;
@@ -42,9 +60,9 @@ function authoritativeResponse(save: { payload: string; updatedAt: string }) {
       ok: true,
       accepted: false,
       updatedAt: save.updatedAt,
-      save: preserveServerSkillSave(
+      save: saveDisplay(preserveServerSkillSave(
         preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload), payload), payload), payload,
-      ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload),
+      ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(payload), payload)),
     });
   } catch {
     return jsonNoStore({ ok: true, accepted: false, updatedAt: save.updatedAt });
@@ -57,6 +75,7 @@ function prepareAuthoritativePayload(
   sessionId: string,
   clientId: string,
   clientSequence: number,
+  savedAt: number,
 ) {
   const next: Record<string, unknown> = { ...incoming, _saveSessionId: sessionId };
   delete next._lastSkillActionId;
@@ -84,10 +103,14 @@ function prepareAuthoritativePayload(
     if (typeof serverSave._lastSkillRebirthLegacyCount === "number")
       next._lastSkillRebirthLegacyCount = serverSave._lastSkillRebirthLegacyCount;
   } catch { /* malformed legacy payloads are replaced by the valid incoming save */ }
-  const guarded = preserveServerResourceRevision(next, serverSave);
+  // Only repair an inherited configuration already present in the canonical
+  // old save. Newly submitted illegal ids/slots still fail validation.
+  const inherited=serverSave?repairInheritedLoadout(next,serverSave):next;
+  const guarded = preserveServerResourceRevision(serverSave?preserveEquipmentSave(inherited,serverSave):inherited, serverSave);
   if (!guarded) return null;
   const protectedSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(guarded, serverSave), serverSave), serverSave), serverSave);
-  return protectedSave ? JSON.stringify(protectedSave) : null;
+  if (!protectedSave || !serverSave) return null;
+  return JSON.stringify(validateSaveTransition(preserveServerIdleClaim(protectedSave, serverSave), serverSave, Date.now(), savedAt));
 }
 
 function nextUpdatedAt(previous: string) {
@@ -134,6 +157,7 @@ export async function GET(request: Request) {
   if (!validId(playerId))
     return jsonNoStore({ error: "invalid player id" }, 400);
   const db = await getDb();
+  await deliverWorldBossMail(db.$client,account.id);
   const [save] = await db
     .select()
     .from(gameSaves)
@@ -149,9 +173,23 @@ export async function GET(request: Request) {
     catch { /* never block loading a valid save */ }
   }
   const savedPayload = JSON.parse(save.payload) as Record<string, unknown>;
-  // Preserve the pre-reset save before committing the one-time skill refund.
-  // A concurrent save wins via updatedAt CAS and is reloaded rather than overwritten.
-  if (Number(savedPayload.skillReworkVersion) < 2 || !Number.isInteger(savedPayload.skillReworkVersion)) {
+  // Recover the previous two-step rebirth only when a server-issued receipt
+  // and ascension advancement prove the reset was already authorized.
+  const recovered=finalizePendingRebirth(savedPayload);
+  if(recovered!==savedPayload){
+    const updatedAt=nextUpdatedAt(save.updatedAt);
+    await db.insert(saveSnapshots).values({playerId,accountId:account.id,payload:save.payload,kind:"rebirth_recovery",capturedAt:new Date().toISOString()});
+    const changed=await db.update(gameSaves).set({payload:JSON.stringify(recovered),updatedAt})
+      .where(and(eq(gameSaves.playerId,playerId),eq(gameSaves.updatedAt,save.updatedAt),activeSaveSession(auth.login.sessionId,account.id)));
+    if(affectedRows(changed)===1)return jsonNoStore({save:saveDisplay(recovered),updatedAt});
+    const [latest]=await db.select({accountId:gameSaves.accountId,payload:gameSaves.payload,updatedAt:gameSaves.updatedAt}).from(gameSaves).where(eq(gameSaves.playerId,playerId)).limit(1);
+    if(!latest||latest.accountId!==account.id)return jsonNoStore({error:"save_retry_required"},503);
+    return jsonNoStore({save:saveDisplay(JSON.parse(latest.payload)),updatedAt:latest.updatedAt});
+  }
+  // Preserve the pre-cutover save before removing legacy skill fields. A
+  // concurrent save wins via updatedAt CAS and is reloaded rather than overwritten.
+  if (Number(savedPayload.skillReworkVersion) < 2 || !Number.isInteger(savedPayload.skillReworkVersion) ||
+      Object.hasOwn(savedPayload, "skills") || Object.hasOwn(savedPayload, "skillPoints")) {
     const migrated = preserveServerSkillSave(savedPayload, savedPayload);
     if (!migrated) return jsonNoStore({ error: "invalid_skill_save_class_or_level" }, 409);
     try {
@@ -163,24 +201,24 @@ export async function GET(request: Request) {
       const changed = await db.update(gameSaves)
         .set({ payload: JSON.stringify(migrated), updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, save.updatedAt)));
-      if ((changed.rowsAffected ?? 0) === 1) {
-        return jsonNoStore({ save: migrated, updatedAt });
+      if (affectedRows(changed) === 1) {
+        return jsonNoStore({ save: saveDisplay(migrated), updatedAt });
       }
       const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
         updatedAt: gameSaves.updatedAt }).from(gameSaves)
         .where(eq(gameSaves.playerId, playerId)).limit(1);
       if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
       const latestPayload = JSON.parse(latest.payload) as Record<string, unknown>;
-      return jsonNoStore({ save: preserveServerSkillSave(latestPayload, latestPayload), updatedAt: latest.updatedAt });
+      return jsonNoStore({ save: saveDisplay(preserveServerSkillSave(latestPayload, latestPayload)), updatedAt: latest.updatedAt });
     } catch {
       // Never return a refunded build unless it was durably committed.
       return jsonNoStore({ error: "skill_reset_retry_required" }, 503);
     }
   }
   return jsonNoStore({
-    save: preserveServerSkillSave(
+    save: saveDisplay(preserveServerSkillSave(
       preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload), savedPayload), savedPayload), savedPayload,
-    ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload),
+    ) ?? preserveServerDailyHuntClaim(resetPersonalBossTicketsIfNeeded(savedPayload), savedPayload)),
     updatedAt: save.updatedAt,
   });
 }
@@ -189,23 +227,47 @@ export async function POST(request: Request) {
   const auth = await authenticatedLogin(request);
   if (!auth.login) return auth.response;
   const account = auth.login.account;
-  const body = (await request.json()) as {
+  let parsedBody: unknown;
+  try { parsedBody = await request.json(); } catch { return jsonNoStore({ error: "invalid_json" }, 400); }
+  if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) return jsonNoStore({ error: "invalid_request" }, 400);
+  const body = parsedBody as {
     playerId?: string;
     save?: unknown;
     payload?: unknown;
     expectedUpdatedAt?: string | null;
-    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "shop_cosmetic" | "skill";
+    equipmentAction?: EquipmentAction;
+    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "shop_cosmetic" | "skill" | "equipment";
     dailyDate?: string;
     dailyKills?: number;
     skillAction?: SkillSaveAction;
     skillActionId?: string;
     purchaseId?: string;
+    claimId?: string;
     shopItem?: string;
   };
-  const playerId = body.playerId ?? "";
+  if(typeof body.playerId!=="string")return jsonNoStore({error:"invalid player id"},400);
+  for(const key of ["action","claimId","purchaseId","shopItem","skillActionId"] as const)
+    if(body[key]!==undefined&&typeof body[key]!=="string")return jsonNoStore({error:"invalid_request"},400);
+  const playerId = body.playerId;
   if (!validId(playerId))
     return jsonNoStore({ error: "invalid player id" }, 400);
-  const incoming = (body.save ?? body.payload ?? {}) as Record<string, unknown>;
+  const rawIncoming = body.save ?? body.payload ?? {};
+  if (!rawIncoming || typeof rawIncoming !== "object" || Array.isArray(rawIncoming)) return jsonNoStore({ error: "invalid_save" }, 400);
+  const incoming = rawIncoming as Record<string, unknown>;
+  const invalidField=invalidSaveField(incoming);
+  if(invalidField){
+    // A rejected malformed upload is still visible to the GM, without exposing
+    // another account's canonical data or letting audit failure permit a save.
+    try {
+      const db=await getDb();
+      const [stored]=await db.select({payload:gameSaves.payload,accountId:gameSaves.accountId}).from(gameSaves).where(eq(gameSaves.playerId,playerId)).limit(1);
+      if(stored?.accountId===account.id){
+        const [recent]=await db.select({createdAt:gmActionLogs.createdAt}).from(gmActionLogs).where(and(eq(gmActionLogs.targetAccountId,account.id),eq(gmActionLogs.action,"save_integrity_rejected"))).orderBy(desc(gmActionLogs.createdAt)).limit(1);
+        if(!recent||Date.now()-Date.parse(recent.createdAt)>=60000)await db.insert(gmActionLogs).values({gmAccountId:"system",targetAccountId:account.id,action:"save_integrity_rejected",detail:integrityAuditDetail(playerId,"invalid_save_field",JSON.parse(stored.payload),incoming,invalidField),createdAt:new Date().toISOString()});
+      }
+    }catch{/* Reject even if audit cannot be stored. */}
+    return jsonNoStore({error:"save_integrity_rejected",reason:"invalid_save_field",field:invalidField},409);
+  }
   const normalizedIncoming = resetPersonalBossTicketsIfNeeded(incoming);
   const payload = JSON.stringify(normalizedIncoming);
   const incomingCharacter = normalizedIncoming as {
@@ -231,6 +293,7 @@ export async function POST(request: Request) {
   if (payload.length > 240_000)
     return jsonNoStore({ error: "save is too large" }, 413);
   const db = await getDb();
+  await deliverWorldBossMail(db.$client,account.id);
   const existing = await db
     .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
     .from(gameSaves)
@@ -241,6 +304,7 @@ export async function POST(request: Request) {
   if (existing[0]) {
     try {
       const saved = JSON.parse(existing[0].payload) as Record<string, unknown>;
+      if(!body.action&&saved._worldBossMailDeliveryId&&incoming._worldBossMailDeliveryId!==saved._worldBossMailDeliveryId)return authoritativeResponse(existing[0]);
       if (!Number.isInteger(saved.skillReworkVersion) || Number(saved.skillReworkVersion) < 2)
         return jsonNoStore({ error: "skill_reset_login_required" }, 409);
     } catch { return jsonNoStore({ error: "invalid_saved_payload" }, 409); }
@@ -271,33 +335,10 @@ export async function POST(request: Request) {
       } catch {
         return jsonNoStore({ error: "invalid_saved_payload" }, 500);
       }
-      const now = Date.now();
-      const lastSeenAt = Number(serverSave.lastSeenAt ?? now);
-      const elapsedSeconds = Math.min(
-        43_200,
-        Math.max(0, Math.floor((now - lastSeenAt) / 1_000)),
-      );
-      if (serverSave.battleOn === false) {
-        const pausedSave = { ...serverSave, lastSeenAt: now, _saveSessionId: sessionId };
-        const pausedPayload = JSON.stringify(pausedSave);
-        const pausedUpdatedAt = nextUpdatedAt(current.updatedAt);
-        const pausedResult = await db.update(gameSaves)
-          .set({ accountId: account.id, payload: pausedPayload, updatedAt: pausedUpdatedAt })
-          .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-        if ((pausedResult.rowsAffected ?? 0) === 1) {
-          return jsonNoStore({ ok: true, accepted: true, updatedAt: pausedUpdatedAt, save: pausedSave, idleSecondsAdded: 0 });
-        }
-        if (await writerRevoked()) return replacedResponse();
-        const [latest] = await db
-          .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
-          .from(gameSaves)
-          .where(eq(gameSaves.playerId, playerId))
-          .limit(1);
-        if (!latest || latest.accountId !== account.id) return jsonNoStore({ error: "save_retry_required" }, 503);
-        current = latest;
-        continue;
-      }
-      if (!elapsedSeconds)
+      const { elapsedSeconds, save: settledSave } = settleIdleSave(serverSave, Date.now(), sessionId);
+      // Manual idle pausing was removed. A legacy paused save, or a tab closed
+      // while confirming rewards, must still accumulate its elapsed time.
+      if (!elapsedSeconds && serverSave.battleOn !== false)
         return jsonNoStore({
           ok: true,
           accepted: false,
@@ -305,18 +346,12 @@ export async function POST(request: Request) {
           save: serverSave,
           idleSecondsAdded: 0,
         });
-      const settledSave = {
-        ...serverSave,
-        storedSeconds: Math.min(43_200, Math.max(0, Number(serverSave.storedSeconds ?? 0)) + elapsedSeconds),
-        lastSeenAt: now,
-        _saveSessionId: sessionId,
-      };
       const settledPayload = JSON.stringify(settledSave);
       const updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: settledPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1) {
+      if (affectedRows(result) === 1) {
         try {
           await createServerCheckpointIfDue(db, {
             playerId,
@@ -346,6 +381,9 @@ export async function POST(request: Request) {
   }
   if (body.action === "claim_idle") {
     if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
+    const claimId = body.claimId ?? "";
+    if (claimId && !/^[a-f0-9-]{36}$/.test(claimId))
+      return jsonNoStore({ error: "invalid_claim_id" }, 400);
     let current = existing[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
       let serverSave: Record<string, unknown>;
@@ -354,15 +392,17 @@ export async function POST(request: Request) {
       } catch {
         return jsonNoStore({ error: "invalid_saved_payload" }, 500);
       }
-      const now = Date.now();
-      const claimedSeconds = Math.min(43_200, Math.max(0, Number(serverSave.storedSeconds ?? 0)));
-      const claimedSave = { ...serverSave, storedSeconds: 0, lastSeenAt: now, battleOn: false, _saveSessionId: sessionId };
-      const claimedPayload = JSON.stringify(claimedSave);
+      const claim = prepareIdleClaim(serverSave, claimId, Date.now(), sessionId);
+      if (!claim.accepted)
+        return jsonNoStore({ ok: true, accepted: false, updatedAt: current.updatedAt,
+          claimedSeconds: claim.claimedSeconds });
+      const claimedPayload = JSON.stringify(claim.save);
       const updatedAt = nextUpdatedAt(current.updatedAt);
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: claimedPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1) return jsonNoStore({ ok: true, accepted: true, updatedAt, claimedSeconds });
+      if (affectedRows(result) === 1)
+        return jsonNoStore({ ok: true, accepted: true, updatedAt, claimedSeconds: claim.claimedSeconds });
       if (await writerRevoked()) return replacedResponse();
       const [latest] = await db
         .select({ accountId: gameSaves.accountId, payload: gameSaves.payload, updatedAt: gameSaves.updatedAt })
@@ -374,6 +414,28 @@ export async function POST(request: Request) {
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
   }
+  if(body.action === "equipment"){
+    if(!existing[0])return jsonNoStore({error:"save_not_found"},404);
+    const action=body.equipmentAction;
+    if(!action||typeof action!=="object"||Array.isArray(action))return jsonNoStore({error:"invalid_equipment_action"},400);
+    let current=existing[0];
+    for(let attempt=0;attempt<4;attempt++){
+      const saved=JSON.parse(current.payload) as Record<string,unknown>;
+      const applied=applyEquipmentAction(saved,action);
+      if(!applied)return jsonNoStore({error:"equipment_action_rejected"},409);
+      if(!applied.accepted)return jsonNoStore({ok:true,accepted:false,item:applied.item,receipt:applied.receipt,adminRevision:applied.save.adminRevision??0,updatedAt:current.updatedAt});
+      const payload=JSON.stringify({...applied.save,_saveSessionId:sessionId});
+      if(payload.length>240000)return jsonNoStore({error:"save is too large"},413);
+      const updatedAt=nextUpdatedAt(current.updatedAt);
+      const changed=await db.update(gameSaves).set({payload,updatedAt}).where(and(eq(gameSaves.playerId,playerId),eq(gameSaves.updatedAt,current.updatedAt),writerCondition()));
+      if(affectedRows(changed)>0)return jsonNoStore({ok:true,accepted:true,item:applied.item,receipt:applied.receipt,adminRevision:applied.save.adminRevision,updatedAt});
+      if(await writerRevoked())return replacedResponse();
+      const [latest]=await db.select({accountId:gameSaves.accountId,payload:gameSaves.payload,updatedAt:gameSaves.updatedAt}).from(gameSaves).where(and(eq(gameSaves.playerId,playerId),eq(gameSaves.accountId,account.id))).limit(1);
+      if(!latest)return jsonNoStore({error:"save_not_found"},404);current=latest;
+    }
+    return jsonNoStore({error:"equipment_retry_required"},503);
+  }
+
   if (body.action === "shop_reforge" || body.action === "shop_cosmetic") {
     if (!existing[0]) return jsonNoStore({ error: "save_not_found" }, 404);
     const purchaseId = body.purchaseId;
@@ -403,7 +465,7 @@ export async function POST(request: Request) {
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: nextPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1)
+      if (affectedRows(result) === 1)
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
           yuanbao: next.yuanbao, reforgeStones: next.reforgeStones,
           ownedTitles: next.ownedTitles, ownedAppearances: next.ownedAppearances,
@@ -433,7 +495,7 @@ export async function POST(request: Request) {
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: nextPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1)
+      if (affectedRows(result) === 1)
         return jsonNoStore({ ok: true, accepted: true, updatedAt, reward: advanced.reward,
           yuanbao: next.yuanbao, adminRevision: next.adminRevision, idleSeconds: next.idleSeconds });
       if (await writerRevoked()) return replacedResponse();
@@ -466,7 +528,7 @@ export async function POST(request: Request) {
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: nextPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1)
+      if (affectedRows(result) === 1)
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
           gold: next.gold, enhanceStones: next.enhanceStones,
           reforgeStones: next.reforgeStones, yuanbao: next.yuanbao,
@@ -503,7 +565,7 @@ export async function POST(request: Request) {
       const result = await db.update(gameSaves)
         .set({ accountId: account.id, payload: nextPayload, updatedAt })
         .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1) {
+      if (affectedRows(result) === 1) {
         return jsonNoStore({ ok: true, accepted: true, updatedAt,
           skillReworkBuild: next.skillReworkBuild, skillAscensions: next.skillAscensions,
           yuanbao: next.yuanbao, adminRevision: next.adminRevision });
@@ -516,6 +578,7 @@ export async function POST(request: Request) {
     }
     return authoritativeResponse(current);
   }
+  if (!existing[0]) return jsonNoStore({ error: "character_creation_required" }, 409);
   const requestId = typeof normalizedIncoming._saveRequestId === "string" ? normalizedIncoming._saveRequestId : "";
   const clientId = typeof normalizedIncoming._saveClientId === "string" ? normalizedIncoming._saveClientId : "";
   const clientSequence = Math.max(0, Number(normalizedIncoming._saveSequence ?? 0));
@@ -532,25 +595,49 @@ export async function POST(request: Request) {
   initialSave._paidSkillResetActionIds = [];
   initialSave._skillActionIds = [];
   delete initialSave._lastSkillRebirthLegacyCount;
+  delete initialSave._lastIdleClaimId;
+  delete initialSave._lastIdleClaimSeconds;
   let finalPayload = JSON.stringify({ ...initialSave, _saveSessionId: sessionId });
   let updatedAt = new Date().toISOString();
   if (existing[0]) {
     let current = existing[0];
     let saved = false;
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const prepared = prepareAuthoritativePayload(normalizedIncoming, current.payload, sessionId, clientId, clientSequence);
+      let prepared: string | null;
+      try {
+        prepared = prepareAuthoritativePayload(normalizedIncoming, current.payload, sessionId, clientId, clientSequence, Date.parse(current.updatedAt));
+      } catch (error) {
+        if (!(error instanceof SaveIntegrityError)) throw error;
+        console.warn("save_integrity_rejected", { accountId: account.id, playerId, reason: error.reason });
+        try {
+          const [recent] = await db.select({ createdAt: gmActionLogs.createdAt }).from(gmActionLogs)
+            .where(and(eq(gmActionLogs.targetAccountId, account.id), eq(gmActionLogs.action, "save_integrity_rejected")))
+            .orderBy(desc(gmActionLogs.createdAt)).limit(1);
+          if (!recent || Date.now() - Date.parse(recent.createdAt) >= 60_000)
+            await db.insert(gmActionLogs).values({ gmAccountId: "system", targetAccountId: account.id,
+              action: "save_integrity_rejected", detail: integrityAuditDetail(playerId, error.reason, JSON.parse(current.payload), normalizedIncoming), createdAt: new Date().toISOString() });
+        } catch { /* audit failures never allow the rejected write */ }
+        return jsonNoStore({ error: "save_integrity_rejected", reason:error.reason, updatedAt: current.updatedAt }, 409);
+      }
       if (!prepared) {
-        // The server wins this race. The client will discard its local state
-        // and reload the canonical payload instead of logging the player out.
-        return authoritativeResponse(current);
+        // Duplicated sequences only acknowledge the existing write. Actual
+        // canonical changes still return the server save for reconciliation.
+        return snapshotResponse(current,normalizedIncoming,sessionId);
       }
       finalPayload = prepared;
       if (finalPayload.length > 240_000) return jsonNoStore({ error: "save is too large" }, 413);
       updatedAt = nextUpdatedAt(current.updatedAt);
-      const result = await db.update(gameSaves)
+      const claims=worldBossClaimStatements(account.id,playerId,updatedAt,JSON.parse(current.payload),JSON.parse(finalPayload),Date.now());
+      const claimGuard=claims.length?sql`NOT EXISTS (SELECT 1 FROM world_boss_reward_claims WHERE mail_id IN (${sql.join(claims.map(c=>sql`${c.bindings[0]}`),sql`, `)}))`:sql`1`;
+      const write = db.update(gameSaves)
         .set({ accountId: account.id, payload: finalPayload, updatedAt })
-        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition()));
-      if ((result.rowsAffected ?? 0) === 1) {
+        .where(and(eq(gameSaves.playerId, playerId), eq(gameSaves.updatedAt, current.updatedAt), writerCondition(),claimGuard)).toSQL();
+      const event=damageEventStatement(account.id,playerId,updatedAt,JSON.parse(current.payload),JSON.parse(finalPayload),Date.now());
+      const statements=[db.$client.prepare(write.sql).bind(...write.params)];
+      if(event)statements.push(db.$client.prepare(event.sql).bind(...event.bindings));
+      for(const claim of claims)statements.push(db.$client.prepare(claim.sql).bind(...claim.bindings));
+      const [result]=await db.$client.batch(statements);
+      if (affectedRows(result) === 1) {
         saved = true;
         break;
       }
@@ -564,7 +651,7 @@ export async function POST(request: Request) {
         return jsonNoStore({ error: "save_retry_required" }, 503);
       current = latest;
     }
-    if (!saved) return authoritativeResponse(current);
+    if (!saved) return snapshotResponse(current,normalizedIncoming,sessionId);
     try {
       await createServerCheckpointIfDue(db, {
         playerId,
@@ -584,7 +671,7 @@ export async function POST(request: Request) {
       if (await writerRevoked()) return replacedResponse();
       const [latest] = await db.select({ accountId: gameSaves.accountId, payload: gameSaves.payload,
         updatedAt: gameSaves.updatedAt }).from(gameSaves).where(eq(gameSaves.playerId, playerId)).limit(1);
-      if (latest?.accountId === account.id) return authoritativeResponse(latest);
+      if (latest?.accountId === account.id) return snapshotResponse(latest,normalizedIncoming,sessionId);
       return jsonNoStore({ error: "save_retry_required" }, 503);
     }
     try {
@@ -611,5 +698,7 @@ export async function POST(request: Request) {
       ]);
     }
   } catch { /* recovery data is retained; cleanup can be retried later */ }
-  return jsonNoStore({ ok: true, accepted: true, updatedAt });
+  const savedClock = JSON.parse(finalPayload) as Record<string, unknown>;
+  return jsonNoStore({ ok: true, accepted: true, updatedAt,
+    idleClock: { storedSeconds: savedClock.storedSeconds, lastSeenAt: savedClock.lastSeenAt } });
 }

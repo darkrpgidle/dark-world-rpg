@@ -18,16 +18,16 @@ export type SocketedGem = { gemId: GemId; tier: GemTier };
 export type EquipmentSockets = { socketCount: 0 | 1 | 2; gems: Array<SocketedGem | null> };
 
 const ICONS: Record<GemId, string> = {
-  redIron: "/gems/red-iron.png",
-  azureGuard: "/gems/azure-guard.png",
-  emeraldLife: "/gems/emerald-life.png",
-  thunderlight: "/gems/thunderlight.png",
-  eagleEye: "/gems/eagle-eye.png",
-  phantom: "/gems/phantom.png",
-  sunburst: "/gems/sunburst.png",
-  blooddrop: "/gems/blooddrop.png",
-  wisdom: "/gems/wisdom.png",
-  greed: "/gems/greed.png",
+  redIron: "/gems/red-iron.webp",
+  azureGuard: "/gems/azure-guard.webp",
+  emeraldLife: "/gems/emerald-life.webp",
+  thunderlight: "/gems/thunderlight.webp",
+  eagleEye: "/gems/eagle-eye.webp",
+  phantom: "/gems/phantom.webp",
+  sunburst: "/gems/sunburst.webp",
+  blooddrop: "/gems/blooddrop.webp",
+  wisdom: "/gems/wisdom.webp",
+  greed: "/gems/greed.webp",
 };
 
 const NAMES: Record<GemId, string> = {

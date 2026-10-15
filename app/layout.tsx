@@ -8,20 +8,20 @@ export const metadata: Metadata = {
     title: "暗黑世界｜黑暗中世紀掛機 RPG",
     description: "狩獵、鍛造、挑戰首領，在輪迴中奪回失落的世界。",
     type: "website",
-    images: ["/logo-dark-world.png"],
+    images: ["/logo-dark-world.webp"],
   },
   twitter: {
     card: "summary",
     title: "暗黑世界｜黑暗中世紀掛機 RPG",
     description: "狩獵、鍛造、挑戰首領，在輪迴中奪回失落的世界。",
-    images: ["/logo-dark-world.png"],
+    images: ["/logo-dark-world.webp"],
   },
   other: {
     "codex-preview": "development",
   },
   icons: {
-    icon: "/logo-dark-world.png",
-    shortcut: "/logo-dark-world.png",
+    icon: "/logo-dark-world.webp",
+    shortcut: "/logo-dark-world.webp",
   },
 };
 

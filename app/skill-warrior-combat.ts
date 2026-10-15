@@ -1,6 +1,8 @@
 // Warrior active casts on the isolated reworked combat path.
 // Caller rolls hit/critical per damage segment and applies actual damage.
 import { type SkillBuild } from "./skill-rework";
+import { balanceConfig } from "./balance-config";
+import { hasCatalogItem } from "./mythic-data";
 import {
   advanceCombatSession,
   createSkillCombatSession,
@@ -71,6 +73,7 @@ export type WarriorTurnInput = {
   now: number;
   ascended: ReadonlySet<WarriorActiveName>;
   roll?: () => number;
+  equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[];
   // Player debuffs are owned by the caller; its ordering chooses which one
   // to remove if the ascended roar activates on this event.
   negativeStatuses?: readonly string[];
@@ -82,6 +85,7 @@ export type WarriorTurnResult = {
   // Base skill multiplier after 崩鎧重擊, before ordinary passive/buff bonuses.
   effectiveBaseDamagePercent: number;
   bonusDamagePercent: number;
+  targetDamageTakenBonusPercent: number;
   extraDamagePercents: number[];
   ascensionDamageEvents: { id: "血祭印記" | "地脈崩裂" | "天地斷絕" | "血怒終焉"; percent: number }[];
   passiveDamageProcs: { id: "堅盾反射" | "泰坦餘震"; percent: number }[];
@@ -122,7 +126,9 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
 
   const roarRank = combat.build.ranks["鮮血怒吼"] ?? 0;
   const newlyTriggeredRoar = roarRank > 0
-    ? triggerWarriorBloodRoar(combat.buffs, roarRank, input.healthPercent, input.ascended.has("鮮血怒吼"))
+    ? triggerWarriorBloodRoar(combat.buffs, roarRank, input.healthPercent, input.ascended.has("鮮血怒吼"),
+      hasCatalogItem(input.equippedItems ?? [], "skill-warrior-blood-heart")
+        ? balanceConfig.equipment.skillMythics.bloodHeart.empoweredAttacks : WARRIOR_ACTIVE_RULES.鮮血怒吼.attacks)
     : null;
   let buffs = newlyTriggeredRoar ?? combat.buffs;
   const rule = activeSkill ? WARRIOR_ACTIVE_RULES[activeSkill] : null;
@@ -134,18 +140,22 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
   const statusApplications: StatusApplication[] = [];
   let bleedChancePercent = 0;
   if (successfulHit && rule && "armorBreak" in rule) {
-    statusApplications.push({ kind: "armorBreak", strength: warriorSkillRankValue(rule.armorBreak, rank) });
+    statusApplications.push({ kind: "armorBreak", strength: warriorSkillRankValue(rule.armorBreak, rank),
+      ...(input.skill === "裂地斬"
+        ? { durationSeconds: warriorSkillRankValue(WARRIOR_ACTIVE_RULES.裂地斬.armorBreakDurationSeconds, rank) } : {}) });
   }
   if (successfulHit && input.skill === "血刃斬") {
-    const brandRank = combat.build.ranks["血戰烙印"] ?? 0;
     bleedChancePercent = warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血刃斬.bleedChance, rank)
-      + (bladeAscended && previousBleed ? 15 : 0)
-      + (marked && brandRank > 0 ? warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血戰烙印.bleedChanceBonus, brandRank) : 0);
+      + (bladeAscended && previousBleed ? 15 : 0);
     if ((input.roll ?? Math.random)() * 100 < bleedChancePercent) {
-      statusApplications.push({ kind: "bleed", ascendedBleed: bladeAscended });
+      statusApplications.push({ kind: "bleed",
+        durationSeconds: warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血刃斬.bleedDurationSeconds, rank),
+        ascendedBleed: bladeAscended });
     }
   }
-  if (successfulHit && input.skill === "血戰烙印") statusApplications.push({ kind: "bloodBrand", level: rank });
+  if (successfulHit && input.skill === "血戰烙印") statusApplications.push({ kind: "bloodBrand", level: rank,
+    durationSeconds: warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血戰烙印.durationSeconds, rank),
+    strength: warriorSkillRankValue(WARRIOR_ACTIVE_RULES.血戰烙印.weaknessDamageBonus, rank) });
 
   const passive = resolveWarriorPassiveAttack(combat.passives, combat.build, {
     kind: active ? "skill" : "normal",
@@ -159,11 +169,15 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     roll: input.roll ?? Math.random,
   });
   statusApplications.push(...passive.statuses);
+  for (const application of statusApplications) {
+    if (application.kind !== "bleed") continue;
+    application.durationSeconds = 5;
+  }
   // Ascension modifies the scheduled bleed tick, not the primary attack or
   // the as-yet undecided base damage-per-second multiplier.
   if (bladeAscended) {
     for (const application of statusApplications) {
-      if (application.kind === "bleed") application.bleedDamageBonusPercent = 20;
+      if (application.kind === "bleed") application.bleedDamageBonusPercent = (application.bleedDamageBonusPercent ?? 0) + 20;
     }
   }
   const bloodBrandBurstUsed = marked ? combat.bloodBrandBurstUsed : false;
@@ -206,6 +220,7 @@ export function resolveWarriorTurn(combat: WarriorCombat, input: WarriorTurnInpu
     baseDamagePercent,
     effectiveBaseDamagePercent,
     bonusDamagePercent: modifiers.damageBonusPercent + passive.damageBonusPercent,
+    targetDamageTakenBonusPercent: marked ? combat.session.enemy.bloodBrand?.strength ?? 0 : 0,
     extraDamagePercents: [
       ...ascensionDamageEvents.map((event) => event.percent),
       ...passiveDamageProcs.map((proc) => proc.percent),

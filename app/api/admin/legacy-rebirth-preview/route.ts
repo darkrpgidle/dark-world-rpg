@@ -64,3 +64,4 @@ export async function GET(request: Request) {
   const preview = previewLegacyRebirth({ capturedAt: new Date().toISOString(), accountIds: [accountId], rows });
   return respond({ account: { id: account.id, username: account.username }, ...preview });
 }
+

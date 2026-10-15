@@ -68,3 +68,4 @@ test("a reworked battle cannot silently switch back to legacy on missing or mism
   }), RangeError);
   assert.equal(otherLedger.remainingHealth, 100);
 });
+

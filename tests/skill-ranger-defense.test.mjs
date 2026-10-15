@@ -96,3 +96,4 @@ test("successful dodge without phantom step still grants learned passives and en
   assert.equal(combat.passives.nextPrimaryCriticalPending, true);
   assert.equal(combat.passives.dodgeFollowupPending, true);
 });
+

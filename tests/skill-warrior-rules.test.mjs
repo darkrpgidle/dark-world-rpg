@@ -15,13 +15,17 @@ const {
 test("all warrior skill levels and ascensions match the rework table", () => {
   assert.equal(Object.keys(WARRIOR_ACTIVE_RULES).length, 8);
   assert.equal(Object.keys(WARRIOR_PASSIVE_RULES).length, 12);
-  assert.deepEqual(WARRIOR_ACTIVE_RULES.裂地斬.damage, [165, 176, 187, 204, 220]);
-  assert.deepEqual(WARRIOR_ACTIVE_RULES.血刃斬.damage, [143, 154, 165, 176, 193]);
-  assert.deepEqual(WARRIOR_ACTIVE_RULES.狂戰姿態.attackSpeedBonus, [10, 14, 18, 22, 26]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.裂地斬.damage, [150, 175, 200, 225, 250]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.裂地斬.armorBreak, [30, 35, 40, 45, 50]);
   assert.deepEqual(WARRIOR_ACTIVE_RULES.泰坦斷界斬.damage, [400, 450, 500, 560, 630]);
-  assert.deepEqual(WARRIOR_ACTIVE_RULES.血戰烙印.durationSeconds, [6, 7, 8, 9, 10]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.血戰烙印.durationSeconds, [6, 7.5, 9, 10.5, 12]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.血戰烙印.weaknessDamageBonus, [15, 19, 23, 27, 30]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.不屈戰意.blockChance, [15, 21, 27, 34, 40]);
+  assert.deepEqual(WARRIOR_ACTIVE_RULES.不屈戰意.counterChance, [25, 31, 38, 44, 50]);
   assert.deepEqual(WARRIOR_PASSIVE_RULES.格擋精通.blockChancePoints, [3, 5, 7, 9, 11]);
-  assert.deepEqual(WARRIOR_PASSIVE_RULES.重刃專精.basicAndBurstDamage, [5, 7, 9, 12, 16]);
+  assert.deepEqual(WARRIOR_PASSIVE_RULES.鐵骨.defenseBonus, [20, 50, 80, 115, 150]);
+  assert.deepEqual(WARRIOR_PASSIVE_RULES.過度失血.bleedDamageBonus, [20, 30, 40, 50, 60]);
+  assert.equal("戰慄重擊" in WARRIOR_PASSIVE_RULES, false);
   for (const skill of Object.values(WARRIOR_ACTIVE_RULES)) {
     assert.equal(typeof skill.ascension, "string");
     for (const value of Object.values(skill)) if (Array.isArray(value)) assert.equal(value.length, 5);
@@ -55,7 +59,7 @@ test("stance lasts eight attacks and status applications can extend it at most t
   for (let i = 0; i < 11; i++) {
     const attack = consumeWarriorPrimaryAttack(state, true);
     assert.equal(attack.attackSpeedBonusPercent, 18);
-    assert.equal(attack.damageBonusPercent, 14);
+    assert.equal(attack.damageBonusPercent, 12);
     assert.equal(attack.defensePenaltyPercent, 15);
     state = attack.state;
   }
@@ -76,4 +80,3 @@ test("ground shock and titan slashes attach only to later primary attacks", () =
   assert.deepEqual(third.extraDamagePercents, [70]);
   assert.deepEqual(consumeWarriorPrimaryAttack(third.state, false).extraDamagePercents, []);
 });
-

@@ -18,23 +18,23 @@ const {
 
 function mageSession() {
   let build = createSkillBuild();
-  for (const name of ["霜火新星", "奧術飛彈", "星界寂滅"]) build = upgradeSkill(build, "法師", 100, name);
+  for (const name of ["霜火新星", "閃電鏈", "星界寂滅"]) build = upgradeSkill(build, "法師", 100, name);
   build = equipActiveSkill(build, "法師", 100, 0, "霜火新星");
-  build = equipActiveSkill(build, "法師", 100, 1, "奧術飛彈");
+  build = equipActiveSkill(build, "法師", 100, 1, "閃電鏈");
   return createSkillCombatSession(build, "法師", 100);
 }
 
 test("one cast charges once, applies each status once and yields scheduled damage", () => {
   let state = mageSession();
   for (let i = 0; i < 3; i++) state = resolveSkillAction(state, { kind: "normal", hits: [{ hit: true }] }, i * 100).session;
-  assert.equal(state.charge.ready[0], "奧術飛彈");
+  assert.equal(state.charge.ready[0], "閃電鏈");
   const selected = takeReadySkill(state, true);
-  assert.equal(selected.skill, "奧術飛彈");
+  assert.equal(selected.skill, "閃電鏈");
   const result = resolveSkillAction(selected.session, {
     kind: "skill", hits: [{ hit: true, critical: true }, { hit: true, critical: true }, { hit: false }],
     successfulStatuses: [{ kind: "burn" }, { kind: "burn" }],
   }, 500);
-  assert.equal(result.session.charge.charges["奧術飛彈"], 1);
+  assert.equal(result.session.charge.charges["閃電鏈"], 1);
   assert.equal(result.session.charge.ultimateEnergy, 30); // three normal hits, one critical, one status
   assert.equal(result.session.enemy.burn.stacks, 1);
   assert.deepEqual(advanceCombatSession(result.session, 1500).ticks, [{ kind: "burn", at: 1500, stacks: 1 }]);
@@ -82,3 +82,4 @@ test("cross-monster transition keeps charge but clears target states and proc bu
   assert.equal(death.charge.ultimateEnergy, 0);
   assert.deepEqual(death.enemy, {});
 });
+

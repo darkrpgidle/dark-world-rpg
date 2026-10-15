@@ -151,7 +151,7 @@ test("stance extension counts successful bleed applications at most three times 
   assert.equal(combat.buffs.stanceRemaining, 8);
   for (let index = 0; index < 3; index++) {
     const applied = turn(combat, "normal", 900 + index * 100, { roll: () => 0 });
-    assert.deepEqual(applied.statusApplications, [{ kind: "bleed", ascendedBleed: false }]);
+    assert.deepEqual(applied.statusApplications, [{ kind: "bleed", durationSeconds: 5, ascendedBleed: false }]);
     assert.equal(applied.combat.buffs.stanceRemaining, 8);
     combat = applied.combat;
   }

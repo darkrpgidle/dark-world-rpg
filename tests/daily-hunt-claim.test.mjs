@@ -74,3 +74,4 @@ test("daily claim rejects wrong day, insufficient kills and invalid resources", 
   assert.equal(applyDailyHuntClaim({ ...ready(), gold: Number.MAX_SAFE_INTEGER },
     { dailyDate: day, dailyKills: 500 }, day), null);
 });
+

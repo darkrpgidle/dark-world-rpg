@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import NextImage from "next/image";
 
 type Anchor = {
   x: number;
@@ -17,8 +18,8 @@ const MARK_LOOP_FRAME_DURATION = 165;
 const EXPLOSION_FRAME_DURATIONS = [120, 120, 110, 120, 130, 300, 360, 220] as const;
 const EXPLOSION_DURATION = EXPLOSION_FRAME_DURATIONS.reduce((sum, value) => sum + value, 0);
 const VFX_SOURCES = [
-  ...Array.from({ length: MARK_FRAMES }, (_, index) => `/vfx/deadly-mark/frame-${String(index).padStart(2, "0")}.png`),
-  ...Array.from({ length: EXPLOSION_FRAME_DURATIONS.length }, (_, index) => `/vfx/deadly-mark-explosion/frame-${String(index).padStart(2, "0")}.png`),
+  ...Array.from({ length: MARK_FRAMES }, (_, index) => `/vfx/deadly-mark/frame-${String(index).padStart(2, "0")}.webp`),
+  ...Array.from({ length: EXPLOSION_FRAME_DURATIONS.length }, (_, index) => `/vfx/deadly-mark-explosion/frame-${String(index).padStart(2, "0")}.webp`),
 ];
 
 function readEnemyAnchor(element: HTMLDivElement): Anchor {
@@ -125,8 +126,8 @@ export function RangerDeadlyMarkVfx({
   }, [effectKey, detonationKey]);
 
   const src = exploding
-    ? `/vfx/deadly-mark-explosion/frame-${String(frame).padStart(2, "0")}.png`
-    : `/vfx/deadly-mark/frame-${String(Math.min(MARK_FRAMES - 1, frame)).padStart(2, "0")}.png`;
+    ? `/vfx/deadly-mark-explosion/frame-${String(frame).padStart(2, "0")}.webp`
+    : `/vfx/deadly-mark/frame-${String(Math.min(MARK_FRAMES - 1, frame)).padStart(2, "0")}.webp`;
   // 標記只作為敵人身上的提示，避免遮住血條與角色；爆炸段才放大到命中範圍。
   const size = anchor ? (exploding ? Math.max(anchor.width, anchor.height) * 1.28 : Math.max(anchor.width, anchor.height) * 0.34) : 0;
   const faceFrame = exploding && (frame === 5 || frame === 6);
@@ -139,7 +140,7 @@ export function RangerDeadlyMarkVfx({
   return (
     <div ref={overlayRef} className="ranger-deadly-mark-vfx" aria-hidden="true">
       {anchor && assetsReady && opacity > 0 && (
-        <img
+        <NextImage unoptimized width={512} height={512} loading="eager"
           className="ranger-deadly-mark-frame"
           src={src}
           alt=""

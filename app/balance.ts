@@ -1,6 +1,60 @@
 import { balanceConfig } from "./balance-config";
+import { armorThreshold, armorMitigation, monsterArmorRating, additiveDamageMultiplier } from "./combat-math";
 
 export type CombatTier = "normal" | "elite" | "guardian" | "boss";
+// Original chapter-2 combat baseline, independent of the newer HP curve.
+export function secondChapterOriginalCombatPower(floor: number) {
+  const map = balanceConfig.maps[1], rules = balanceConfig.mapFloors;
+  const bounded = Math.max(1, Math.min(30, floor));
+  if (bounded >= 30) return map.bossPower;
+  if (bounded <= 10) return Math.round(map.power[0] + (map.phasePower[0] - map.power[0]) * (bounded - 1) / 9);
+  if (bounded <= 20) {
+    const start = Math.round(map.phasePower[0] * rules.phaseTwoStartMultiplier);
+    return Math.round(start + (map.phasePower[1] - start) * (bounded - 11) / 9);
+  }
+  const start = Math.round(map.phasePower[1] * rules.phaseThreeStartMultiplier);
+  return Math.round(start + (map.power[1] - start) * (bounded - 21) / 8);
+}
+export function secondChapterPower(floor: number) {
+  const anchors = balanceConfig.secondChapter.anchors;
+  const bounded = Math.max(1, Math.min(30, floor));
+  for (let i = 1; i < anchors.length; i++) {
+    const a = anchors[i - 1], b = anchors[i];
+    if (bounded <= b[0]) return Math.round(a[1] + (b[1] - a[1]) * (bounded - a[0]) / (b[0] - a[0]));
+  }
+  return anchors[anchors.length - 1][1];
+}
+export function secondChapterHealth(power: number, tier: CombatTier, name?: string) {
+  const anchors = balanceConfig.secondChapter.anchors;
+  let hp = anchors[anchors.length - 1][2];
+  for (let i = 1; i < anchors.length; i++) {
+    const a = anchors[i - 1], b = anchors[i];
+    if (power <= b[1]) { hp = a[2] + (b[2] - a[2]) * Math.max(0, power - a[1]) / (b[1] - a[1]); break; }
+  }
+  const variation = tier === "normal" ? 1 + (monsterProfile(name).health - 1) * balanceConfig.secondChapter.profileVariation : 1;
+  return Math.max(balanceConfig.mapFloors.monsterHealth.minimum, Math.round(hp * variation));
+}
+// Interpolate shared first-chapter anchors for UI and all damage/HP paths.
+export function firstChapterPower(floor: number) {
+  const anchors = balanceConfig.firstChapter.anchors;
+  const bounded = Math.max(1, Math.min(30, floor));
+  for (let i = 1; i < anchors.length; i++) {
+    const a = anchors[i - 1], b = anchors[i];
+    if (bounded <= b[0]) return Math.round(a[1] + (b[1] - a[1]) * (bounded - a[0]) / (b[0] - a[0]));
+  }
+  return anchors[anchors.length - 1][1];
+}
+export function firstChapterHealth(power: number, tier: CombatTier, name?: string) {
+  const anchors = tier === "normal" ? balanceConfig.firstChapter.ordinaryHealthAnchors
+    : balanceConfig.firstChapter.anchors.map(anchor => [anchor[1], anchor[2]]);
+  let hp = anchors[anchors.length - 1][1];
+  for (let i = 1; i < anchors.length; i++) {
+    const a = anchors[i - 1], b = anchors[i];
+    if (power <= b[0]) { hp = a[1] + (b[1] - a[1]) * Math.max(0, power - a[0]) / (b[0] - a[0]); break; }
+  }
+  const variation = tier === "normal" ? 1 + (monsterProfile(name).health - 1) * balanceConfig.firstChapter.profileVariation : 1;
+  return Math.max(balanceConfig.mapFloors.monsterHealth.minimum, Math.round(hp * variation));
+}
 export type SuppressionTier = "none" | "light" | "medium" | "heavy" | "abyss";
 
 export function realmSuppression(combatPower: number, recommendedPower: number) {
@@ -80,6 +134,18 @@ export function evadeChanceFromRatings(accuracyRating: number, evasionRating: nu
   return 100 - hitChanceFromRatings(accuracyRating, evasionRating);
 }
 
+export function monsterRatingsForMap(mapId: number) {
+  const rules = balanceConfig.combat.evasionModel;
+  const mapIndex = Math.max(1, Math.min(rules.monsterAccuracyRatingByMap.length - 1, Math.round(mapId)));
+  return {
+    accuracy: rules.monsterAccuracyRatingByMap[mapIndex] ?? rules.monsterAccuracyBase,
+    evasion: Math.round(
+      (rules.monsterEvasionRatingByMap[mapIndex] ?? rules.monsterEvasionBase) *
+      (1 + (rules.monsterEvasionBonusPercentByMap[mapIndex] ?? 0) / 100),
+    ),
+  };
+}
+
 export function enhancementGoldCost(
   targetLevel: number,
   context: { mapId?: number; quality?: string; slot?: string } = {},
@@ -116,21 +182,6 @@ export function enhancementStoneCost(targetLevel: number) {
   return Math.ceil(rules.lateBase * rules.lateGrowth ** (level - 10));
 }
 
-export function enhancementStoneDropChance(baseChance: number, bonusPercent = 0, blessingBonus = 0) {
-  const multiplier = balanceConfig.economy.enhancementStones.combatDropChanceMultiplier;
-  return clamp(0, 1, (baseChance + bonusPercent / 100 + blessingBonus) * multiplier);
-}
-
-export function enhancementStoneDismantleYield(qualityRank: number, enhancementLevel: number) {
-  const baseYield = Math.max(0, qualityRank) + Math.floor(Math.max(0, enhancementLevel) / 3);
-  const multiplier = balanceConfig.economy.enhancementStones.dismantleYieldMultiplier;
-  return Math.max(1, Math.floor(baseYield * multiplier));
-}
-
-export function enhancementFailureLevel(currentLevel: number) {
-  return currentLevel <= 10 ? currentLevel : currentLevel - 1;
-}
-
 export function equipmentReforgeCost(completedAttempts: number, targeted = false) {
   const rules = balanceConfig.economy.costs.reforge;
   const requestedAttempts = Number(completedAttempts);
@@ -145,6 +196,21 @@ export function equipmentReforgeCost(completedAttempts: number, targeted = false
     gold: Math.ceil(baseGold * multiplier),
     stones: Math.ceil(baseStones * multiplier),
   };
+}
+
+export function enhancementStoneDropChance(baseChance: number, bonusPercent = 0, blessingBonus = 0) {
+  const multiplier = balanceConfig.economy.enhancementStones.combatDropChanceMultiplier;
+  return clamp(0, 1, (baseChance + bonusPercent / 100 + blessingBonus) * multiplier);
+}
+
+export function enhancementStoneDismantleYield(qualityRank: number, enhancementLevel: number) {
+  const baseYield = Math.max(0, qualityRank) + Math.floor(Math.max(0, enhancementLevel) / 3);
+  const multiplier = balanceConfig.economy.enhancementStones.dismantleYieldMultiplier;
+  return Math.max(1, Math.floor(baseYield * multiplier));
+}
+
+export function enhancementFailureLevel(currentLevel: number) {
+  return currentLevel <= 10 ? currentLevel : currentLevel - 1;
 }
 
 export function gamblePackageReward(roll: number) {
@@ -163,7 +229,6 @@ export function towerCombatValues({
   tier,
   attacks,
   skillTriggered,
-  setTier,
   echoMultiplier = 1,
   skillMultiplier = 1,
   skillDamage = 0,
@@ -177,9 +242,13 @@ export function towerCombatValues({
   playerDefense = 0,
   playerAttack = 54,
   playerDamageMultiplier = 1,
+  bossDamage = 0,
   defenseIgnore = 0,
   playerHit,
   monsterEvasionRating = 0,
+  firstChapterTuning = true,
+  secondChapterTuning = false,
+  calibrateMonsterStats = true,
 }: {
   combatPower: number;
   recommendedPower: number;
@@ -202,12 +271,25 @@ export function towerCombatValues({
   playerDefense?: number;
   playerAttack?: number;
   playerDamageMultiplier?: number;
+  bossDamage?: number;
   defenseIgnore?: number;
   playerHit?: number;
   monsterEvasionRating?: number;
+  firstChapterTuning?: boolean;
+  secondChapterTuning?: boolean;
+  calibrateMonsterStats?: boolean;
 }) {
-  const profile = monsterProfile(monsterName);
-  const suppression = realmSuppression(combatPower, recommendedPower);
+  const originalProfile = monsterProfile(monsterName);
+  const chapter = balanceConfig.firstChapter;
+  const useChapter = mapId === 1 && firstChapterTuning;
+  const profile = useChapter ? {
+    ...originalProfile,
+    attack: 1 + (originalProfile.attack - 1) * chapter.profileVariation,
+    defense: 1 + (originalProfile.defense - 1) * chapter.profileVariation,
+  } : originalProfile;
+  const combatRecommendedPower = mapId === 2 && secondChapterTuning
+    ? secondChapterOriginalCombatPower(localFloor) : recommendedPower;
+  const suppression = realmSuppression(combatPower, combatRecommendedPower);
   const lateGameScale = lateGameMonsterScale(mapId);
   const checkpoint =
     tier === "guardian" && localFloor === 20
@@ -215,33 +297,30 @@ export function towerCombatValues({
       : tier === "guardian" && localFloor === 10
         ? balanceConfig.combat.guardianCheckpoints.floor10
         : { defense: 1, attack: 1 };
-  const checkpointDefense =
-    checkpoint.defense;
+  const calibrationTier = tier === "guardian" && localFloor === 10 ? "guardian10" : tier;
+  const calibration = (calibrateMonsterStats
+    ? balanceConfig.combat.monsterCalibrationByMap[mapId - 1]?.[calibrationTier] : undefined)
+    ?? { attack: 1, defense: 1 };
+  const checkpointDefense = useChapter ? 1 : checkpoint.defense;
   const tierDefense =
-    balanceConfig.combat.tierDefense[tier] *
+    (useChapter ? chapter.tierDefense[tier] * chapter.defenseScale : balanceConfig.combat.tierDefense[tier]) *
     checkpointDefense *
     lateGameScale.defense *
     profile.defense *
-    suppression.defenseMultiplier *
-    (1 - Math.min(0.8, Math.max(0, defenseIgnore) / 100));
+    suppression.defenseMultiplier * calibration.defense;
   const mapDamageReduction =
     balanceConfig.combat.monsterDamageReductionByMap[mapId] ?? 0;
-  const defenseRules = balanceConfig.combat.defenseMitigation;
-  const defenseThreshold =
-    defenseRules.baseThreshold + Math.max(0, mapId - 1) * defenseRules.perMapThreshold;
-  const defenseMitigation = Math.min(
-    defenseRules.cap,
-    Math.max(0, playerDefense) / (Math.max(0, playerDefense) + defenseThreshold),
-  );
+  const defenseThreshold = armorThreshold(mapId, localFloor);
+  const defenseMitigation = armorMitigation(playerDefense, defenseThreshold);
   const monsterStats = balanceConfig.combat.monsterStats;
-  const monsterDefense =
+  const monsterDefense = monsterArmorRating(
     (monsterStats.baseDefense +
       Math.max(0, localFloor - 1) * monsterStats.floorDefenseGrowth +
       Math.max(0, mapId - 1) * monsterStats.mapDefenseGrowth) *
-    tierDefense *
-    profile.defense *
-    (1 - Math.min(0.8, Math.max(0, defenseIgnore) / 100));
-  const attackDefenseFactor = 100 / (100 + Math.max(0, monsterDefense));
+    tierDefense, defenseThreshold);
+  const attackDefenseFactor = 1 - armorMitigation(monsterDefense, defenseThreshold, defenseIgnore);
+  const damageBonusMultiplier = additiveDamageMultiplier({ skillDamage, bossDamage, eliteDamage, lowHealthDamage,
+    skillTriggered, bossTarget: tier !== "normal", eliteTarget: tier === "elite" || tier === "guardian", lowHealth });
   const playerHitChance = playerHit === undefined
     ? 100
     : Math.max(5, hitChanceFromRatings(
@@ -259,18 +338,16 @@ export function towerCombatValues({
         attacks *
         echoMultiplier *
         skillMultiplier *
-        (1 + (skillTriggered ? skillDamage : 0) / 100) *
+        damageBonusMultiplier *
         (1 - mapDamageReduction / 100) *
-        (tier === "elite" || tier === "guardian" ? 1 + eliteDamage / 100 : 1) *
-        (lowHealth ? 1 + lowHealthDamage / 100 : 1) *
         Math.max(0, playerDamageMultiplier),
     ),
     );
   const tierAttack =
-    balanceConfig.combat.tierAttack[tier] *
-    checkpoint.attack *
+    (useChapter ? chapter.tierAttack[tier] * chapter.attackScale : balanceConfig.combat.tierAttack[tier]) *
+    (useChapter ? 1 : checkpoint.attack) *
     lateGameScale.attack *
-    (localFloor % 10 === 0
+    (!useChapter && localFloor % 10 === 0
       ? 1 - balanceConfig.combat.monsterDamage.milestoneAttackReduction
       : 1);
   const ordinaryPressure =
@@ -285,7 +362,7 @@ export function towerCombatValues({
   const monsterAttackScale =
     tier === "normal" ? monsterStats.normalAttackScale : monsterStats.attackScale;
   const progressionDamageFloor =
-    recommendedPower *
+    combatRecommendedPower *
     monsterStats.recommendedPowerAttackScale *
     tierAttack *
     ordinaryPressure *
@@ -293,7 +370,7 @@ export function towerCombatValues({
   const monsterDamage = Math.max(
     balanceConfig.combat.monsterDamage.minimum,
     Math.round(
-      Math.max(monsterAttack * monsterAttackScale, progressionDamageFloor) *
+      Math.max(monsterAttack * monsterAttackScale, progressionDamageFloor) * calibration.attack *
         suppression.damageMultiplier *
         (tier === "boss" ? 1 - Math.min(balanceConfig.progression.damageReductionCap, bossReduction) / 100 : 1) *
         (lowHealth ? 1 - Math.min(balanceConfig.progression.damageReductionCap, lowHealthReduction) / 100 : 1) *
@@ -309,10 +386,11 @@ export function towerCombatValues({
     progressionDamageFloor,
     monsterDefense,
     tierDefense,
-    // 保留輸入參數以避免舊存檔與既有呼叫端變動；戰力不再參與實戰。
+    // 保留原戰鬥戰力與樓層需求：仍參與境界壓制，不使用地圖卡片的綜合戰力建議。
     combatPower,
     recommendedPower,
     defenseMitigation,
+    damageBonusMultiplier,
     playerHitChance,
     suppression,
   };

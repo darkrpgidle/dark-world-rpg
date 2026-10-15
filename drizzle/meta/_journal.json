@@ -64,6 +64,34 @@
       "when": 1789354434281,
       "tag": "0008_slippery_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790567355966,
+      "tag": "0009_famous_lady_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791017323134,
+      "tag": "0010_slow_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791783831631,
+      "tag": "0011_faithful_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791784430427,
+      "tag": "0012_cuddly_karnak",
+      "breakpoints": true
     }
   ]
 }

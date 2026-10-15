@@ -60,7 +60,7 @@ export function SkillConstellation({ characterClass, catalog, ranks, activeSlots
     const row = Math.floor(index / 7);
     const column = index % 7;
     const rank = ranks[skill.name] ?? 0;
-    const unlocked = skill.unlockLevel <= characterLevel;
+    const unlocked = skill.unlockLevel <= characterLevel || rank > 0;
     const equipped = activeSlots.includes(skill.name);
     const base = palettes[characterClass][skill.kind === "active" ? "active" : "passive"];
     const color = !unlocked ? "#3f4a4a" : rank === 0 ? "#6b7370" : base;

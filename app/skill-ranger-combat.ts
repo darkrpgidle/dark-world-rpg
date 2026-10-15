@@ -1,6 +1,8 @@
 // Ranger primary actions on the isolated skill-rework combat path.
 // The caller applies direct HP damage and rolls each arrow's hit/critical.
 import type { SkillBuild } from "./skill-rework";
+import { balanceConfig } from "./balance-config";
+import { hasCatalogItem } from "./mythic-data";
 import {
   advanceCombatSession, createSkillCombatSession, resolveSkillAction, takeReadySkill,
   transitionCombatSession,
@@ -64,6 +66,7 @@ export type RangerTurnInput = {
   now: number;
   ascended: ReadonlySet<RangerActiveName>;
   roll?: () => number;
+  equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[];
 };
 
 export type RangerTurnResult = {
@@ -101,7 +104,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   let session = settled.session;
   const rule = input.skill === "normal" ? null : RANGER_ACTIVE_RULES[input.skill];
   const rank = input.skill === "normal" ? 0 : combat.build.ranks[input.skill] ?? 0;
-  if (input.skill === "疾風連射" && input.hits.length !== RANGER_ACTIVE_RULES.疾風連射.arrows) return null;
+  const feathers = hasCatalogItem(input.equippedItems ?? [], "skill-ranger-thousand-feathers");
+  const volleyCount = feathers ? balanceConfig.equipment.skillMythics.thousandFeathers.arrows : RANGER_ACTIVE_RULES.疾風連射.arrows;
+  if (input.skill === "疾風連射" && input.hits.length !== volleyCount) return null;
   if (input.skill === "蒼穹箭雨" &&
       input.hits.length !== RANGER_ACTIVE_RULES.蒼穹箭雨.rainArrows + RANGER_ACTIVE_RULES.蒼穹箭雨.mainArrows) return null;
 
@@ -179,7 +184,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   }
 
   const damageSegmentPercents = input.skill === "疾風連射"
-    ? Array.from({ length: 5 }, () => rangerSkillRankValue(RANGER_ACTIVE_RULES.疾風連射.damagePerArrow, rank))
+    ? Array.from({ length: volleyCount }, () => rangerSkillRankValue(RANGER_ACTIVE_RULES.疾風連射.damagePerArrow, rank)
+      * (feathers ? RANGER_ACTIVE_RULES.疾風連射.arrows / volleyCount
+        * (1 + balanceConfig.equipment.skillMythics.thousandFeathers.totalDamageBonusPercent / 100) : 1))
     : input.skill === "蒼穹箭雨"
       ? [
         ...Array.from({ length: RANGER_ACTIVE_RULES.蒼穹箭雨.rainArrows },
@@ -193,7 +200,7 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   const totalDamagePercent = input.skill === "蒼穹箭雨"
     ? rangerSkillRankValue(RANGER_ACTIVE_RULES.蒼穹箭雨.totalDamage, rank) : 0;
   const rapidSixthArrow = input.skill === "疾風連射"
-    && input.ascended.has("疾風連射") && input.hits.every((hit) => hit.hit)
+    && input.ascended.has("疾風連射") && input.hits.slice(0, RANGER_ACTIVE_RULES.疾風連射.arrows).every((hit) => hit.hit)
     ? RANGER_ACTIVE_RULES.疾風連射.sixthArrowDamage : 0;
   const tailwindArrow = input.skill === "追風箭" && input.ascended.has("追風箭")
     && input.hits.some((hit) => hit.hit && hit.critical)
@@ -205,7 +212,9 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
   const skyMarks = input.skill === "蒼穹箭雨" && input.ascended.has("蒼穹箭雨")
     ? input.hits.slice(0, 8).filter((hit) => hit.hit && hit.critical).length : 0;
   const ignoreDefensePercent = (input.skill === "穿雲箭"
-    ? rangerSkillRankValue(RANGER_ACTIVE_RULES.穿雲箭.ignoreDefense, rank) : 0)
+    ? hasCatalogItem(input.equippedItems ?? [], "skill-ranger-sky-piercer")
+      ? balanceConfig.equipment.skillMythics.skyPiercer.ignoreDefensePercent
+      : rangerSkillRankValue(RANGER_ACTIVE_RULES.穿雲箭.ignoreDefense, rank) : 0)
     + (rule && combat.nextSkillIgnoreDefensePending ? RANGER_ACTIVE_RULES.穿雲箭.nextSkillIgnoreDefense : 0);
   const nextSkillIgnoreDefensePending = input.skill === "穿雲箭" && input.ascended.has("穿雲箭")
     ? true : rule ? false : combat.nextSkillIgnoreDefensePending;
@@ -252,3 +261,4 @@ export function resolveRangerTurn(combat: RangerCombat, input: RangerTurnInput):
     dueTicks: [...settled.ticks, ...action.ticks],
   };
 }
+

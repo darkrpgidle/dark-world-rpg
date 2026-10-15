@@ -81,3 +81,4 @@ export function summarizeSkillBalance(observations: readonly SkillBalanceObserva
     missing: rows.filter((row) => row.metrics === null).map((row) => row.scenario),
   };
 }
+

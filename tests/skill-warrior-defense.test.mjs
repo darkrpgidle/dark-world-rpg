@@ -32,7 +32,7 @@ test("one enemy attack event counts once even with many segments; fourth event a
   }
   const fourth = enemy(combat, true, 7, true);
   assert.deepEqual(fourth.activation, {
-    blockChancePercent: 15, counterChancePercent: 10, grantsGuaranteedBlock: true,
+    blockChancePercent: 15, counterChancePercent: 25, grantsGuaranteedBlock: true,
   });
   assert.deepEqual(fourth.combat.defense, {
     receivedAttacks: 0, activeAttacksRemaining: 2, activeForAttack: true,
@@ -89,6 +89,6 @@ test("non-learned defense stays inactive but passive protection still reports lo
   assert.equal(next.activation, null);
   assert.equal(next.combat.defense.receivedAttacks, 0);
   assert.deepEqual(next.passive, {
-    maxHealthBonusPercent: 0, blockChancePoints: 3, incomingDamageReductionPercent: 4,
+    defenseBonusFlat: 0, blockChancePoints: 3, incomingDamageReductionPercent: 6,
   });
 });

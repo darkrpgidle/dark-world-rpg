@@ -1,0 +1,1 @@
+{"capturedAt":"2026-09-27T01:00:00Z","accounts":[{"id":"account-a"}],"saves":[{"playerId":"player-a","accountId":"account-a","payload":"{\"rebirthCount\":3}","updatedAt":"2026-09-26 12:00:00"}],"snapshots":[{"id":1,"playerId":"player-a","accountId":"account-a","payload":"{\"rebirthCount\":21}","capturedAt":"2026-09-25 12:00:00"}]}

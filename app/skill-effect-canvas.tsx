@@ -28,7 +28,8 @@ type CombatAnchors = {
 const EFFECT_DURATION: Record<string, number> = {
   鮮血怒吼強化斬擊: 680,
   裂地斬: 1395,
-  鮮血怒吼: 1050,
+  鮮血怒吼: 755,
+  鮮血怒吼血爆: 700,
   處決: 1900,
   霜火新星: 1250,
   魔力護盾: 1150,
@@ -41,21 +42,32 @@ const PREMIUM_VFX_ASSETS: Record<string, string> = {
 };
 
 const BLOOD_ROAR_BASIC_ATTACK_FRAMES = [
-  "/vfx/blood-roar-basic/frame-00.png",
-  "/vfx/blood-roar-basic/frame-01.png",
-  "/vfx/blood-roar-basic/frame-02.png",
-  "/vfx/blood-roar-basic/frame-03.png",
+  "/vfx/blood-roar-basic/frame-00.webp",
+  "/vfx/blood-roar-basic/frame-01.webp",
+  "/vfx/blood-roar-basic/frame-02.webp",
+  "/vfx/blood-roar-basic/frame-03.webp",
 ];
 
+const BLOOD_ROAR_ACTIVATION_FRAMES = Array.from(
+  { length: 6 },
+  (_, index) => `/vfx/blood-roar-activation/frame-${String(index).padStart(2, "0")}.webp`,
+);
+const BLOOD_ROAR_BURST_FRAMES = Array.from(
+  { length: 6 },
+  (_, index) => `/vfx/blood-roar-burst/frame-${String(index).padStart(2, "0")}.webp`,
+);
+const BLOOD_ROAR_ACTIVATION_FRAME_DURATIONS = [100, 105, 90, 130, 150, 180] as const;
+const BLOOD_ROAR_BURST_FRAME_DURATIONS = [105, 90, 75, 110, 140, 180] as const;
+
 const EXECUTION_FRAMES = [
-  "/vfx/execution/frame-00.png",
-  "/vfx/execution/frame-01.png",
-  "/vfx/execution/frame-02.png",
-  "/vfx/execution/frame-03.png",
-  "/vfx/execution/frame-04.png",
-  "/vfx/execution/frame-05.png",
-  "/vfx/execution/frame-06.png",
-  "/vfx/execution/frame-07.png",
+  "/vfx/execution/frame-00.webp",
+  "/vfx/execution/frame-01.webp",
+  "/vfx/execution/frame-02.webp",
+  "/vfx/execution/frame-03.webp",
+  "/vfx/execution/frame-04.webp",
+  "/vfx/execution/frame-05.webp",
+  "/vfx/execution/frame-06.webp",
+  "/vfx/execution/frame-07.webp",
 ];
 
 // The first five frames are the fall-to-impact portion.  Keep the first
@@ -78,7 +90,7 @@ function executionLandingFrame(elapsed: number) {
 
 const GROUND_SPLIT_FRAMES = Array.from(
   { length: 5 },
-  (_, index) => `/vfx/ground-split-v2/frame-${String(index).padStart(2, "0")}.png`,
+  (_, index) => `/vfx/ground-split-v2/frame-${String(index).padStart(2, "0")}.webp`,
 );
 
 // The crack travels in a quick burst, pauses for the first eruption, then
@@ -115,7 +127,17 @@ function groundSplitFinalOpacity(elapsed: number) {
 
 function baseEffectName(name: string) {
   if (name === "鮮血怒吼・強化斬擊") return "鮮血怒吼強化斬擊";
+  if (name === "鮮血怒吼・血爆") return "鮮血怒吼血爆";
   return name.endsWith("・回響") ? name.slice(0, -3) : name;
+}
+
+function sequenceFrameAt(elapsed: number, frameDurations: readonly number[]) {
+  let elapsedAtFrameStart = 0;
+  for (let index = 0; index < frameDurations.length; index += 1) {
+    elapsedAtFrameStart += frameDurations[index];
+    if (elapsed < elapsedAtFrameStart) return index;
+  }
+  return frameDurations.length - 1;
 }
 
 function resolveCombatAnchors(canvas: HTMLCanvasElement, rect: DOMRect): CombatAnchors {
@@ -167,6 +189,8 @@ function drawPremiumVfx(
   const intro = Math.min(1, progress * 4.5);
   const fade = Math.max(0, Math.min(1, (1 - progress) * 5));
   const compactBloodRoar = effect === "鮮血怒吼強化斬擊";
+  const bloodRoarActivation = effect === "鮮血怒吼";
+  const bloodRoarBurst = effect === "鮮血怒吼血爆";
   const execution = effect === "處決";
   const groundSplit = effect === "裂地斬";
   // Keep the 750ms beat, but accelerate sharply into the impact so the blade
@@ -190,7 +214,11 @@ function drawPremiumVfx(
   const groundSplitWidth = groundSplitTravel
     ? anchors.enemyX - anchors.playerX + anchors.playerWidth * 0.36 + anchors.enemyWidth * 0.4
     : Math.max(anchors.enemyWidth * 1.32, anchors.enemyHeight * 0.94);
-  const targetWidth = groundSplit
+  const targetWidth = bloodRoarActivation
+      ? Math.min(anchors.playerWidth * 1.42, anchors.playerHeight * 0.86)
+    : bloodRoarBurst
+      ? Math.min(anchors.enemyWidth * 1.38, anchors.enemyHeight * 0.96)
+    : groundSplit
       ? groundSplitWidth * scale
     : compactBloodRoar
       ? Math.min(anchors.enemyWidth * 1.35, anchors.enemyHeight * 0.52) * scale
@@ -205,6 +233,10 @@ function drawPremiumVfx(
     : targetWidth / assetRatio;
   const x = compactBloodRoar
       ? anchors.enemyX - targetWidth / 2
+    : bloodRoarActivation
+      ? anchors.playerX - targetWidth / 2
+    : bloodRoarBurst
+      ? anchors.enemyX - targetWidth / 2
     : execution
         ? anchors.enemyX - targetWidth / 2
       : groundSplit
@@ -216,6 +248,10 @@ function drawPremiumVfx(
     ? Math.max(-8, Math.min(height - targetHeight + 8, anchors.groundY - targetHeight * 0.82))
     : compactBloodRoar
     ? anchors.enemyY - targetHeight / 2
+    : bloodRoarActivation
+      ? anchors.playerY - targetHeight / 2
+    : bloodRoarBurst
+      ? anchors.enemyY - targetHeight / 2
     : execution
       ? anchors.enemyY - targetHeight / 2 - (1 - executionDropProgress) * anchors.enemyHeight * 1.18
     : (height - targetHeight) / 2 + height * 0.035;
@@ -226,16 +262,24 @@ function drawPremiumVfx(
       ? Math.max(0, 1 - executionDissipateProgress) ** 0.8
       : 1;
   ctx.save();
-  ctx.globalAlpha = (execution
-    ? executionOpacity
-    : groundSplit
-      ? groundSplitFade
-    : compactBloodRoar
-      ? Math.min(1, intro * 2.5) * Math.max(0.08, fade)
-      : Math.min(1, intro * 1.8) * Math.max(0.12, fade)) * opacity;
+  ctx.globalAlpha = (
+    bloodRoarActivation || bloodRoarBurst
+      ? frameIndex === 5 ? fade : 1
+      : execution
+        ? executionOpacity
+        : groundSplit
+          ? groundSplitFade
+          : compactBloodRoar
+            ? Math.min(1, intro * 2.5) * Math.max(0.08, fade)
+            : Math.min(1, intro * 1.8) * Math.max(0.12, fade)
+  ) * opacity;
   ctx.globalCompositeOperation = "lighter";
   ctx.filter = compactBloodRoar
       ? "drop-shadow(0 0 8px rgba(188, 19, 35, .8))"
+      : bloodRoarActivation
+        ? "drop-shadow(0 0 12px rgba(218, 24, 43, .78))"
+      : bloodRoarBurst
+        ? "drop-shadow(0 0 17px rgba(255, 37, 48, .96)) drop-shadow(0 0 7px rgba(255, 160, 103, .7))"
       : execution
         ? "drop-shadow(0 0 16px rgba(255, 47, 47, .92)) drop-shadow(0 0 6px rgba(255, 224, 166, .78))"
         : "drop-shadow(0 0 16px rgba(175, 24, 38, .72))";
@@ -576,6 +620,27 @@ function drawEffect(
     burst(ctx, sparks, left, playerY, pulse, playerScale);
   }
 
+  if (name === "鮮血怒吼血爆") {
+    const centerX = right;
+    const collapse = Math.min(1, progress / 0.34);
+    const impact = Math.max(0, Math.min(1, (progress - 0.28) / 0.72));
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let index = 0; index < 10; index += 1) {
+      const angle = (Math.PI * 2 * index) / 10 + progress * 0.25;
+      const inner = enemyH * (0.18 + 0.34 * (1 - easeOut(collapse)));
+      const x = centerX + Math.cos(angle) * inner;
+      const y = centerY + Math.sin(angle) * inner;
+      glowLine(ctx, x, y, centerX, centerY, index % 3 === 0 ? "#ff6048" : "#b20d27", Math.max(1.5, enemyW * 0.014), 12);
+    }
+    ctx.restore();
+    if (progress >= 0.28) {
+      shockwave(ctx, centerX, centerY, enemyH * (0.08 + easeOut(impact) * 0.54), "#ff3045", 1 - impact);
+      burst(ctx, sparks, centerX, centerY, impact, enemyScale);
+      if (impact < 0.22) flash(ctx, width, height, (0.22 - impact) * 0.55, "#ffccd0");
+    }
+  }
+
   if (name === "處決") {
     const cut = easeOut(Math.min(1, progress * 1.7));
     const slashStart = left + (right - left) * 0.14;
@@ -641,23 +706,33 @@ export function SkillEffectCanvas({
   name,
   effectKey,
   targetKey,
+  onComplete,
 }: {
   name: string;
   effectKey: number;
   targetKey?: string;
+  onComplete?: (effectKey: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const targetKeyRef = useRef(targetKey);
+  const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
     targetKeyRef.current = targetKey;
   }, [targetKey]);
 
   useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      onCompleteRef.current?.(effectKey);
+      return;
+    }
     const effect = baseEffectName(name);
     const duration = EFFECT_DURATION[effect] ?? 950;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -672,7 +747,11 @@ export function SkillEffectCanvas({
             ? ["#b49aff", "#f7efff", "#738fff"]
           : ["#ff753e", "#ffe29a", "#6ddfff"];
     const sparks = makeSparks(seed, reducedMotion ? 10 : 42, palette, 150);
-    const assetSources = effect === "鮮血怒吼強化斬擊"
+    const assetSources = effect === "鮮血怒吼"
+        ? BLOOD_ROAR_ACTIVATION_FRAMES
+      : effect === "鮮血怒吼血爆"
+        ? BLOOD_ROAR_BURST_FRAMES
+      : effect === "鮮血怒吼強化斬擊"
         ? BLOOD_ROAR_BASIC_ATTACK_FRAMES
         : effect === "處決"
           ? EXECUTION_FRAMES
@@ -688,7 +767,9 @@ export function SkillEffectCanvas({
     });
     let animationFrame = 0;
     let startedAt = 0;
+    let firstFrameAt: number | null = null;
     let executionReleaseAt = 0;
+    let completionNotified = false;
     const executionTargetKey = targetKeyRef.current;
 
     const resize = () => {
@@ -701,6 +782,13 @@ export function SkillEffectCanvas({
     resize();
 
     const render = (time: number) => {
+      if (firstFrameAt === null) firstFrameAt = time;
+      const bloodRoarFrameSet = effect === "鮮血怒吼" || effect === "鮮血怒吼血爆";
+      const bloodRoarFramesStillLoading = bloodRoarFrameSet && premiumAssets.some((asset) => !asset.complete);
+      if (bloodRoarFramesStillLoading && time - firstFrameAt < 4_000) {
+        animationFrame = requestAnimationFrame(render);
+        return;
+      }
       if (!startedAt) startedAt = time;
       const rect = canvas.getBoundingClientRect();
       const elapsed = time - startedAt;
@@ -710,6 +798,10 @@ export function SkillEffectCanvas({
       const anchors = resolveCombatAnchors(canvas, rect);
       let frameIndex = effect === "鮮血怒吼強化斬擊"
           ? Math.min(BLOOD_ROAR_BASIC_ATTACK_FRAMES.length - 1, Math.floor(progress * BLOOD_ROAR_BASIC_ATTACK_FRAMES.length))
+        : effect === "鮮血怒吼"
+          ? reducedMotion ? 4 : sequenceFrameAt(elapsed, BLOOD_ROAR_ACTIVATION_FRAME_DURATIONS)
+        : effect === "鮮血怒吼血爆"
+          ? reducedMotion ? 4 : sequenceFrameAt(elapsed, BLOOD_ROAR_BURST_FRAME_DURATIONS)
         : effect === "裂地斬"
           ? reducedMotion
             ? GROUND_SPLIT_FRAMES.length - 1
@@ -751,7 +843,11 @@ export function SkillEffectCanvas({
         // Rendering only the active frame prevents the old path from stacking
         // beneath the final explosion or remaining after its flash-out.
         drawPremiumVfx(context, premiumAsset, effect, progress, rect.width, rect.height, frameIndex, anchors, sparks, groundSplitOpacity);
-      } else if (!["處決", "裂地斬", "鮮血怒吼強化斬擊"].includes(effect)) {
+      } else if (bloodRoarFrameSet && (premiumAssets.every((asset) => asset.complete) || time - (firstFrameAt ?? time) >= 4_000)) {
+        // Keep these two phases visible if an individual sprite fails or is slow to arrive.
+        context.globalCompositeOperation = "lighter";
+        drawEffect(context, effect, progress, rect.width, rect.height, sparks, anchors);
+      } else if (!["處決", "裂地斬", "鮮血怒吼", "鮮血怒吼血爆", "鮮血怒吼強化斬擊"].includes(effect)) {
         // Frame-based warrior VFX must never fall back to the old procedural
         // renderer while an image is still loading; that fallback was the
         // intermittent Pixi-like effect seen during execution.
@@ -759,6 +855,10 @@ export function SkillEffectCanvas({
         drawEffect(context, effect, progress, rect.width, rect.height, sparks, anchors);
       }
       context.globalCompositeOperation = "source-over";
+      if (!keepAnimating && !completionNotified) {
+        completionNotified = true;
+        onCompleteRef.current?.(effectKey);
+      }
       if (keepAnimating) animationFrame = requestAnimationFrame(render);
     };
     animationFrame = requestAnimationFrame(render);

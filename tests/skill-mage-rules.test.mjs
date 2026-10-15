@@ -17,7 +17,7 @@ const { createSkillCombatState, recordPrimaryAttack, consumeReadySkill, SKILL_CH
 const hit = { kind: "skill", hits: [{ hit: true }] };
 const missiles = { kind: "skill", hits: [{ hit: true }, { hit: true }, { hit: true }] };
 function exhaust(state) {
-  for (let i = 0; i < 6; i++) state = consumeMageOverload(state, hit).state;
+  for (let i = 0; i < 3; i++) state = consumeMageOverload(state, hit).state;
   return state;
 }
 
@@ -28,8 +28,8 @@ test("mage catalog has all eight actives and twelve passives in the specified un
   assert.equal(passive.length, 12);
   assert.deepEqual(Object.keys(MAGE_ACTIVE_RULES), active.map((skill) => skill.name));
   assert.deepEqual(Object.keys(MAGE_PASSIVE_RULES), passive.map((skill) => skill.name));
-  assert.deepEqual(active.map((skill) => skill.unlockLevel), [2, 6, 10, 16, 22, 28, 38, 50]);
-  assert.deepEqual(passive.map((skill) => skill.unlockLevel), [4, 8, 12, 14, 18, 20, 24, 26, 30, 34, 42, 46]);
+  assert.deepEqual(active.map((skill) => skill.unlockLevel), [1, 10, 20, 30, 40, 52, 66, 80]);
+  assert.deepEqual(passive.map((skill) => skill.unlockLevel), [5, 12, 18, 24, 32, 38, 45, 50, 56, 62, 70, 76]);
   assert.deepEqual(Object.values(MAGE_ACTIVE_RULES).map((rule) => rule.category), active.map((skill) => skill.category));
 });
 
@@ -37,27 +37,27 @@ test("all mage Lv1–5 rows match sections 10 and 17 of the specification", () =
   const rows = (rules) => Object.fromEntries(Object.entries(rules).map(([name, rule]) =>
     [name, Object.fromEntries(Object.entries(rule).filter(([, value]) => Array.isArray(value)))]));
   assert.deepEqual(rows(MAGE_ACTIVE_RULES), {
-    霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [20, 25, 30, 35, 40] },
-    奧術飛彈: { damagePerMissile: [50, 55, 60, 66, 72] },
+    霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [25, 30, 35, 40, 50] },
+    閃電鏈: { damagePerMissile: [60, 70, 80, 90, 100] },
     魔力護盾: { maxHealthShieldPercent: [12, 15, 18, 21, 25] },
-    元素蝕印: { durationSeconds: [7, 8, 9, 10, 12], statusChancePoints: [5, 7, 9, 11, 14] },
-    隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [25, 30, 35, 40, 50] },
-    奧術超載: { skillEfficiencyBonus: [10, 14, 18, 22, 26] },
+    元素蝕印: { durationSeconds: [7, 8, 9, 10, 12], statusChancePoints: [5, 7, 9, 11, 14], statusEffectBonus: [10, 15, 20, 25, 30] },
+    隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [100, 100, 100, 100, 100] },
+    奧術超載: { skillEfficiencyBonus: [15, 18, 22, 26, 30] },
     虛空崩解: { damage: [250, 275, 300, 330, 365], damageBonusVsStatus: [20, 25, 30, 35, 40] },
     星界寂滅: { totalDamage: [420, 475, 530, 590, 660] },
   });
   assert.deepEqual(rows(MAGE_PASSIVE_RULES), {
-    奧術感知: { activeDirectDamageBonus: [3, 5, 7, 9, 12] },
-    焰脈: { normalBurnChance: [4, 6, 8, 10, 12] },
-    星界護體: { maxHealthBonus: [3, 5, 7, 9, 12] },
+    奧術感知: { activeDirectDamageBonus: [5, 8, 10, 13, 15] },
+    焰脈: { normalBurnChance: [5, 8, 10, 13, 15] },
+    星界護體: { incomingShieldChancePercent: [5, 5, 5, 5, 5], incomingShieldMaxHealthPercent: [5, 6, 7, 8, 10] },
     燃燼導引: { activeDirectDamageVsBurn: [6, 9, 12, 15, 18] },
-    護盾轉流: { activeDirectDamageWithShield: [4, 6, 8, 10, 12] },
-    精密咒式: { activeStatusChancePoints: [3, 4, 5, 6, 8] },
+    護盾轉流: { activeDirectDamageWithShield: [5, 8, 10, 13, 15] },
+    精密咒式: { activeStatusChanceBonus: [5, 8, 10, 13, 15] },
     餘燼回響: { extraDamage: [25, 35, 45, 55, 65] },
     奧術循環: { ultimateEnergyPerSuccessfulCast: [2, 3, 4, 5, 6] },
-    元素共振: { activeDirectDamagePerStatus: [3, 4, 5, 6, 8] },
-    屏障續航: { initialShieldBonus: [4, 6, 8, 10, 12] },
-    枯竭控制: { exhaustionReductionPoints: [2, 4, 6, 8, 10] },
+    元素共振: { activeDirectDamagePerStatus: [5, 8, 10, 13, 15] },
+    屏障續航: { initialShieldBonus: [10, 15, 20, 25, 30] },
+    枯竭控制: { exhaustionReductionPercent: [10, 20, 30, 40, 50] },
     星界回爆: { ultimateFinalExplosionExtraDamage: [45, 55, 65, 75, 90] },
   });
   for (const rule of [...Object.values(MAGE_ACTIVE_RULES), ...Object.values(MAGE_PASSIVE_RULES)]) {
@@ -69,10 +69,10 @@ test("all mage Lv1–5 rows match sections 10 and 17 of the specification", () =
 
 test("ascension data preserves segment counts, shield/mark limits and independent proc caps", () => {
   assert.deepEqual(Object.values(MAGE_ACTIVE_RULES).map((rule) => rule.ascension),
-    ["極炎霜爆", "星環共鳴", "星界屏障", "混沌刻印", "天火墜星", "魔能暴走", "萬象湮滅", "諸星終焉"]);
+    ["極炎霜爆", "雷環共鳴", "星界屏障", "混沌刻印", "天火墜星", "魔能暴走", "萬象湮滅", "諸星終焉"]);
   assert.equal(MAGE_ACTIVE_RULES.霜火新星.afterburstDamage, 70);
-  assert.equal(MAGE_ACTIVE_RULES.奧術飛彈.missiles, 3);
-  assert.equal(MAGE_ACTIVE_RULES.奧術飛彈.resonanceMissileDamage, 80);
+  assert.equal(MAGE_ACTIVE_RULES.閃電鏈.missiles, 3);
+  assert.equal(MAGE_ACTIVE_RULES.閃電鏈.resonanceMissileDamage, 80);
   assert.equal(MAGE_ACTIVE_RULES.魔力護盾.healthBelow, 60);
   assert.equal(MAGE_ACTIVE_RULES.魔力護盾.followingActiveCasts, 3);
   assert.equal(MAGE_ACTIVE_RULES.魔力護盾.activeDamageBonus, 10);
@@ -84,7 +84,7 @@ test("ascension data preserves segment counts, shield/mark limits and independen
   assert.equal(MAGE_ACTIVE_RULES.星界寂滅.maxCollapseStacks, 6);
   assert.equal(MAGE_ACTIVE_RULES.星界寂滅.finalExplosionDamagePerStack * 6, 48);
   assert.equal(MAGE_PASSIVE_RULES.餘燼回響.procChance, 15);
-  assert.equal(MAGE_PASSIVE_RULES.餘燼回響.maxProcsPerCast, 1);
+  assert.equal(MAGE_PASSIVE_RULES.餘燼回響.maxProcsPerCast, undefined);
   assert.equal(MAGE_PASSIVE_RULES.元素共振.maxDistinctStatuses, 3);
   assert.equal(MAGE_PASSIVE_RULES.星界回爆.maxProcsPerUltimate, 1);
 });
@@ -100,38 +100,38 @@ test("rank lookup and overload activation reject invalid ranks without silently 
   }
 });
 
-test("queue charges overload once per successful complete cast and activation leaves six later casts", () => {
-  assert.deepEqual(SKILL_CHARGE_RULES.法師.奧術超載, { event: "skillHit", threshold: 6 });
-  assert.equal(MAGE_ACTIVE_RULES.奧術超載.successfulActiveCastsRequired, 6);
+test("queue charges overload once per successful complete cast and activation leaves three later casts", () => {
+  assert.deepEqual(SKILL_CHARGE_RULES.法師.奧術超載, { event: "skillHit", threshold: 3 });
+  assert.equal(MAGE_ACTIVE_RULES.奧術超載.successfulActiveCastsRequired, 3);
   let queue = createSkillCombatState({ ranks: { 奧術超載: 1 }, activeSlots: ["奧術超載", null, null] }, "法師", null);
   queue = recordPrimaryAttack(queue, { kind: "normal", hits: [{ hit: true }] });
   queue = recordPrimaryAttack(queue, { kind: "skill", hits: [{ hit: false }, { hit: false }] });
   assert.equal(queue.charges.奧術超載, 0);
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 3; i++) {
     queue = recordPrimaryAttack(queue, i === 1 ? { kind: "skill", hits: [{ hit: false }, { hit: true }] } : missiles);
     assert.equal(queue.charges.奧術超載, i);
-    assert.deepEqual(queue.ready, i < 6 ? [] : ["奧術超載"]);
+    assert.deepEqual(queue.ready, i < 3 ? [] : ["奧術超載"]);
   }
   const cast = consumeReadySkill(queue, true);
   assert.equal(cast.skill, "奧術超載");
   assert.equal(cast.state.charges.奧術超載, 0);
   const overload = activateMageOverload(1, false);
-  assert.equal(overload.remainingSuccessfulCasts, 6);
+  assert.equal(overload.remainingSuccessfulCasts, 3);
   assert.equal(overload.stabilityStacks, 0);
 });
 
-test("six successful subsequent casts receive efficiency; exhaustion begins only after the sixth", () => {
+test("three successful subsequent casts receive efficiency; exhaustion begins only after the third", () => {
   for (let rank = 1; rank <= 5; rank++) {
     let state = activateMageOverload(rank, false);
-    const bonuses = [10, 14, 18, 22, 26];
-    for (let i = 0; i < 6; i++) {
+    const bonuses = [15, 18, 22, 26, 30];
+    for (let i = 0; i < 3; i++) {
       const result = consumeMageOverload(state, missiles);
       assert.equal(result.skillEfficiencyBonusPercent, bonuses[rank - 1]);
       assert.equal(result.skillDamagePenaltyPercent, 0);
-      if (i < 5) assert.equal(result.state.remainingSuccessfulCasts, 5 - i);
+      if (i < 2) assert.equal(result.state.remainingSuccessfulCasts, 2 - i);
       state = result.state;
     }
-    assert.deepEqual(state, { phase: "exhausted", basePenaltyPercent: 15 });
+    assert.deepEqual(state, { phase: "exhausted", expiresAt: 5000, basePenaltyPercent: 15 });
     const next = consumeMageOverload(state, hit);
     assert.equal(next.skillEfficiencyBonusPercent, 0);
     assert.equal(next.skillDamagePenaltyPercent, 15);
@@ -148,10 +148,10 @@ test("misses and non-active damage never consume overload or produce implicit st
       { state, skillEfficiencyBonusPercent: 0, skillDamagePenaltyPercent: 0 });
   }
   const partial = consumeMageOverload(state, { kind: "skill", hits: [{ hit: false }, { hit: true }, { hit: false }] });
-  assert.equal(partial.state.remainingSuccessfulCasts, 5);
+  assert.equal(partial.state.remainingSuccessfulCasts, 2);
   assert.equal(partial.state.stabilityStacks, 0);
-  assert.equal(state.remainingSuccessfulCasts, 6);
-  assert.deepEqual(exhaust(state), { phase: "exhausted", basePenaltyPercent: 15 });
+  assert.equal(state.remainingSuccessfulCasts, 3);
+  assert.deepEqual(exhaust(state), { phase: "exhausted", expiresAt: 5000, basePenaltyPercent: 15 });
 });
 
 test("only explicit ascended stability events can reach the six-stack reduced-penalty threshold", () => {
@@ -171,10 +171,10 @@ test("only explicit ascended stability events can reach the six-stack reduced-pe
 test("exhaustion control combines with ascension at every rank and cannot turn into extra damage", () => {
   const basic = exhaust(activateMageOverload(1, false));
   const stable = exhaust(addMageOverloadStability(activateMageOverload(1, true), 6));
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rank) => mageExhaustionPenaltyPercent(basic, rank)), [15, 13, 11, 9, 7, 5]);
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rank) => mageExhaustionPenaltyPercent(stable, rank)), [5, 3, 1, 0, 0, 0]);
-  assert.equal(consumeMageOverload(stable, hit, 5).skillDamagePenaltyPercent, 0);
-  assert.equal(consumeMageOverload(basic, hit, 5).skillDamagePenaltyPercent, 5);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rank) => mageExhaustionPenaltyPercent(basic, rank)), [15, 13.5, 12, 10.5, 9, 7.5]);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((rank) => mageExhaustionPenaltyPercent(stable, rank)), [5, 4.5, 4, 3.5, 3, 2.5]);
+  assert.equal(consumeMageOverload(stable, hit, 5).skillDamagePenaltyPercent, 2.5);
+  assert.equal(consumeMageOverload(basic, hit, 5).skillDamagePenaltyPercent, 7.5);
 });
 
 test("exhaustion persists until explicitly cleared and never penalizes non-active damage", () => {

@@ -1,8 +1,15 @@
+import { saveDisplay } from "../../../save-field-schema";
+import { adminJson } from "../../../admin-response";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { accounts, gameSaves, gmActionLogs, saveSnapshots, sessions } from "../../../../db/schema";
+import { accountRebirthEntitlements, accounts, gameSaves, saveSnapshots } from "../../../../db/schema";
 import { currentAccount } from "../../auth-utils";
 import { preserveLegacyRebirthCount } from "../../../legacy-rebirth-storage";
+import { legacyRebirthReward } from "../../../legacy-rebirth-rewards";
+import { clampRebirthCount } from "../../../rebirth-config";
+import { commitAdminSave } from "../../../admin-save-mutation";
+import { resetAdminIntegrity } from "../../../admin-state";
+import { preserveServerSkillSave } from "../../../skill-save-policy";
 
 type SavePreview = {
   playerName?: string;
@@ -39,11 +46,13 @@ function normalizeSnapshotPayload(payload: string, accountId: string) {
   normalized.accountId = accountId;
   normalized.saveSchemaVersion = CURRENT_SAVE_SCHEMA_VERSION;
   normalized.items = legacyItems.filter((item) => item && typeof item === "object");
-  for (const key of ["gold", "yuanbao", "enhanceStones", "reforgeStones", "bossTickets", "worldAttempts", "skillPoints"]) {
+  for (const key of ["gold", "yuanbao", "enhanceStones", "reforgeStones", "bossTickets", "worldAttempts"]) {
     normalized[key] = asNonNegativeInteger(normalized[key]);
   }
+  delete normalized.skills;
+  delete normalized.skillPoints;
   normalized.level = Math.min(100, Math.max(1, asNonNegativeInteger(normalized.level, 1)));
-  normalized.rebirthCount = Math.min(20, asNonNegativeInteger(normalized.rebirthCount));
+  normalized.rebirthCount = clampRebirthCount(normalized.rebirthCount);
   normalized.wave = Math.min(30, Math.max(1, asNonNegativeInteger(normalized.wave, 1)));
   normalized.highestFloor = Math.min(30, Math.max(1, asNonNegativeInteger(normalized.highestFloor, normalized.wave as number)));
   normalized.enemyHp = 100;
@@ -54,7 +63,7 @@ function normalizeSnapshotPayload(payload: string, accountId: string) {
 
 function preview(payload: string) {
   try {
-    const save = JSON.parse(payload) as SavePreview;
+    const save = saveDisplay(JSON.parse(payload)) as SavePreview;
     const warehouseItems = Array.isArray(save.items)
       ? save.items
       : Array.isArray(save.inventory)
@@ -81,8 +90,8 @@ function preview(payload: string) {
 
 async function requireGm(request: Request) {
   const gm = await currentAccount(request);
-  if (!gm) return { error: Response.json({ error: "not_authenticated" }, { status: 401 }) } as const;
-  if (!gm.isGm) return { error: Response.json({ error: "forbidden" }, { status: 403 }) } as const;
+  if (!gm) return { error: adminJson({ error: "not_authenticated" }, { status: 401 }) } as const;
+  if (!gm.isGm) return { error: adminJson({ error: "forbidden" }, { status: 403 }) } as const;
   return { gm } as const;
 }
 
@@ -90,11 +99,11 @@ export async function GET(request: Request) {
   const auth = await requireGm(request);
   if ("error" in auth) return auth.error;
   const accountId = new URL(request.url).searchParams.get("accountId")?.trim() ?? "";
-  if (!accountId) return Response.json({ error: "account_required" }, { status: 400 });
+  if (!accountId) return adminJson({ error: "account_required" }, { status: 400 });
   const db = await getDb();
   const [target] = await db.select({ id: accounts.id, username: accounts.username, isGm: accounts.isGm })
     .from(accounts).where(eq(accounts.id, accountId)).limit(1);
-  if (!target || target.isGm) return Response.json({ error: "protected_account" }, { status: 403 });
+  if (!target || target.isGm) return adminJson({ error: "protected_account" }, { status: 403 });
   const snapshots = await db.select({
     id: saveSnapshots.id,
     kind: saveSnapshots.kind,
@@ -107,7 +116,7 @@ export async function GET(request: Request) {
     capturedAt: saveSnapshots.capturedAt,
     payload: saveSnapshots.payload,
   }).from(saveSnapshots).where(and(eq(saveSnapshots.accountId, auth.gm.id), eq(saveSnapshots.kind, "global_pre_wipe"))).orderBy(desc(saveSnapshots.capturedAt));
-  return Response.json({
+  return adminJson({
     player: target,
     snapshots: snapshots.map((snapshot) => ({
       id: snapshot.id,
@@ -132,47 +141,48 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { accountId?: string; snapshotId?: number };
   const accountId = body.accountId?.trim() ?? "";
   const snapshotId = Number(body.snapshotId);
-  if (!accountId || !Number.isInteger(snapshotId)) return Response.json({ error: "invalid_restore_request" }, { status: 400 });
+  if (!accountId || !Number.isInteger(snapshotId)) return adminJson({ error: "invalid_restore_request" }, { status: 400 });
   const db = await getDb();
   const [target] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
-  if (!target || target.isGm || target.id === auth.gm.id) return Response.json({ error: "protected_account" }, { status: 403 });
+  if (!target || target.isGm || target.id === auth.gm.id) return adminJson({ error: "protected_account" }, { status: 403 });
   const [snapshot] = await db.select().from(saveSnapshots).where(eq(saveSnapshots.id, snapshotId)).limit(1);
-  if (!snapshot || snapshot.accountId !== target.id) return Response.json({ error: "snapshot_not_found" }, { status: 404 });
+  if (!snapshot || snapshot.accountId !== target.id) return adminJson({ error: "snapshot_not_found" }, { status: 404 });
   const [currentSave] = await db.select().from(gameSaves).where(eq(gameSaves.accountId, target.id)).limit(1);
-  if (!currentSave) return Response.json({ error: "save_not_found" }, { status: 404 });
   let restored: Record<string, unknown>;
   let currentRevision = 0;
-  try { restored = normalizeSnapshotPayload(snapshot.payload, target.id); } catch { return Response.json({ error: "invalid_snapshot" }, { status: 409 }); }
+  let currentPayload: Record<string,unknown>|null=null;
+  try { restored = normalizeSnapshotPayload(snapshot.payload, target.id); } catch { return adminJson({ error: "invalid_snapshot" }, { status: 409 }); }
+  const [entitlement] = await db.select({ legacyRebirthCount: accountRebirthEntitlements.legacyRebirthCount })
+    .from(accountRebirthEntitlements).where(eq(accountRebirthEntitlements.accountId, target.id)).limit(1);
   try {
-    const current = JSON.parse(currentSave.payload) as Record<string, unknown>;
-    currentRevision = Number(current.adminRevision ?? 0);
+    const current = currentSave ? JSON.parse(currentSave.payload) as Record<string, unknown>
+      : entitlement ? { legacyRebirthCount: entitlement.legacyRebirthCount } : null;
+    currentPayload=current;
+    currentRevision = Number(current?.adminRevision ?? 0);
     restored = preserveLegacyRebirthCount(restored, current);
-  } catch { return Response.json({ error: "invalid_current_save" }, { status: 409 }); }
-  const now = new Date().toISOString();
+    if (entitlement) {
+      restored.legacyRebirthCount = entitlement.legacyRebirthCount;
+      const reward = legacyRebirthReward(entitlement.legacyRebirthCount);
+      const owned = Array.isArray(restored.ownedTitles) ? restored.ownedTitles.filter((id): id is string => typeof id === "string") : [];
+      restored.ownedTitles = [...new Set(["none", ...owned, ...reward.unlockedTitleIds])];
+      if (!restored.selectedTitle || restored.selectedTitle === "none") restored.selectedTitle = reward.titleId ?? "none";
+    }
+  } catch { return adminJson({ error: "invalid_current_save" }, { status: 409 }); }
+  const migrated=preserveServerSkillSave(restored,restored);
+  if(!migrated) return adminJson({error:"invalid_snapshot"},{status:409});
+  restored=resetAdminIntegrity(migrated,currentPayload);
   restored.adminRevision = Math.max(Number(restored.adminRevision ?? 0), currentRevision) + 1;
-  const restoredPayload = JSON.stringify(restored);
   try {
-    // Keep these writes separate. A D1 batch failure otherwise makes the
-    // restore look like a generic failure and can hide which statement broke.
-    await db.insert(saveSnapshots).values({ playerId: currentSave.playerId, accountId: target.id, payload: currentSave.payload, kind: "pre_restore", capturedAt: now });
-    await db.update(gameSaves).set({ payload: restoredPayload, updatedAt: now }).where(eq(gameSaves.playerId, currentSave.playerId));
-  } catch {
-    return Response.json({ error: "restore_storage_failed" }, { status: 500 });
-  }
-  try { await db.delete(sessions).where(eq(sessions.accountId, target.id)); } catch { /* restore remains valid if session cleanup is temporarily unavailable */ }
+    const mutation=await commitAdminSave(db,{accountId:target.id,playerId:currentSave?.playerId ?? snapshot.playerId,
+      gmAccountId:auth.gm.id,current:currentSave ?? null,save:restored,kind:"pre_restore",action:"restore_snapshot",
+      detail:`還原 ${snapshot.capturedAt} 的存檔，並已建立還原前備份`});
+    if(!mutation.accepted) return adminJson({error:"save_conflict"},{status:409});
+  } catch { return adminJson({error:"restore_storage_failed"},{status:500}); }
   try {
     const snapshotsToTrim = await db.select({ id: saveSnapshots.id }).from(saveSnapshots)
       .where(and(eq(saveSnapshots.accountId, target.id), eq(saveSnapshots.kind, "automatic")))
       .orderBy(desc(saveSnapshots.capturedAt)).offset(24);
     for (const old of snapshotsToTrim) await db.delete(saveSnapshots).where(eq(saveSnapshots.id, old.id));
   } catch { /* cleanup cannot invalidate an already completed restore */ }
-  try {
-    await db.insert(gmActionLogs).values({
-      gmAccountId: auth.gm.id,
-      targetAccountId: target.id,
-      action: "restore_snapshot",
-      detail: `還原 ${snapshot.capturedAt} 的存檔，並已建立還原前備份`,
-    });
-  } catch { /* audit logging must not undo a completed restore */ }
-  return Response.json({ ok: true, username: target.username, restoredAt: snapshot.capturedAt });
+  return adminJson({ ok: true, username: target.username, restoredAt: snapshot.capturedAt });
 }

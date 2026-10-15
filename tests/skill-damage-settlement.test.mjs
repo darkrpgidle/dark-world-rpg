@@ -95,3 +95,4 @@ test("a mage skill and its equipped meteor follow-up share one HP and display se
   assert.equal(settleSkillDamageAction(settled.ledger, 1, segments).appliedDamage, 0);
   assert.equal(cast.combat.session.usedDamageProcs.length, 1);
 });
+

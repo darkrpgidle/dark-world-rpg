@@ -67,3 +67,4 @@ test("malformed balances and counters reject payouts", () => {
   assert.equal(advanceOnlineYuanbao(legacy(), Number.NaN, "session-a"), null);
   assert.equal(advanceOnlineYuanbao(legacy(), start, ""), null);
 });
+

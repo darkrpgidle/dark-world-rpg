@@ -31,3 +31,4 @@ test("future, malformed or negative client revisions never bypass server checks"
     assert.equal(preserveServerResourceRevision({ adminRevision: value, yuanbao: 9999 }, server), null);
   assert.equal(preserveServerResourceRevision({ adminRevision: 0 }, { ...server, adminRevision: -1 }), null);
 });
+

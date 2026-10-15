@@ -27,7 +27,7 @@ test("rapid fire requires five arrow outcomes, then an all-hit ascension adds on
   assert.equal(turn(combat, "疾風連射", 700, [{ hit: true }]), null);
   const cast = turn(combat, "疾風連射", 700, Array.from({ length: 5 }, () => ({ hit: true })),
     new Set(["疾風連射"]));
-  assert.deepEqual(cast.damageSegmentPercents, [55, 55, 55, 55, 55]);
+  assert.deepEqual(cast.damageSegmentPercents, [60, 60, 60, 60, 60]);
   assert.equal(cast.additionalArrowPercent, 90);
   assert.equal(cast.combat.session.charge.charges["疾風連射"], 1);
   assert.deepEqual(cast.combat.session.charge.ready, []);
@@ -84,3 +84,4 @@ test("sky rain checks nine independent segments and counts only rain-arrow criti
   assert.equal(cast.mainArrowDamageBonusPercent, 48);
   assert.equal(cast.combat.session.charge.ultimateEnergy, 3);
 });
+

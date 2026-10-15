@@ -10,9 +10,10 @@ import {
 import {
   MAGE_ACTIVE_RULES, activateMageOverload, addMageOverloadStability,
   clearMageExhaustion, consumeMageOverload, createMageOverload,
-  mageSkillRankValue, type MageActiveName, type MageOverloadState,
+  advanceMageOverload, mageSkillRankValue, type MageActiveName, type MageOverloadState,
 } from "./skill-mage-rules";
-import { countEnemyAbnormalKinds } from "./skill-debuff-timer";
+import { countEnemyAbnormalKinds, calculateDebuffTickRawDamage } from "./skill-debuff-timer";
+import { balanceConfig } from "./balance-config";
 import { resolveMagePassiveAttack } from "./skill-mage-passives";
 import { equippedSkillMythic } from "./mythic-data";
 import { consumeMageShieldActiveCast, createMageShieldState, type MageShieldState } from "./skill-mage-shield";
@@ -47,15 +48,14 @@ export function transitionMageCombat(combat: MageCombat, boundary: CombatBoundar
     session: transitionCombatSession(combat.session, boundary),
     overload: boundary === "normal-kill" ? combat.overload : createMageOverload(),
     shield: boundary === "normal-kill" ? combat.shield : createMageShieldState(),
-    shieldActivatedThisBattle: boundary === "normal-kill" ? combat.shieldActivatedThisBattle : false,
+    shieldActivatedThisBattle: false,
     sigil: boundary === "normal-kill"
       ? transitionMageSigilTarget(combat.sigil, false) : createMageSigilState(),
   };
 }
 
-// Sources of stability and exhaustion recovery are awaiting specification.
-// Expose only explicit event entry points: no hit implicitly grants a stack,
-// and no elapsed time or normal attack implicitly clears exhaustion.
+// Explicit administrative reset helpers; live casts award original-hit stability
+// and wall-clock advancement releases five-second exhaustion.
 export function recordMageStability(combat: MageCombat, stacks: number): MageCombat {
   return { ...combat, overload: addMageOverloadStability(combat.overload, stacks) };
 }
@@ -71,6 +71,8 @@ export type MageTurnInput = {
   ascended: ReadonlySet<MageActiveName>;
   roll?: () => number;
   equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[];
+  attackSnapshot?: number;
+  burnAttackSnapshot?: number;
   finalExplosionConfirmed?: boolean; // final original ultimate segment was the explosion
 };
 
@@ -82,7 +84,7 @@ export type MageTurnResult = {
   // The caller resolves each ascension segment's own hit/crit, HP damage and
   // VFX after the indicated original segment. These are not primary actions.
   ascensionDamageEvents: {
-    id: "極炎霜爆" | "星環共鳴" | "天火墜星";
+    id: "極炎霜爆" | "雷環共鳴" | "天火墜星";
     percent: number;
     afterOriginalSegment: number;
   }[];
@@ -100,8 +102,10 @@ export type MageTurnResult = {
   skillEfficiencyBonusPercent: number;
   skillDamagePenaltyPercent: number;
   passiveDirectDamageBonusPercent: number;
+  passiveDirectDamageMultiplier: number;
   equipmentSkillDamageBonusPercent: number;
-  passiveStatusChancePoints: number;
+  equipmentBurnDetonationDamage: number;
+  passiveStatusChanceBonus: number;
   passiveUltimateEnergyGain: number;
   abnormalKindsCounted: number;
   passiveDamageProcs: { id: "餘燼回響" | "星界回爆"; percent: number }[];
@@ -122,8 +126,8 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const isActive = input.skill !== "normal";
   const rank = isActive ? combat.build.ranks[input.skill] ?? 0 : 0;
   if (isActive && !rank) return null;
-  if (input.skill === "奧術飛彈") {
-    if (input.hits.length !== MAGE_ACTIVE_RULES.奧術飛彈.missiles) return null;
+  if (input.skill === "閃電鏈") {
+    if (input.hits.length !== MAGE_ACTIVE_RULES.閃電鏈.missiles) return null;
   } else if (input.skill === "奧術超載") {
     if (input.hits.length !== 0) return null;
   } else if (input.skill === "星界寂滅") {
@@ -132,6 +136,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     return null;
   }
 
+  combat = { ...combat, overload: advanceMageOverload(combat.overload, input.now) };
   const settled = advanceCombatSession(combat.session, input.now);
   let session = settled.session;
   // The specification does not define recasting overload before its current
@@ -150,6 +155,17 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   // ticks are already settled and expired statuses are no longer counted.
   const markActiveAtStart = Boolean(session.enemy.elementSigil);
   const targetBurningAtStart = Boolean(session.enemy.burn);
+  const priorBurn = session.enemy.burn;
+  let equipmentBurnDetonationDamage = 0;
+  if (input.skill === "霜火新星" && successfulHit && priorBurn?.nextTickAt !== undefined
+      && equippedSkillMythic(input.equippedItems ?? [], "霜火新星")?.id === "skill-mage-polar-staff") {
+    const remainingTicks = Math.max(0, Math.floor((priorBurn.expiresAt - priorBurn.nextTickAt) / 1000) + 1);
+    equipmentBurnDetonationDamage = remainingTicks * calculateDebuffTickRawDamage({
+      kind: "burn", at: priorBurn.nextTickAt, stacks: priorBurn.stacks, effectMultiplier: priorBurn.effectMultiplier,
+    }, input.burnAttackSnapshot ?? input.attackSnapshot ?? 0) * balanceConfig.equipment.skillMythics.polarStaff.remainingBurnMultiplier;
+    // Due ticks were settled above; consume only the old future ticks. This
+    // cast may subsequently apply a fresh burn with its own snapshot.
+  }
   const targetHadSigil = session.enemy.elementSigil?.strength ?? 0;
   const currentSigil = transitionMageSigilTarget(combat.sigil, markActiveAtStart);
   // Consume a previously granted buff before this cast may grant a new one.
@@ -176,7 +192,7 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   const shieldCast = consumeMageShieldActiveCast(combat.shield, isActive);
 
   const hasDirectDamage = input.skill === "normal" || input.skill === "霜火新星"
-    || input.skill === "奧術飛彈" || input.skill === "隕星術"
+    || input.skill === "閃電鏈" || input.skill === "隕星術"
     || input.skill === "虛空崩解" || input.skill === "星界寂滅";
   const equipmentSkillDamageBonusPercent = isActive && hasDirectDamage && combat.shield.value > 0
     && equippedSkillMythic(input.equippedItems ?? [], "魔力護盾")?.id === "skill-mage-eternal-core"
@@ -192,28 +208,59 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
 
   const statusApplications: StatusApplication[] = [...passive.statuses];
   let burnChancePercent = 0;
-  if (successfulHit && (input.skill === "霜火新星" || input.skill === "隕星術")) {
-    const chances = input.skill === "霜火新星"
-      ? MAGE_ACTIVE_RULES.霜火新星.burnChance : MAGE_ACTIVE_RULES.隕星術.burnChance;
-    burnChancePercent = Math.min(100, mageSkillRankValue(chances, rank)
-      + targetHadSigil + passive.activeStatusChancePoints + sigilCast.statusChancePoints);
-    // A multi-segment cast receives one status roll per status category.
-    if ((input.roll ?? Math.random)() * 100 < burnChancePercent) {
-      statusApplications.push({ kind: "burn" });
+  const roll = input.roll ?? Math.random;
+  const precisionMultiplier = 1 + passive.activeStatusChanceBonus / 100;
+  const overloadBonus = combat.overload.phase === "overloaded" && isActive && input.skill !== "奧術超載"
+    ? mageSkillRankValue(MAGE_ACTIVE_RULES.奧術超載.skillEfficiencyBonus, combat.overload.rank) : 0;
+  const sigilEffectBonus = session.enemy.elementSigil?.effectBonusPercent ?? 0;
+  const effectMultiplier = (1 + sigilEffectBonus / 100)
+    * (1 + overloadBonus / 100);
+  const statusChance = (base: number) => Math.min(100, (base + targetHadSigil + sigilCast.statusChancePoints) * precisionMultiplier);
+  if (successfulHit && input.skill === "霜火新星") {
+    burnChancePercent = statusChance(mageSkillRankValue(MAGE_ACTIVE_RULES.霜火新星.burnChance, rank));
+    if (roll() * 100 < burnChancePercent) {
+      const kind = roll() < 0.5 ? "burn" : "freeze";
+      statusApplications.push({ kind, ...(effectMultiplier !== 1 ? { effectMultiplier } : {}),
+        ...(kind === "freeze" && input.ascended.has("霜火新星") ? { freezeBurstPercent: MAGE_ACTIVE_RULES.霜火新星.afterburstDamage, attackSnapshot: input.attackSnapshot } : {}) });
     }
   }
+  if (successfulHit && input.skill === "隕星術") {
+    burnChancePercent = 100;
+    statusApplications.push({ kind: "burn", ...(effectMultiplier !== 1 ? { effectMultiplier } : {}) });
+  }
+  if (input.skill === "閃電鏈") {
+    for (const hit of input.hits) if (hit.hit && roll() * 100 < statusChance(MAGE_ACTIVE_RULES.閃電鏈.paralysisChance))
+      statusApplications.push({ kind: "paralysis", ...(effectMultiplier !== 1 ? { effectMultiplier } : {}) });
+  }
+  for (const status of statusApplications) if (status.kind === "burn" && status.effectMultiplier === undefined && effectMultiplier !== 1) status.effectMultiplier = effectMultiplier;
   if (input.skill === "元素蝕印" && successfulHit) {
     statusApplications.push({
       kind: "elementSigil", level: rank,
       strength: mageSkillRankValue(MAGE_ACTIVE_RULES.元素蝕印.statusChancePoints, rank),
+      effectBonusPercent: mageSkillRankValue(MAGE_ACTIVE_RULES.元素蝕印.statusEffectBonus, rank),
     });
   }
 
+  if (equipmentBurnDetonationDamage > 0) {
+    const { burn: consumed, ...enemy } = session.enemy;
+    void consumed;
+    session = { ...session, enemy };
+  }
   const action = resolveSkillAction(session, {
     kind: isActive ? "skill" : "normal", hits: input.hits,
     successfulStatuses: statusApplications,
   }, input.now);
   session = action.session;
+  if (equipmentBurnDetonationDamage > 0) {
+    const proc = trySkillProc(session, { id: "skill-mage-polar-staff", kind: "damage", source: "primary", family: "equipment" });
+    session = proc.session;
+    if (!proc.allowed) equipmentBurnDetonationDamage = 0;
+  }
+  if (combat.overload.phase !== "idle" || input.skill === "奧術超載") {
+    session = { ...session, charge: { ...session.charge,
+      charges: { ...session.charge.charges, ...(session.charge.charges["奧術超載"] !== undefined ? { 奧術超載: 0 } : {}) },
+      ready: session.charge.ready.filter((name) => name !== "奧術超載") } };
+  }
   const sigil = recordMageSigilStatuses(sigilCast.state, {
     hadCurrentSigil: markActiveAtStart,
     appliedKinds: statusApplications.map((status) => status.kind),
@@ -232,16 +279,16 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   // Overload activation itself has no target hit and does not consume one of
   // its six following successful active casts. Other skills consume at most
   // once even when several of their original segments connect.
-  const overloadResult = input.skill === "奧術超載" ? null : consumeMageOverload(combat.overload, {
+  const overloadResult = input.skill === "奧術超載" ? null : consumeMageOverload(addMageOverloadStability(combat.overload, input.hits.filter((hit) => hit.hit).length), {
     kind: isActive ? "skill" : "normal", hits: input.hits,
-  }, combat.build.ranks["枯竭控制"] ?? 0);
+  }, combat.build.ranks["枯竭控制"] ?? 0, input.now);
   const overload = input.skill === "奧術超載"
     ? activateMageOverload(rank, input.ascended.has("奧術超載"))
     : overloadResult!.state;
 
-  const damageSegmentPercents = input.skill === "奧術飛彈"
-    ? Array.from({ length: MAGE_ACTIVE_RULES.奧術飛彈.missiles },
-      () => mageSkillRankValue(MAGE_ACTIVE_RULES.奧術飛彈.damagePerMissile, rank))
+  const damageSegmentPercents = input.skill === "閃電鏈"
+    ? Array.from({ length: MAGE_ACTIVE_RULES.閃電鏈.missiles },
+      () => mageSkillRankValue(MAGE_ACTIVE_RULES.閃電鏈.damagePerMissile, rank))
     : input.skill === "星界寂滅"
       ? [
           ...Array.from({ length: MAGE_ACTIVE_RULES.星界寂滅.beamCount },
@@ -269,14 +316,14 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
   }
   const ascensionDamageEvents: MageTurnResult["ascensionDamageEvents"] = [];
   if (input.skill !== "normal" && input.ascended.has(input.skill)) {
-    if (input.skill === "霜火新星" && successfulHit && targetBurningAtStart) {
+    if (input.skill === "霜火新星" && successfulHit && targetBurningAtStart && !statusApplications.some((status) => status.kind === "freeze")) {
       ascensionDamageEvents.push({
         id: "極炎霜爆", percent: MAGE_ACTIVE_RULES.霜火新星.afterburstDamage, afterOriginalSegment: 1,
       });
-    } else if (input.skill === "奧術飛彈" && input.hits.every((hit) => hit.hit)) {
+    } else if (input.skill === "閃電鏈" && input.hits.every((hit) => hit.hit)) {
       ascensionDamageEvents.push({
-        id: "星環共鳴", percent: MAGE_ACTIVE_RULES.奧術飛彈.resonanceMissileDamage,
-        afterOriginalSegment: MAGE_ACTIVE_RULES.奧術飛彈.missiles,
+        id: "雷環共鳴", percent: MAGE_ACTIVE_RULES.閃電鏈.resonanceMissileDamage,
+        afterOriginalSegment: MAGE_ACTIVE_RULES.閃電鏈.missiles,
       });
     } else if (input.skill === "隕星術" && successfulHit && targetBurningAtStart) {
       ascensionDamageEvents.push({
@@ -302,8 +349,10 @@ export function resolveMageTurn(combat: MageCombat, input: MageTurnInput): MageT
     skillEfficiencyBonusPercent: overloadResult?.skillEfficiencyBonusPercent ?? 0,
     skillDamagePenaltyPercent: overloadResult?.skillDamagePenaltyPercent ?? 0,
     passiveDirectDamageBonusPercent: passive.directDamageBonusPercent,
+    passiveDirectDamageMultiplier: passive.directDamageMultiplier,
     equipmentSkillDamageBonusPercent,
-    passiveStatusChancePoints: passive.activeStatusChancePoints,
+    equipmentBurnDetonationDamage,
+    passiveStatusChanceBonus: passive.activeStatusChanceBonus,
     passiveUltimateEnergyGain: passive.ultimateEnergyGain,
     abnormalKindsCounted: passive.abnormalCount,
     passiveDamageProcs,

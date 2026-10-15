@@ -47,3 +47,4 @@ export function advanceOnlineYuanbao(
     adminRevision: revision + (reward > 0 ? 1 : 0),
   } };
 }
+

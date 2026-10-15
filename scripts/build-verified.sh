@@ -19,6 +19,9 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+# vinext preserves previously copied public assets across builds. Clear only
+# this project's generated output so renamed artwork cannot ship twice.
+node -e 'const { rmSync } = require("node:fs"); const { resolve } = require("node:path"); rmSync(resolve(process.env.SITES_PROJECT_ROOT, "dist"), { recursive: true, force: true });'
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \

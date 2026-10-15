@@ -37,7 +37,9 @@ export function applyDailyHuntClaim(
   today = taipeiDailyDate(),
 ): { accepted: boolean; save: Record<string, unknown> } | null {
   if (claimedDailyHuntDate(save) === today) return { accepted: false, save };
+  const verifiedKills = save.dailyDate === today ? save.dailyKills : 0;
   if (request.dailyDate !== today || !Number.isSafeInteger(request.dailyKills) ||
+      !Number.isSafeInteger(verifiedKills) || Number(verifiedKills) < DAILY_HUNT_REWARD.kills ||
       (request.dailyKills as number) < DAILY_HUNT_REWARD.kills) return null;
   const balances = {
     gold: save.gold ?? 0, enhanceStones: save.enhanceStones ?? 0,
@@ -50,7 +52,7 @@ export function applyDailyHuntClaim(
   if (!Number.isSafeInteger(revision) || revision < 0 || revision >= Number.MAX_SAFE_INTEGER) return null;
   const next = {
     ...save, dailyDate: today,
-    dailyKills: Math.max(Number(save.dailyDate === today ? save.dailyKills : 0) || 0, request.dailyKills as number),
+    dailyKills: verifiedKills as number,
     dailyRewardClaimed: true, _lastDailyHuntClaimDate: today,
     gold: (balances.gold as number) + DAILY_HUNT_REWARD.gold,
     enhanceStones: (balances.enhanceStones as number) + DAILY_HUNT_REWARD.enhanceStones,
@@ -60,3 +62,4 @@ export function applyDailyHuntClaim(
   };
   return { accepted: true, save: next };
 }
+

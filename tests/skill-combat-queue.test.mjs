@@ -53,15 +53,15 @@ test("wind domain counts successful primary casts once, including multi-hit skil
 });
 
 test("multiple damage segments never multiply charges, critical energy or skill-hit counters", () => {
-  let state = loadout("法師", ["奧術飛彈", "奧術超載", "霜火新星"], "星界寂滅");
+  let state = loadout("法師", ["閃電鏈", "奧術超載", "霜火新星"], "星界寂滅");
   const segments = [{ hit: true, critical: true }, { hit: true, critical: true }, { hit: false }];
   state = recordPrimaryAttack(state, { kind: "skill", hits: segments, appliedStatus: true });
-  assert.deepEqual(state.charges, { 奧術飛彈: 1, 奧術超載: 1, 霜火新星: 1 });
+  assert.deepEqual(state.charges, { 閃電鏈: 1, 奧術超載: 1, 霜火新星: 1 });
   assert.equal(state.ultimateEnergy, 6);
   state = recordPrimaryAttack(state, { kind: "skill", hits: [{ hit: false }, { hit: false }] });
   assert.equal(state.charges["奧術超載"], 1);
-  assert.equal(state.charges["奧術飛彈"], 2);
-  assert.equal(SKILL_CHARGE_RULES.法師["奧術超載"].threshold, 6);
+  assert.equal(state.charges["閃電鏈"], 2);
+  assert.equal(SKILL_CHARGE_RULES.法師["奧術超載"].threshold, 3);
 });
 
 test("a blocked status skill preserves its original queue position across monsters", () => {
@@ -83,18 +83,31 @@ test("ultimate caps at 100, joins queue and resets only on cast or battle bounda
   state = recordSuccessfulDodge(state);
   state = recordPrimaryAttack(state, { kind: "normal", hits: [{ hit: true, critical: true }] });
   assert.equal(state.ultimateEnergy, 100);
-  assert.deepEqual(state.ready, ["穿雲箭", "蒼穹箭雨"]);
+  assert.deepEqual(state.ready, ["蒼穹箭雨", "穿雲箭"]);
   const first = consumeReadySkill(state, true);
-  assert.equal(first.skill, "穿雲箭");
-  assert.equal(first.state.ultimateEnergy, 100);
-  const ultimate = consumeReadySkill(first.state, true);
-  assert.equal(ultimate.skill, "蒼穹箭雨");
-  assert.equal(ultimate.state.ultimateEnergy, 0);
+  assert.equal(first.skill, "蒼穹箭雨");
+  assert.equal(first.state.ultimateEnergy, 0);
+  assert.deepEqual(first.state.ready, ["穿雲箭"]);
   for (const boundary of ["death", "map-change", "boss-start", "pvp-start"]) {
     const cleared = transitionSkillCombat(state, boundary);
     assert.equal(cleared.ultimateEnergy, 0);
     assert.deepEqual(cleared.ready, []);
     assert.equal(cleared.charges["穿雲箭"], 0);
+  }
+});
+
+test("a fully charged ultimate takes top priority for all three classes", () => {
+  const cases = [
+    ["戰士", "裂地斬", "泰坦斷界斬"],
+    ["遊俠", "穿雲箭", "蒼穹箭雨"],
+    ["法師", "霜火新星", "星界寂滅"],
+  ];
+  for (const [characterClass, activeSkill, ultimateSkill] of cases) {
+    let state = loadout(characterClass, [activeSkill], ultimateSkill);
+    for (let i = 0; i < 13; i++) state = recordPrimaryAttack(state, normalHit);
+    assert.equal(state.ultimateEnergy, 100, characterClass);
+    assert.equal(nextReadySkill(state, true), ultimateSkill, characterClass);
+    assert.equal(consumeReadySkill(state, true).skill, ultimateSkill, characterClass);
   }
 });
 

@@ -6,40 +6,55 @@
  */
 
 export const balanceConfig = {
-  // 第 18 批：法師新版技能數值；僅供獨立重製規則使用，尚未接入正式戰鬥。
+  // 三職共用異常與法師技能數值，供正式戰鬥及介面共用。
   skillRework: {
     // 第 27 批試行：每秒基礎持續傷害以施加時的面板攻擊為基準。
-    dot: { bleedPerStackAttackPercent: 20, burnAttackPercent: 30 },
+    dot: { bleedPerStackAttackPercent: 30, burnAttackPercent: 60 },
+    abnormalities: { burnSeconds: 5, bleedSeconds: 5, bleedMaxStacks: 3, ascendedBleedMaxStacks: 5, freezeSeconds: 3, paralysisSeconds: 3, paralysisSlowPercent: 30, exhaustionSeconds: 5 },
     warrior: {
       active: {
+        // 2026-10-07: narrow sustained boss damage without changing tank defenses.
+        狂戰姿態: { damageBonus: [6, 9, 12, 14, 16] },
         // Ascended 崩鎧重擊: twice this cast's armor-break value,
         // capped at +60% of the skill's base damage multiplier.
         碎甲猛擊: { repeatedArmorBreakFactor: 2, repeatedArmorBreakBonusCap: 60 },
       },
+      passive: {
+        過度失血: { bleedDamageBonus: [20, 30, 40, 50, 60] },
+      },
+    },
+    ranger: {
+      active: {
+        // Stronger early arrows; burst gains remain smaller at geared endgame.
+        穿雲箭: { damage: [165, 180, 195, 210, 225] },
+        追風箭: { damage: [145, 160, 175, 190, 205] },
+        疾風連射: { damagePerArrow: [60, 65, 70, 76, 84] },
+        破星狙擊: { damage: [295, 330, 365, 405, 450] },
+      },
     },
     mage: {
       active: {
-        霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [20, 25, 30, 35, 40], afterburstDamage: 70 },
-        奧術飛彈: { missiles: 3, damagePerMissile: [50, 55, 60, 66, 72], resonanceMissileDamage: 80 },
+        霜火新星: { damage: [155, 165, 175, 190, 205], burnChance: [25, 30, 35, 40, 50], afterburstDamage: 70 },
+        閃電鏈: { missiles: 3, damagePerMissile: [60, 70, 80, 90, 100], paralysisChance: 20, resonanceMissileDamage: 80 },
         魔力護盾: { healthBelow: 60, maxHealthShieldPercent: [12, 15, 18, 21, 25], followingActiveCasts: 3, activeDamageBonus: 10, energyOnBreak: 15 },
-        元素蝕印: { durationSeconds: [7, 8, 9, 10, 12], statusChancePoints: [5, 7, 9, 11, 14], followingActiveCasts: 3, nextStatusChancePoints: 15 },
-        隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [25, 30, 35, 40, 50], emberExplosionDamage: 120 },
-        奧術超載: { successfulActiveCastsRequired: 6, followingSuccessfulActiveCasts: 6, skillEfficiencyBonus: [10, 14, 18, 22, 26], exhaustionPenalty: 15, stableExhaustionPenalty: 5, stabilityStacksRequired: 6 },
+        元素蝕印: { durationSeconds: [7, 8, 9, 10, 12], statusChancePoints: [5, 7, 9, 11, 14], statusEffectBonus: [10, 15, 20, 25, 30], followingActiveCasts: 3, nextStatusChancePoints: 15 },
+        隕星術: { damage: [260, 290, 320, 355, 395], burnChance: [100, 100, 100, 100, 100], emberExplosionDamage: 120 },
+        奧術超載: { successfulActiveCastsRequired: 3, followingSuccessfulActiveCasts: 3, skillEfficiencyBonus: [15, 18, 22, 26, 30], exhaustionPenalty: 15, stableExhaustionPenalty: 5, stabilityStacksRequired: 6 },
         虛空崩解: { damage: [250, 275, 300, 330, 365], damageBonusVsStatus: [20, 25, 30, 35, 40], damagePerDistinctStatus: 18, maxDistinctStatuses: 3 },
         星界寂滅: { totalDamage: [420, 475, 530, 590, 660], beamCount: 6, beamDamageSharePercent: 40, finalExplosionDamageSharePercent: 60, maxCollapseStacks: 6, finalExplosionDamagePerStack: 8 },
       },
       passive: {
-        奧術感知: { activeDirectDamageBonus: [3, 5, 7, 9, 12] },
-        焰脈: { normalBurnChance: [4, 6, 8, 10, 12] },
-        星界護體: { maxHealthBonus: [3, 5, 7, 9, 12] },
+        奧術感知: { activeDirectDamageBonus: [5, 8, 10, 13, 15] },
+        焰脈: { normalBurnChance: [5, 8, 10, 13, 15] },
+        星界護體: { incomingShieldChancePercent: [5, 5, 5, 5, 5], incomingShieldMaxHealthPercent: [5, 6, 7, 8, 10] },
         燃燼導引: { activeDirectDamageVsBurn: [6, 9, 12, 15, 18] },
-        護盾轉流: { activeDirectDamageWithShield: [4, 6, 8, 10, 12] },
-        精密咒式: { activeStatusChancePoints: [3, 4, 5, 6, 8] },
-        餘燼回響: { extraDamage: [25, 35, 45, 55, 65], procChance: 15, maxProcsPerCast: 1 },
+        護盾轉流: { activeDirectDamageWithShield: [5, 8, 10, 13, 15] },
+        精密咒式: { activeStatusChanceBonus: [5, 8, 10, 13, 15] },
+        餘燼回響: { extraDamage: [25, 35, 45, 55, 65], procChance: 15 },
         奧術循環: { ultimateEnergyPerSuccessfulCast: [2, 3, 4, 5, 6] },
-        元素共振: { activeDirectDamagePerStatus: [3, 4, 5, 6, 8], maxDistinctStatuses: 3 },
-        屏障續航: { initialShieldBonus: [4, 6, 8, 10, 12] },
-        枯竭控制: { exhaustionReductionPoints: [2, 4, 6, 8, 10] },
+        元素共振: { activeDirectDamagePerStatus: [5, 8, 10, 13, 15], maxDistinctStatuses: 3 },
+        屏障續航: { initialShieldBonus: [10, 15, 20, 25, 30] },
+        枯竭控制: { exhaustionReductionPercent: [10, 20, 30, 40, 50] },
         星界回爆: { ultimateFinalExplosionExtraDamage: [45, 55, 65, 75, 90], maxProcsPerUltimate: 1 },
       },
     },
@@ -48,7 +63,6 @@ export const balanceConfig = {
   progression: {
     mapFloors: 30,
     experienceMultiplier: 3,
-    dodgeCap: 40,
     damageReductionCap: 80,
     maxEnhancement: 15,
     experienceRequired: {
@@ -61,16 +75,37 @@ export const balanceConfig = {
   },
 
   maps: [
-    { power: [1000, 5500], phasePower: [4000, 5200], bossPower: 5800, exp: [6, 12] },
-    { power: [3000, 7600], phasePower: [6500, 7500], bossPower: 8000, exp: [15, 28] },
-    { power: [6000, 12300], phasePower: [10500, 12000], bossPower: 13000, exp: [35, 55] },
-    { power: [10000, 18000], phasePower: [15000, 17500], bossPower: 19000, exp: [70, 105] },
-    { power: [16000, 26500], phasePower: [21500, 25500], bossPower: 28000, exp: [130, 190] },
-    { power: [24000, 38000], phasePower: [29000, 35000], bossPower: 42000, exp: [230, 320] },
-    { power: [35000, 58000], phasePower: [42000, 50000], bossPower: 65000, exp: [380, 520] },
-    { power: [50000, 85000], phasePower: [60000, 70000], bossPower: 95000, exp: [600, 800] },
-    { power: [70000, 120000], phasePower: [85000, 100000], bossPower: 140000, exp: [900, 1200] },
+    // Fixed panel-score advice: stable first checkpoint / later checkpoints and boss.
+    // Three-class sampled thresholds plus 5% rounding margin; original realm rules remain.
+    { recommendedAssessedPower: [3000, 6000], power: [1000, 5500], phasePower: [4000, 5200], bossPower: 5800, exp: [6, 12] },
+    { recommendedAssessedPower: [11000, 14000], power: [3000, 7600], phasePower: [6500, 7500], bossPower: 8000, exp: [15, 28] },
+    { recommendedAssessedPower: [20000, 24000], power: [6000, 12300], phasePower: [10500, 12000], bossPower: 13000, exp: [35, 55] },
+    { recommendedAssessedPower: [32000, 40000], power: [10000, 18000], phasePower: [15000, 17500], bossPower: 19000, exp: [70, 105] },
+    { recommendedAssessedPower: [51000, 68000], power: [16000, 26500], phasePower: [21500, 25500], bossPower: 28000, exp: [130, 190] },
+    { recommendedAssessedPower: [88000, 116000], power: [24000, 38000], phasePower: [29000, 35000], bossPower: 42000, exp: [230, 320] },
+    { recommendedAssessedPower: [139000, 189000], power: [35000, 58000], phasePower: [42000, 50000], bossPower: 65000, exp: [380, 520] },
+    { recommendedAssessedPower: [230000, 362000], power: [50000, 85000], phasePower: [60000, 70000], bossPower: 95000, exp: [600, 800] },
+    { recommendedAssessedPower: [468000, 584000], power: [70000, 120000], phasePower: [85000, 100000], bossPower: 140000, exp: [900, 1200] },
   ],
+
+  firstChapter: {
+    // Floor, recommended power, HP: milestones raise HP while attack stays gradual.
+    anchors: [[1,1000,320],[4,1600,540],[5,1800,650],[9,2600,900],[10,2800,1260],[11,2900,1300],[14,3300,1460],[15,3450,1610],[19,4050,1900],[20,4200,2850],[21,4350,2930],[24,4750,3200],[25,4900,3500],[29,5500,4000],[30,5800,7200]],
+    // Ordinary enemies only: raise HP toward the next checkpoint, preserving
+    // the existing elite/guardian/boss anchors and all attack/defense values.
+    ordinaryHealthAnchors: [[1000,360],[1600,580],[2000,760],[2600,1130],[2900,1340],[3300,1490],[3600,1800],[4050,2500],[4350,2980],[4750,3260],[5050,4200],[5500,6250]],
+    attackScale: 0.8,
+    defenseScale: 0.8,
+    tierAttack: { normal: 1, elite: 1.1, guardian: 1.15, boss: 1.25 },
+    tierDefense: { normal: 1, elite: 1.05, guardian: 1.1, boss: 1.15 },
+    profileVariation: 0.2,
+  },
+
+  secondChapter: {
+    // Chapter 2 only; checkpoint HP never decreases from version 431.
+    anchors: [[1,3000,1500],[4,3750,4100],[5,4000,4951],[6,4200,5400],[9,4750,10600],[10,5000,13007],[11,5150,13200],[14,5550,13300],[15,5700,14000],[16,5850,14200],[19,6350,14500],[20,6500,15008],[21,6650,15500],[24,7050,16400],[25,7200,18000],[26,7350,18500],[29,7750,21000],[30,8000,24000]],
+    profileVariation: 0.2,
+  },
 
   mapFloors: {
     phaseTwoStartMultiplier: 1.05,
@@ -159,11 +194,13 @@ export const balanceConfig = {
       maximumHitChance: 95,
       statToRating: 10,
       monsterEvasionBase: 20,
-      monsterEvasionPerMap: 22,
-      // 後段地圖額外增加的固定閃避率，直接從玩家命中率扣除。
-      monsterEvasionBonusByMap: [0, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+      // 第三圖起相較舊值約提高 10%，讓玩家可透過洗鍊命中提升命中率。
+      monsterEvasionRatingByMap: [0, 42, 65, 97, 122, 147, 173, 198, 223, 249],
+      // 第五圖起再提高 15%；第七圖起改為 25%（不與 15% 疊加）。
+      monsterEvasionBonusPercentByMap: [0, 0, 0, 0, 0, 15, 15, 25, 25, 25],
       monsterAccuracyBase: 100,
-      monsterAccuracyPerMap: 5,
+      // 怪物命中評等按地圖配置；第六圖起降低成長幅度，避免後期閃避流失去作用。
+      monsterAccuracyRatingByMap: [0, 100, 100, 115, 130, 145, 160, 175, 190, 205],
       suppressionAccuracyPerPoint: 5,
       bossEvasionPerLevel: 1.7,
       bossAccuracyPerLevel: 1.6,
@@ -185,9 +222,10 @@ export const balanceConfig = {
       // 攻擊面板值就是基礎傷害核心；只有怪物防禦、技能倍率與詞綴會再改變結果。
       playerAttackScale: 1,
     },
-    // 防禦採用「防禦 / (防禦 + 地圖門檻)」：高等裸裝不會天然接近上限，
+    // 雙方護甲採用「0.85 × 防禦 / (防禦 + 場景門檻)」，平滑接近85%；
     // 但穿著當前地圖的胸甲、頭盔、鞋子與護腕時能明顯提高存活力。
-    defenseMitigation: { baseThreshold: 500, perMapThreshold: 400, cap: 0.75 },
+    defenseMitigation: { baseThreshold: 350, perMapThreshold: 200, perFloorThreshold: 3,
+      cap: 0.85, maximumIgnore: 0.8, monsterReferenceScale: 100, monsterRatingMultiplier: 1.25 },
     // 普通怪物也要隨樓層逐步施壓：前段不再長時間停留在最低傷害，
     // 後段則讓空裝角色有機會因累積受傷而死亡，必須持續更換與強化裝備。
     monsterDamage: {
@@ -202,8 +240,21 @@ export const balanceConfig = {
     // 新版裝備最多 5 條詞綴，降低高階敵人倍率，避免戰鬥詞綴削減後難度失控。
     tierDefense: { normal: 1, elite: 1.18, guardian: 1.38, boss: 1.62 },
     tierAttack: { normal: 1, elite: 1.15, guardian: 1.5, boss: 1.72 },
+    // 依統一攻防前的同配裝實戰樣本校準；只調整怪物攻防，不改生命與壓制。
+    monsterCalibrationByMap: [
+      {normal: {attack: 1.003, defense: 0.892}, elite: {attack: 0.996, defense: 1.147}, guardian: {attack: 0.998, defense: 1.062}, boss: {attack: 0.962, defense: 1.275}, guardian10: {attack: 0.998, defense: 1.062}},
+      {normal: {attack: 1.054, defense: 0.816}, elite: {attack: 1.051, defense: 1.615}, guardian: {attack: 0.946, defense: 1.836}, boss: {attack: 1.026, defense: 1.912}, guardian10: {attack: 0.946, defense: 1.836}},
+      {normal: {attack: 1.167, defense: 1.116}, elite: {attack: 1.164, defense: 1.211}, guardian: {attack: 1.048, defense: 1.275}, boss: {attack: 1.139, defense: 1.615}, guardian10: {attack: 1.048, defense: 1.275}},
+      {normal: {attack: 1.183, defense: 0.969}, elite: {attack: 1.174, defense: 1.275}, guardian: {attack: 1.059, defense: 1.34}, boss: {attack: 1.034, defense: 1.734}, guardian10: {attack: 1.059, defense: 1.34}},
+      {normal: {attack: 1.19, defense: 0.969}, elite: {attack: 1.18, defense: 1.466}, guardian: {attack: 0.947, defense: 1.833}, boss: {attack: 1.038, defense: 2.422}, guardian10: {attack: 0.947, defense: 1.833}},
+      {normal: {attack: 1.174, defense: 1.147}, elite: {attack: 1.163, defense: 1.615}, guardian: {attack: 0.934, defense: 2.008}, boss: {attack: 0.843, defense: 2.422}, guardian10: {attack: 0.934, defense: 2.008}},
+      {normal: {attack: 1.158, defense: 1.071}, elite: {attack: 1.14, defense: 1.912}, guardian: {attack: 0.918, defense: 2.933}, boss: {attack: 0.741, defense: 3.91}, guardian10: {attack: 0.918, defense: 2}},
+      {normal: {attack: 1.079, defense: 1.515}, elite: {attack: 1.166, defense: 2.231}, guardian: {attack: 0.961, defense: 3.188}, boss: {attack: 0.827, defense: 7.48}, guardian10: {attack: 0.961, defense: 1.5}},
+      {normal: {attack: 1.04, defense: 1.402}, elite: {attack: 1.143, defense: 3.4}, guardian: {attack: 0.866, defense: 1.5}, boss: {attack: 0.859, defense: 13.6}, guardian10: {attack: 0.866, defense: 1.5}},
+    ],
     // 世界首領每次普通攻擊固定造成 1 點傷害，攻擊頻率獨立設定。
-    worldBoss: { damagePerHit: 1, attacksPerSecond: 1.25 },
+    worldBoss: { damagePerHit: 1, attacksPerSecond: 1.25,
+      rankingRewards: [{ yuanbao: 500, reforgeStones: 200 }, { yuanbao: 300, reforgeStones: 150 }, { yuanbao: 200, reforgeStones: 100 }] },
     // 後段地圖對玩家造成的總傷害減免，地圖 1 為 0%，地圖 9 為 9%。
     monsterDamageReductionByMap: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     // 玩家戰力低於當前樓層需求時，依戰力比施加境界壓制。
@@ -220,11 +271,24 @@ export const balanceConfig = {
   },
 
   character: {
-    levelGrowth: { hp: 24, attack: 8, defense: 5 },
+    levelGrowth: {
+      戰士: { hp: 32, attack: 7, defense: 7 },
+      遊俠: { hp: 24, attack: 8, defense: 4 },
+      法師: { hp: 20, attack: 10, defense: 3 },
+    },
     combatPower: { base: 1350, perLevel: 56 },
+    // Panel/gear assessment only. Expedition difficulty keeps combatPower above.
+    powerAssessment: {
+      displayDivisor: 10,
+      base: 1350, damageWeight: 4, effectiveHealthWeight: 0.25,
+      referenceEvasion: 80, referenceAccuracy: 140, referenceDefenseScale: 800,
+      bossShare: 0.5, sustainPressurePerSecond: 0.08, maxSustainBonus: 0.5,
+      maxSkillProtection: 2, sampleSeconds: 60, cacheEntries: 64,
+      equipmentSampleTrials: 4, equipmentIncomingHealthShare: 0.06, equipmentCacheEntries: 512,
+    },
     baseStats: {
-      戰士: { hp: 620, attack: 54, defense: 36, speed: 100, hit: 100, dodge: 5, crit: 8, lifesteal: 0 },
-      遊俠: { hp: 410, attack: 54, defense: 21, speed: 122, hit: 100, dodge: 10, crit: 12, lifesteal: 0 },
+      戰士: { hp: 620, attack: 46, defense: 36, speed: 100, hit: 100, dodge: 5, crit: 8, lifesteal: 0 },
+      遊俠: { hp: 480, attack: 54, defense: 21, speed: 115, hit: 100, dodge: 10, crit: 12, lifesteal: 0 },
       法師: { hp: 390, attack: 68, defense: 19, speed: 108, hit: 112, dodge: 4, crit: 8, lifesteal: 0 },
     },
   },
@@ -241,9 +305,20 @@ export const balanceConfig = {
     ],
     mapPowerScale: [0, 1, 1.55, 2.25, 3.2, 4.45, 6, 8, 10.5, 13.5],
     dropPower: { base: 80, qualityGrowth: 38, maximumMultiplier: 1.18 },
+    // Catalog/mythic and historical affix ranges retain their original curve.
     baseScaleByMap: [0, 2, 2.9, 6.15, 8.7, 12.15, 13.4, 17, 23, 32],
+    // Map gear: retain chapter 1/9 endpoints, soften chapter 3's jump and chapter 6's stall.
+    sceneScaleByMap: [0, 2, 3.4, 5.4, 8.2, 11.1, 14.8, 19, 24.6, 32],
     // 普通到神話的基礎能力總差距為 30%，六個品質平均遞進。
     baseQualityMultipliers: [1, 1.06, 1.12, 1.18, 1.24, 1.3],
+    skillMythics: {
+      titanAxe: { normalAttacks: 3, extraAttackPercent: 30, detonationPercent: 100 },
+      bloodHeart: { empoweredAttacks: 7, currentHealthCostPercent: 10, burstPercent: 250 },
+      skyPiercer: { ignoreDefensePercent: 60, nextAttackBonusPercent: 30 },
+      thousandFeathers: { arrows: 7, totalDamageBonusPercent: 20 },
+      polarStaff: { remainingBurnMultiplier: 1.5 },
+      eternalCore: { maxHealthBurstPercent: 15 },
+    },
     // [屬性、常數、每張地圖成長]。胸甲保有最高防禦，武器保有最高攻擊。
     baseStats: {
       武器: [["攻擊", 18, 4]],
@@ -289,6 +364,7 @@ export const balanceConfig = {
     },
     statWeights: { 生命: 0.25, "生命%": 3, 攻擊: 4, "攻擊%": 5, 防禦: 3, "防禦%": 4, 攻速: 4, 命中: 5, 閃避: 8, 暴擊: 8, 暴擊傷害: 7, 吸血: 10, 經驗: 5, 金幣: 4, 首領傷害: 7, 傷害減免: 10, 技能傷害: 7, 首領減傷: 9, 資源掉落率: 4, 元寶掉率: 12 },
     affixes: {
+      sceneFlatStatMultipliers: { 生命: 1.25, 防禦: 1.4 },
       flatQualityMultipliers: [[0.08, 0.12], [0.13, 0.18], [0.19, 0.24], [0.25, 0.3], [0.3, 0.4], [0.45, 0.6]],
       percentQualityBands: {
         "生命%": [[1, 2], [2, 3], [3, 4], [3, 6], [4, 8], [5, 10]],
@@ -296,8 +372,6 @@ export const balanceConfig = {
         "防禦%": [[1, 2], [2, 3], [3, 4], [3, 6], [4, 8], [5, 10]],
         暴擊: [[1, 1], [2, 2], [3, 4], [3, 6], [4, 8], [6, 10]],
         暴擊傷害: [[5, 5], [5, 8], [6, 10], [8, 12], [8, 14], [10, 16]],
-        命中: [[1, 2], [3, 3], [4, 5], [6, 7], [8, 10], [12, 15]],
-        閃避: [[1, 1], [2, 2], [4, 4], [4, 6], [5, 8], [5, 10]],
         吸血: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [7, 9]],
         首領傷害: [[1, 1], [2, 2], [3, 4], [5, 6], [7, 9], [11, 15]],
         傷害減免: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 5], [7, 9]],
@@ -309,7 +383,13 @@ export const balanceConfig = {
         元寶掉率: [[1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3]],
       },
       speedQualityBands: [[1, 3], [2, 6], [3, 8], [4, 10], [5, 10], [8, 12]],
-      percentMapGrowth: { 暴擊: 0.45, 命中: 0.5, 閃避: 0.35, 吸血: 0.35, 首領傷害: 0.6, 傷害減免: 0.35, 經驗: 0.55, 金幣: 0.6 },
+      percentMapGrowth: { 暴擊: 0.45, 吸血: 0.35, 首領傷害: 0.6, 傷害減免: 0.35, 經驗: 0.55, 金幣: 0.6 },
+      // 命中、閃避是評等點數詞綴，不是百分比；地圖成長沿用原有曲線。
+      ratingQualityBands: {
+        命中: [[1, 2], [3, 3], [4, 5], [6, 7], [8, 10], [12, 15]],
+        閃避: [[1, 1], [2, 2], [4, 4], [4, 6], [5, 8], [5, 10]],
+      },
+      ratingMapGrowth: { 命中: 0.5, 閃避: 0.35 },
       speedMapGrowth: 0,
     },
   },
@@ -318,11 +398,11 @@ export const balanceConfig = {
     onlineYuanbao: { intervalSeconds: 600, reward: 10, heartbeatMaxSeconds: 90 },
     yuanbaoReforgeBundle: { price: 10, stones: 12 },
     yuanbaoCosmetics: {
-      "title-ash": 80,
-      "title-abyss": 180,
-      "appearance-ember": 120,
-      "appearance-arcane": 180,
-      "appearance-abyss": 300,
+      "title-ash": 200,
+      "title-abyss": 2000,
+      "appearance-ember": 500,
+      "appearance-arcane": 1500,
+      "appearance-abyss": 4500,
     },
     dailyHuntReward: { kills: 500, gold: 5_000, enhanceStones: 10, reforgeStones: 10, yuanbao: 20 },
     gold: {

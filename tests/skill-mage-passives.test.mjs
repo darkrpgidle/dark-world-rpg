@@ -14,7 +14,7 @@ const { trySkillProc } = await import("../app/skill-combat-session.ts");
 const { grantUltimateEnergy } = await import("../app/skill-combat-queue.ts");
 const { tryActivateMageShield } = await import("../app/skill-mage-shield.ts");
 
-function mage(names, slots = names.filter((name) => ["霜火新星", "奧術飛彈", "隕星術", "虛空崩解"].includes(name)), ranks = {}) {
+function mage(names, slots = names.filter((name) => ["霜火新星", "閃電鏈", "隕星術", "虛空崩解"].includes(name)), ranks = {}) {
   let build = createSkillBuild();
   for (const name of names) {
     for (let i = 0; i < (ranks[name] ?? 1); i++) build = upgradeSkill(build, "法師", 100, name);
@@ -39,18 +39,22 @@ function withStatus(combat, kind, now = 0, options = {}) {
   };
 }
 
-test("unlearned passives contribute nothing; learned health and shield bonuses remain separate snapshot inputs", () => {
+test("unlearned passives contribute nothing; astral body reports ranked chance and barrier strength", () => {
   const empty = mage(["霜火新星"]);
-  assert.deepEqual(magePassiveStats(empty.build), { maxHealthBonusPercent: 0, initialShieldBonusPercent: 0 });
+  assert.deepEqual(magePassiveStats(empty.build), {
+    incomingShieldChancePercent: 0, incomingShieldMaxHealthPercent: 0, initialShieldBonusPercent: 0,
+  });
   const learned = mage(["霜火新星", "星界護體", "屏障續航"], ["霜火新星"],
     { 星界護體: 5, 屏障續航: 5 });
-  assert.deepEqual(magePassiveStats(learned.build), { maxHealthBonusPercent: 12, initialShieldBonusPercent: 12 });
+  assert.deepEqual(magePassiveStats(learned.build), {
+    incomingShieldChancePercent: 5, incomingShieldMaxHealthPercent: 10, initialShieldBonusPercent: 30,
+  });
   assert.equal(turn(charge(learned, 4), "霜火新星", 400).passiveDirectDamageBonusPercent, 0);
 });
 
 test("arcane sense affects active direct damage, not normal attacks, missed casts, buffs or target ticks", () => {
   const prepared = charge(mage(["霜火新星", "奧術感知"], ["霜火新星"], { 奧術感知: 5 }), 4);
-  assert.equal(turn(prepared, "霜火新星", 400).passiveDirectDamageBonusPercent, 12);
+  assert.equal(turn(prepared, "霜火新星", 400).passiveDirectDamageBonusPercent, 15);
   assert.equal(turn(prepared, "霜火新星", 400, [{ hit: false }]).passiveDirectDamageBonusPercent, 0);
   const normal = turn(mage(["奧術感知"], [], { 奧術感知: 5 }), "normal", 0);
   assert.equal(normal.passiveDirectDamageBonusPercent, 0);
@@ -71,7 +75,7 @@ test("normal-only flame vein makes one burn roll, awards one status energy and p
   assert.equal(first.combat.session.enemy.burn.nextTickAt, 1000);
   const refreshed = turn(first.combat, "normal", 500, [{ hit: true }], { roll: () => 0 });
   assert.equal(refreshed.combat.session.enemy.burn.nextTickAt, 1000);
-  assert.equal(refreshed.combat.session.enemy.burn.expiresAt, 3500);
+  assert.equal(refreshed.combat.session.enemy.burn.expiresAt, 5500);
   const miss = turn(refreshed.combat, "normal", 750, [{ hit: false }], { roll: () => { throw Error("no roll on miss"); } });
   assert.deepEqual(miss.statusApplications, []);
   assert.equal(miss.combat.session.charge.ultimateEnergy, 22);
@@ -83,11 +87,12 @@ test("precision adds points to a skill's one burn roll, preserving the existing 
   combat = charge(combat, 4, 100);
   let draws = 0;
   const cast = turn(combat, "霜火新星", 500, [{ hit: true }], { roll: () => { draws++; return 0.41; } });
-  assert.equal(cast.passiveStatusChancePoints, 8);
-  assert.equal(cast.burnChancePercent, 42);
-  assert.equal(draws, 1);
+  assert.equal(cast.passiveStatusChanceBonus, 15);
+  assert.equal(cast.burnChancePercent, 44.849999999999994);
+  assert.equal(draws, 2);
   assert.deepEqual(cast.statusApplications, [{ kind: "burn" }]);
 });
+
 
 test("burn guidance, shield transfer and resonance count only existing, distinct abnormal states", () => {
   let combat = mage(["霜火新星", "魔力護盾", "奧術感知", "燃燼導引", "護盾轉流", "元素共振"],
@@ -100,31 +105,31 @@ test("burn guidance, shield transfer and resonance count only existing, distinct
   assert.equal(combat.session.enemy.bleed.stacks, 2);
   combat = charge(combat, 4);
   const withShield = tryActivateMageShield(combat,
-    { currentHealth: 500, maxHealthBeforeMagePassive: 1000, ascended: false }).combat;
+    { currentHealth: 500, maxHealth: 1000, ascended: false }).combat;
   const shielded = turn(withShield, "霜火新星", 400);
   assert.equal(shielded.abnormalKindsCounted, 3);
-  assert.equal(shielded.passiveDirectDamageBonusPercent, 12 + 18 + 12 + 24);
+  assert.equal(shielded.passiveDirectDamageBonusPercent, 15 + 18 + 15 + 45);
   assert.equal(turn(combat, "霜火新星", 400)
-    .passiveDirectDamageBonusPercent, 12 + 18 + 24);
+    .passiveDirectDamageBonusPercent, 15 + 18 + 45);
   assert.equal(turn(withShield, "霜火新星", 400, [{ hit: false }])
     .passiveDirectDamageBonusPercent, 0);
   assert.equal(turn(withShield, "霜火新星", 8000)
-    .passiveDirectDamageBonusPercent, 12 + 12);
+    .passiveDirectDamageBonusPercent, 15 + 15);
 });
 
 test("ember echo rolls once only against an already burning target and does not refresh burn", () => {
-  let combat = mage(["奧術飛彈", "餘燼回響", "星界寂滅"], ["奧術飛彈"], { 餘燼回響: 5 });
+  let combat = mage(["閃電鏈", "餘燼回響", "星界寂滅"], ["閃電鏈"], { 餘燼回響: 5 });
   combat = withStatus(combat, "burn", 0);
   combat = charge(combat, 3);
   let draws = 0;
-  const cast = turn(combat, "奧術飛彈", 300,
+  const cast = turn(combat, "閃電鏈", 300,
     [{ hit: true }, { hit: false }, { hit: true }], { roll: () => { draws++; return 0.14; } });
-  assert.equal(draws, 1);
+  assert.equal(draws, 3);
   assert.deepEqual(cast.passiveDamageProcs, [{ id: "餘燼回響", percent: 65 }]);
-  assert.equal(cast.combat.session.enemy.burn.expiresAt, 3000);
-  assert.equal(cast.combat.session.charge.ultimateEnergy, 24); // three normals only
+  assert.equal(cast.combat.session.enemy.burn.expiresAt, 5000);
+  assert.equal(cast.combat.session.charge.ultimateEnergy, 27); // three normals plus paralysis only
   assert.equal(cast.combat.session.usedDamageProcs.length, 1);
-  assert.deepEqual(turn(combat, "奧術飛彈", 300,
+  assert.deepEqual(turn(combat, "閃電鏈", 300,
     [{ hit: false }, { hit: false }, { hit: false }], { roll: () => { throw Error("no roll on miss"); } })
     .passiveDamageProcs, []);
   const fresh = charge(mage(["霜火新星", "餘燼回響"], ["霜火新星"]), 4);
@@ -132,21 +137,21 @@ test("ember echo rolls once only against an already burning target and does not 
     .passiveDamageProcs, []); // burn added by this cast was absent at its start
 });
 
-test("arcane cycle grants energy once per successful cast, capped and queued after earlier skills", () => {
-  let combat = mage(["奧術飛彈", "奧術循環", "星界寂滅"], ["奧術飛彈"], { 奧術循環: 5 });
+test("arcane cycle grants energy once per successful cast and promotes a full ultimate", () => {
+  let combat = mage(["閃電鏈", "奧術循環", "星界寂滅"], ["閃電鏈"], { 奧術循環: 5 });
   combat = charge(combat, 3);
-  const cast = turn(combat, "奧術飛彈", 300,
+  const cast = turn(combat, "閃電鏈", 300,
     [{ hit: true, critical: true }, { hit: true, critical: true }, { hit: false }]);
   assert.equal(cast.passiveUltimateEnergyGain, 6);
   assert.equal(cast.combat.session.charge.ultimateEnergy, 24 + 3 + 6);
-  assert.equal(turn(combat, "奧術飛彈", 300, [{ hit: false }, { hit: false }, { hit: false }])
+  assert.equal(turn(combat, "閃電鏈", 300, [{ hit: false }, { hit: false }, { hit: false }])
     .passiveUltimateEnergyGain, 0);
 
-  const near = { ...combat.session.charge, ultimateEnergy: 98, ready: ["奧術飛彈"] };
+  const near = { ...combat.session.charge, ultimateEnergy: 98, ready: ["閃電鏈"] };
   const gained = grantUltimateEnergy(near, 6);
   assert.equal(gained.ultimateEnergy, 100);
-  assert.deepEqual(gained.ready, ["奧術飛彈", "星界寂滅"]);
-  assert.deepEqual(near.ready, ["奧術飛彈"]);
+  assert.deepEqual(gained.ready, ["星界寂滅", "閃電鏈"]);
+  assert.deepEqual(near.ready, ["閃電鏈"]);
   assert.throws(() => grantUltimateEnergy(near, -1), RangeError);
 });
 
@@ -159,8 +164,7 @@ test("final explosion echo requires an explicit final hit; two passive procs sha
   assert.deepEqual(turn(combat, "星界寂滅", 1300, hits, { roll: () => 0 }).passiveDamageProcs,
     [{ id: "餘燼回響", percent: 65 }]);
   assert.deepEqual(turn(combat, "星界寂滅", 1300,
-    [...hits.slice(0, 6), { hit: false }],
-    { roll: () => 0, finalExplosionConfirmed: true }).passiveDamageProcs,
+    [...hits.slice(0, 6), { hit: false }], { roll: () => 0, finalExplosionConfirmed: true }).passiveDamageProcs,
     [{ id: "餘燼回響", percent: 65 }]);
   const cast = turn(combat, "星界寂滅", 1300, hits,
     { roll: () => 0, finalExplosionConfirmed: true });
@@ -183,7 +187,7 @@ test("exhaustion control reduces the next skill's penalty but cannot create a da
   combat = { ...combat, overload: { phase: "exhausted", basePenaltyPercent: 5 } };
   combat = charge(combat, 4);
   const cast = turn(combat, "霜火新星", 400);
-  assert.equal(cast.skillDamagePenaltyPercent, 0);
+  assert.equal(cast.skillDamagePenaltyPercent, 2.5);
   assert.equal(cast.combat.overload.phase, "exhausted");
-  assert.equal(turn(combat, "霜火新星", 400, [{ hit: false }]).skillDamagePenaltyPercent, 0);
+  assert.equal(turn(combat, "霜火新星", 400, [{ hit: false }]).skillDamagePenaltyPercent, 2.5);
 });

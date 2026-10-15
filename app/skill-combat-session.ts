@@ -22,9 +22,12 @@ import {
 export type StatusApplication = {
   kind: EnemyDebuffKind;
   level?: number;
+  durationSeconds?: number;
   ascendedBleed?: boolean;
   bleedDamageBonusPercent?: number;
   strength?: number;
+  effectBonusPercent?: number;
+  effectMultiplier?: number; freezeBurstPercent?: number; attackSnapshot?: number;
 };
 
 export type SkillCombatSession = {

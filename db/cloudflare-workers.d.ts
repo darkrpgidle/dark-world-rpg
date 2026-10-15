@@ -5,3 +5,4 @@ declare module "cloudflare:workers" {
     DB?: Parameters<typeof import("drizzle-orm/d1").drizzle>[0];
   };
 }
+

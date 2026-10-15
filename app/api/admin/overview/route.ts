@@ -1,4 +1,6 @@
-import { count, desc, eq, gt } from "drizzle-orm";
+import { saveDisplay } from "../../../save-field-schema";
+import { adminJson } from "../../../admin-response";
+import { and, count, desc, gt } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { deathEvents, accounts, gameSaves, sessions } from "../../../../db/schema";
 import { currentAccount } from "../../auth-utils";
@@ -6,17 +8,17 @@ import { maps } from "../../../game-data";
 
 export async function GET(request: Request) {
   const account = await currentAccount(request);
-  if (!account) return Response.json({ error: "not_authenticated" }, { status: 401 });
-  if (!account.isGm) return Response.json({ error: "forbidden" }, { status: 403 });
+  if (!account) return adminJson({ error: "not_authenticated" }, { status: 401 });
+  if (!account.isGm) return adminJson({ error: "forbidden" }, { status: 403 });
   const db = await getDb();
   const activeSince = new Date(Date.now() - 90_000).toISOString();
   const [accountRows, saveRows, onlineSessionRows, [accountCount], [saveCount], [sessionCount], [latestSave], [deathCount], deathHotspots] = await Promise.all([
     db.select({ id: accounts.id, username: accounts.username }).from(accounts),
     db.select({ accountId: gameSaves.accountId, playerId: gameSaves.playerId, payload: gameSaves.payload }).from(gameSaves),
-    db.select({ accountId: sessions.accountId, lastSeenAt: sessions.lastSeenAt }).from(sessions).where(gt(sessions.lastSeenAt, activeSince)),
+    db.select({ accountId: sessions.accountId, lastSeenAt: sessions.lastSeenAt }).from(sessions).where(and(gt(sessions.lastSeenAt, activeSince),gt(sessions.expiresAt,new Date().toISOString()))),
     db.select({ value: count() }).from(accounts),
     db.select({ value: count() }).from(gameSaves),
-    db.select({ value: count() }).from(sessions).where(gt(sessions.lastSeenAt, activeSince)),
+    db.select({ value: count() }).from(sessions).where(and(gt(sessions.lastSeenAt, activeSince),gt(sessions.expiresAt,new Date().toISOString()))),
     db.select({ updatedAt: gameSaves.updatedAt }).from(gameSaves).orderBy(desc(gameSaves.updatedAt)).limit(1),
     db.select({ value: count() }).from(deathEvents),
     db.select({ mapId: deathEvents.mapId, floor: deathEvents.floor, deaths: count() })
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
   ]);
   const saveByAccount = new Map(saveRows.map((row) => {
     let payload: { playerName?: string; level?: number } = {};
-    try { payload = JSON.parse(row.payload) as typeof payload; } catch { /* ignore malformed legacy saves */ }
+    try { const parsed=JSON.parse(row.payload); payload=saveDisplay(parsed); } catch { /* ignore malformed legacy saves */ }
     return [row.accountId ?? "", { playerId: row.playerId, playerName: payload.playerName ?? "", level: payload.level ?? 1 }] as const;
   }));
   const onlinePlayers = [...new Map(onlineSessionRows.map((session) => [session.accountId, session])).values()]
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
       };
     })
     .sort((a, b) => a.username.localeCompare(b.username));
-  return Response.json({
+  return adminJson({
     serverTime: new Date().toISOString(),
     database: {
       accounts: accountCount?.value ?? 0,
@@ -67,3 +69,4 @@ export async function GET(request: Request) {
     },
   });
 }
+

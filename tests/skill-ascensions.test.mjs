@@ -75,3 +75,4 @@ test("second and third rebirth choices cannot repeat; fifth is the fixed ultimat
     assert.equal(beginSkillRebirth(state, characterClass, 100), null);
   }
 });
+

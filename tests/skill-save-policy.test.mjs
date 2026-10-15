@@ -23,7 +23,7 @@ test("legacy saves migrate without granting old rebirths, malformed or cross-cla
   assert.deepEqual(restoreSkillSave(malformed).skillAscensions, createSkillAscensions());
 });
 
-test("version 2 resets existing players once and refunds points by current level", () => {
+test("version 2 migration removes old skill data and preserves unrelated progress", () => {
   for (const level of [1, 2, 37, 100]) {
     const before = { ...base(), level, skillReworkVersion: 1, gold: 123,
       skills: [{ name: "裂地斬", level: 5, max: 5, cost: 1 }],
@@ -32,14 +32,14 @@ test("version 2 resets existing players once and refunds points by current level
     const migrated = preserveServerSkillSave(before, before);
     assert.equal(migrated.skillReworkVersion, 2);
     assert.deepEqual(migrated.skillReworkBuild, createSkillBuild());
-    assert.equal(migrated.skillPoints, Math.floor(level / 2));
-    assert.equal(migrated.skills[0].level, 0);
+    assert.equal(Object.hasOwn(migrated, "skillPoints"), false);
+    assert.equal(Object.hasOwn(migrated, "skills"), false);
     assert.equal(migrated.gold, 123);
     assert.deepEqual(migrated._paidSkillResetActionIds, ["old-receipt"]);
     const upgraded = level >= 2 ? applySkillSaveAction(migrated, { kind: "upgrade", name: "裂地斬" }) : migrated;
     const reconnect = preserveServerSkillSave({ ...before, skillReworkVersion: 1 }, upgraded);
     assert.deepEqual(reconnect.skillReworkBuild, upgraded.skillReworkBuild);
-    assert.equal(reconnect.skills[0].level, 0);
+    assert.equal(Object.hasOwn(reconnect, "skills"), false);
   }
 });
 
@@ -48,8 +48,20 @@ test("generic autosaves preserve canonical skill fields, including after stale a
   const incoming = { ...base(), skillReworkBuild: createSkillBuild(), skillAscensions: { rebirthCount: 5 } };
   assert.deepEqual(preserveServerSkillSave(incoming, saved).skillReworkBuild, saved.skillReworkBuild);
   assert.deepEqual(preserveServerSkillSave(incoming, saved).skillAscensions, saved.skillAscensions);
-  assert.deepEqual(preserveServerSkillSave(incoming, null).skillReworkBuild, createSkillBuild());
+  const staleLegacyData = preserveServerSkillSave({ ...incoming, skills: [{ name: "裂地斬", level: 5 }], skillPoints: 99 }, saved);
+  assert.equal(Object.hasOwn(staleLegacyData, "skills"), false);
+  assert.equal(Object.hasOwn(staleLegacyData, "skillPoints"), false);
+  assert.deepEqual(preserveServerSkillSave({ ...incoming,
+    skillReworkBuild: { ranks: { 裂地斬: 5 }, activeSlots: ["裂地斬", null, null], adminPointLimit: 100 } }, null).skillReworkBuild, createSkillBuild());
   assert.equal(preserveServerSkillSave({ ...incoming, playerClass: "法師" }, saved), null);
+});
+
+test("skill actions never write legacy skill fields", () => {
+  const result = applySkillSaveAction({ ...base(), skills: [{ name: "裂地斬", level: 5 }], skillPoints: 20 },
+    { kind: "upgrade", name: "裂地斬" });
+  assert.equal(Object.hasOwn(result, "skills"), false);
+  assert.equal(Object.hasOwn(result, "skillPoints"), false);
+  assert.equal(result.skillReworkBuild.ranks.裂地斬, 1);
 });
 
 test("client autosaves cannot assign or overwrite the future server-owned legacy count", () => {
@@ -59,7 +71,7 @@ test("client autosaves cannot assign or overwrite the future server-owned legacy
   const unissued = preserveServerSkillSave(client, oldServer);
   assert.equal(Object.hasOwn(fresh, "legacyRebirthCount"), false);
   assert.equal(Object.hasOwn(unissued, "legacyRebirthCount"), false);
-  assert.equal(unissued.rebirthCount, 12); // The old combat flow is unchanged until the reset.
+  assert.equal(unissued.rebirthCount, 5); // The active progression is capped even for stale clients.
 
   const issued = { ...oldServer, legacyRebirthCount: 5 };
   assert.equal(preserveServerSkillSave(client, issued).legacyRebirthCount, 5);
@@ -100,6 +112,7 @@ test("server upgrade and equip enforce earned points, unlocked levels and exact 
 test("rebirth and ascension actions enforce eligibility, choices and confirmation", () => {
   assert.equal(applySkillSaveAction({ ...base(), mapBestFloors: { 9: 29 } }, { kind: "begin_rebirth" }), null);
   assert.equal(applySkillSaveAction({ ...base(), level: 99 }, { kind: "begin_rebirth" }), null);
+  assert.equal(applySkillSaveAction({ ...base(), rebirthCount: 5 }, { kind: "begin_rebirth" }), null);
   let save = applySkillSaveAction(base(), { kind: "begin_rebirth" });
   assert.equal(save.skillAscensions.rebirthCount, 1);
   assert.deepEqual(save.skillReworkBuild, createSkillBuild());

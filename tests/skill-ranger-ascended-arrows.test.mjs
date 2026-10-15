@@ -50,3 +50,4 @@ test("ascended snipe critical recovers two charges after its one primary attack,
   assert.equal(unascended.attackChargeRecovered, 0);
   assert.equal(unascended.combat.session.charge.charges["穿雲箭"], 3);
 });
+

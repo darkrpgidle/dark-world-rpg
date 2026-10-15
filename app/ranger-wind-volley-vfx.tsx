@@ -1,147 +1,135 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
-
-type Anchor = {
-  playerX: number;
-  playerY: number;
-  playerWidth: number;
-  playerHeight: number;
-  enemyX: number;
-  enemyY: number;
-  enemyWidth: number;
-  enemyHeight: number;
-};
-
-const CHARGE_FRAMES = [0, 1, 2, 3] as const;
-const SHOT_FRAME_DURATIONS = [55, 85, 105, 175] as const;
-const SHOT_DURATION = SHOT_FRAME_DURATIONS.reduce((sum, duration) => sum + duration, 0);
-
-function readAnchors(element: HTMLDivElement): Anchor {
-  const stage = element.closest(".battle-stage");
-  const player = stage?.querySelector<HTMLElement>(".fighter.player .fighter-frame");
-  const enemy = stage?.querySelector<HTMLElement>(".fighter.enemy .fighter-frame");
-  const overlayRect = element.getBoundingClientRect();
-  if (!player || !enemy) {
-    return {
-      playerX: overlayRect.width * 0.3,
-      playerY: overlayRect.height * 0.43,
-      playerWidth: overlayRect.width * 0.3,
-      playerHeight: overlayRect.height * 0.68,
-      enemyX: overlayRect.width * 0.71,
-      enemyY: overlayRect.height * 0.43,
-      enemyWidth: overlayRect.width * 0.3,
-      enemyHeight: overlayRect.height * 0.68,
-    };
-  }
-  const playerRect = player.getBoundingClientRect();
-  const enemyRect = enemy.getBoundingClientRect();
-  return {
-    playerX: playerRect.left - overlayRect.left + playerRect.width / 2,
-    playerY: playerRect.top - overlayRect.top + playerRect.height / 2,
-    playerWidth: playerRect.width,
-    playerHeight: playerRect.height,
-    enemyX: enemyRect.left - overlayRect.left + enemyRect.width / 2,
-    enemyY: enemyRect.top - overlayRect.top + enemyRect.height / 2,
-    enemyWidth: enemyRect.width,
-    enemyHeight: enemyRect.height,
-  };
-}
-
-function frameAt(elapsed: number) {
-  let end = 0;
-  for (let index = 0; index < SHOT_FRAME_DURATIONS.length; index += 1) {
-    end += SHOT_FRAME_DURATIONS[index];
-    if (elapsed < end) return index;
-  }
-  return SHOT_FRAME_DURATIONS.length - 1;
-}
-
-function chargeFrameAt(elapsed: number) {
-  if (elapsed < 250) {
-    if (elapsed < 55) return CHARGE_FRAMES[0];
-    if (elapsed < 120) return CHARGE_FRAMES[1];
-    if (elapsed < 185) return CHARGE_FRAMES[2];
-    return CHARGE_FRAMES[3];
-  }
-  const pulseElapsed = (elapsed - 250) % 220;
-  return pulseElapsed < 105 ? CHARGE_FRAMES[2] : CHARGE_FRAMES[3];
-}
-
-function shotOpacity(elapsed: number) {
-  if (elapsed < 0 || elapsed >= SHOT_DURATION) return 0;
-  if (elapsed < 55) return elapsed / 55;
-  if (elapsed < 240) return 1;
-  return Math.max(0, 1 - (elapsed - 240) / (SHOT_DURATION - 240));
-}
-
-export function RangerWindVolleyVfx({ effectKey, shotCount = 5 }: { effectKey: number; shotCount?: number }) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [anchor, setAnchor] = useState<Anchor | null>(null);
-  const shotStarts = Array.from({ length: Math.max(1, shotCount) }, (_, index) => 250 + index * 250);
-  const totalDuration = (shotStarts[shotStarts.length - 1] ?? 250) + SHOT_DURATION;
-
+import { WebGLVfxRenderer } from "./webgl-vfx-renderer";
+export const VOLLEY_INTERVAL_MS = 70;
+export const VOLLEY_FLIGHT_MS = 160;
+type Arrow = { hit: boolean; critical: boolean; sixth: boolean };
+type Props = { effectKey: number; shotCount?: number; arrows?: Arrow[];
+  onImpact: (key: number, index: number) => void; onComplete: (key: number) => void };
+// Painted anchors in the 3x2 atlases, normalized within each cell.
+const GREEN_ANCHORS = [[.87,.485],[.87,.485],[.87,.485],[.70,.445],[.605,.445],[.64,.51]];
+const SIXTH_ANCHORS = [[.985,.61],[.985,.61],[.97,.61],[.84,.525],[.85,.56],[.65,.53]];
+export function RangerWindVolleyVfx({ effectKey, shotCount = 5, arrows, onImpact, onComplete }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const callbacks = useRef({ onImpact, onComplete });
+  const started = useRef<number | null>(null);
+  const impacted = useRef(new Set<number>());
+  const [fallback, setFallback] = useState(false);
+  useEffect(() => { callbacks.current = { onImpact, onComplete }; }, [onImpact, onComplete]);
   useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-    setElapsed(0);
-    setAnchor(readAnchors(overlay));
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const startedAt = performance.now();
-    let animationFrame = 0;
-    const render = (time: number) => {
-      const nextElapsed = reducedMotion ? totalDuration : time - startedAt;
-      setElapsed(nextElapsed);
-      if (!reducedMotion && nextElapsed < totalDuration) animationFrame = requestAnimationFrame(render);
+    const element = canvasRef.current;
+    if (!element) return;
+    const canvas = element;
+    const stage = canvas.closest<HTMLElement>(".battle-stage");
+    const shots = arrows ?? Array.from({ length: shotCount }, () => ({ hit: true, critical: false, sixth: false }));
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let disposed = false, completed = false, raf = 0;
+    let renderer: WebGLVfxRenderer | null = null, context: CanvasRenderingContext2D | null = null;
+    const animations: Animation[] = [];
+    const impact = (index: number, shake = true) => {
+      if (impacted.current.has(index)) return;
+      impacted.current.add(index); callbacks.current.onImpact(effectKey, index);
+      const enemy = stage?.querySelector<HTMLElement>(".fighter.enemy .fighter-frame");
+      if (shake && shots[index].hit && !reduced && enemy?.animate) {
+        const sixth=shots[index].sixth;
+        animations.push(enemy.animate([{ transform: "translate(0,0)",filter:"brightness(1)" },
+          { transform: sixth?"translate(5px,-3px)":"translate(2px,-1px)",filter:sixth?"brightness(1.7)":"brightness(1.22)" },
+          { transform: sixth?"translate(-4px,2px)":"translate(-1px,1px)",filter:"brightness(1.08)" },
+          { transform: "translate(0,0)",filter:"brightness(1)" }], { duration: sixth ? 180 : 60 }));
+        if(sixth && stage?.animate) {
+          const power=(canvas.clientWidth||canvas.getBoundingClientRect().width)<600?4:7;
+          animations.push(stage.animate([{transform:"translate(0,0)"},
+            {transform:`translate(${-power}px,2px)`},{transform:`translate(${power}px,-2px)`},
+            {transform:`translate(${-power*.4}px,1px)`},{transform:"translate(0,0)"}],{duration:180}));
+        }
+      }
     };
-    animationFrame = requestAnimationFrame(render);
-    const updateAnchors = () => setAnchor(readAnchors(overlay));
-    window.addEventListener("resize", updateAnchors);
+    const finish = () => {
+      if (disposed || completed) return;
+      completed = true; shots.forEach((_, index) => impact(index, false));
+      callbacks.current.onComplete(effectKey);
+    };
+    let fallbackTimer: number | undefined;
+    if (!fallback) {
+      try { renderer = new WebGLVfxRenderer(canvas); }
+      catch { fallbackTimer = window.setTimeout(() => setFallback(true), 0); }
+      if (!renderer) return () => { window.clearTimeout(fallbackTimer); };
+    } else {
+      context = canvas.getContext("2d");
+      if (!context) { finish(); return; }
+    }
+    const images = [new Image(), new Image()];
+    const schedule = () => { if (!disposed && !completed) { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); } };
+    const ready = () => {
+      if (images.every((image, index) => index === 1 && !shots.some((shot) => shot.sixth) || image.complete && image.naturalWidth > 0)) {
+        window.clearTimeout(watchdog); schedule();
+      }
+    };
+    const watchdog = window.setTimeout(finish, 5000);
+    images.forEach((image) => { image.onload = ready; image.onerror = finish; });
+    images[0].src = "/vfx/wind-volley-v2/arrows.webp";
+    if (shots.some((shot) => shot.sixth)) images[1].src = "/vfx/wind-volley-v2/sixth.webp";
+    const observer = new ResizeObserver(schedule); observer.observe(canvas);
+    const lost = (event: Event) => { event.preventDefault(); setFallback(true); };
+    canvas.addEventListener("webglcontextlost", lost);
+    function draw(now: number) {
+      if (disposed || completed || !images[0].complete || !images[0].naturalWidth || renderer?.gl.isContextLost()) return;
+      if (shots.some((shot) => shot.sixth) && (!images[1].complete || !images[1].naturalWidth)) return;
+      started.current ??= now;
+      const elapsed = now - started.current;
+      const duration = reduced ? 240 : 30 + (shots.length - 1) * VOLLEY_INTERVAL_MS + VOLLEY_FLIGHT_MS + 240;
+      if (elapsed >= duration) { finish(); return; }
+      const rect = canvas.getBoundingClientRect();
+      const width = canvas.clientWidth || rect.width, height = canvas.clientHeight || rect.height;
+      const scaleX = width / Math.max(1, rect.width), scaleY = height / Math.max(1, rect.height);
+      const player = stage?.querySelector<HTMLElement>(".fighter.player .fighter-frame")?.getBoundingClientRect();
+      const enemy = stage?.querySelector<HTMLElement>(".fighter.enemy .fighter-frame")?.getBoundingClientRect();
+      const fromX = player ? (player.left - rect.left + player.width * .75) * scaleX : width * .27;
+      const fromY = player ? (player.top - rect.top + player.height * .53) * scaleY : height * .46;
+      const toX = enemy ? (enemy.left - rect.left + enemy.width * .5) * scaleX : width * .73;
+      if (renderer) { renderer.resize(width, height); renderer.clear(); }
+      else if (context) {
+        const ratio = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.max(1, Math.round(width * ratio)); canvas.height = Math.max(1, Math.round(height * ratio));
+        context.setTransform(ratio, 0, 0, ratio, 0, 0); context.clearRect(0, 0, width, height);
+      }
+      shots.forEach((shot, index) => {
+        const age = reduced ? VOLLEY_FLIGHT_MS : elapsed - 30 - index * VOLLEY_INTERVAL_MS;
+        if (age >= VOLLEY_FLIGHT_MS) impact(index);
+        if (age < 0 || age >= VOLLEY_FLIGHT_MS + 240) return;
+        const primaryCount = shots.filter((arrow) => !arrow.sixth).length;
+        const targetHeight = shot.sixth ? .40 : .78 - index * .54 / Math.max(1, primaryCount - 1);
+        const toY = enemy ? (enemy.top - rect.top + enemy.height * targetHeight) * scaleY : height * (.68 - index * .36 / Math.max(1, primaryCount - 1));
+        const travel = reduced ? 1 : Math.min(shot.hit ? 1 : 1.3, age / VOLLEY_FLIGHT_MS);
+        const tipX = fromX + (toX - fromX) * travel, tipY = fromY + (toY - fromY) * travel;
+        const frame = age < VOLLEY_FLIGHT_MS || !shot.hit ? Math.min(2, Math.floor(age / 54)) : Math.min(5, 3 + Math.floor((age - VOLLEY_FLIGHT_MS) / 80));
+        const image = images[shot.sixth ? 1 : 0];
+        const cw = image.naturalWidth / 3, ch = image.naturalHeight / 2;
+        const sx = frame % 3 * cw + 1, sy = Math.floor(frame / 3) * ch + 1, sw = cw - 2, sh = ch - 2;
+        const w = Math.min(width * (shot.sixth?.46:.40), shot.sixth ? 260 : 180, Math.max(80, (toX - fromX) * (shot.sixth ? .78 : .53)));
+        const h = w * sh / sw;
+        const anchors = shot.sixth ? SIXTH_ANCHORS : GREEN_ANCHORS;
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+        const dx = w * (anchors[frame][0] - .5), dy = h * (anchors[frame][1] - .5);
+        const x = tipX - dx * Math.cos(angle) + dy * Math.sin(angle) - w / 2;
+        const y = tipY - dx * Math.sin(angle) - dy * Math.cos(angle) - h / 2;
+        const opacity = reduced ? .75 : Math.min(1, (VOLLEY_FLIGHT_MS + 240 - age) / 100);
+        if (renderer) renderer.sprite(image, x, y, w, h, opacity, false,
+          [sx / image.naturalWidth, sy / image.naturalHeight, sw / image.naturalWidth, sh / image.naturalHeight], angle);
+        else if (context) {
+          context.save(); context.globalAlpha = opacity; context.translate(x + w / 2, y + h / 2); context.rotate(angle);
+          context.drawImage(image, sx, sy, sw, sh, -w / 2, -h / 2, w, h); context.restore();
+        }
+      });
+      schedule();
+    }
     return () => {
-      cancelAnimationFrame(animationFrame);
-      window.removeEventListener("resize", updateAnchors);
+      disposed = true; cancelAnimationFrame(raf); window.clearTimeout(watchdog); observer.disconnect();
+      images.forEach((image) => { image.onload = null; image.onerror = null; });
+      animations.forEach((animation) => animation.cancel());
+      canvas.removeEventListener("webglcontextlost", lost);
+      if (renderer && !renderer.gl.isContextLost()) renderer.dispose();
     };
-  }, [effectKey, totalDuration]);
-
-  const chargeFrame = chargeFrameAt(elapsed);
-  const chargeOpacity = elapsed < 1470 ? 1 : Math.max(0, 1 - (elapsed - 1470) / 310);
-  const srcForCharge = `/vfx/wind-volley/charge/frame-${String(chargeFrame).padStart(2, "0")}.png`;
-  const distance = anchor ? Math.max(1, anchor.enemyX - anchor.playerX) : 1;
-  const chargeSize = anchor ? Math.max(anchor.playerWidth * 0.9, anchor.playerHeight * 0.48) : 0;
-
-  return (
-    <div ref={overlayRef} className="ranger-wind-volley-vfx" aria-hidden="true">
-      {anchor && (
-        <img
-          className="ranger-wind-volley-charge"
-          src={srcForCharge}
-          alt=""
-          style={{ left: anchor.playerX, top: anchor.playerY - anchor.playerHeight * 0.06, width: chargeSize, height: chargeSize, opacity: chargeOpacity }}
-        />
-      )}
-      {anchor && shotStarts.map((shotStart, shotIndex) => {
-        const shotElapsed = elapsed - shotStart;
-        const shotFrame = frameAt(Math.max(0, shotElapsed));
-        const progress = Math.min(1, Math.max(0, shotElapsed / 240));
-        const travel = 1 - Math.pow(1 - progress, 3);
-        const targetY = anchor.enemyY + anchor.enemyHeight * (0.3 - (shotIndex / Math.max(1, shotCount - 1)) * 0.6);
-        const x = anchor.playerX + distance * (shotFrame < 2 ? Math.max(0.05, travel) : 1);
-        const y = anchor.playerY + (targetY - anchor.playerY) * Math.min(1, travel);
-        const impact = shotFrame >= 2;
-        const size = shotFrame < 2
-          ? Math.max(anchor.playerWidth * 0.46, distance * (shotFrame === 0 ? 0.34 : 0.62))
-          : Math.max(anchor.enemyWidth, anchor.enemyHeight) * (shotFrame === 2 ? 0.55 : 0.72);
-        return shotElapsed >= 0 && shotElapsed < SHOT_DURATION ? (
-          <img
-            key={`${effectKey}-shot-${shotIndex}`}
-            className={`ranger-wind-volley-arrow frame-${shotFrame} ${impact ? "impact" : ""}`}
-            src={`/vfx/wind-volley/arrow/frame-${String(shotFrame).padStart(2, "0")}.png`}
-            alt=""
-            style={{ left: x, top: y, width: size, height: size, opacity: shotOpacity(shotElapsed) }}
-          />
-        ) : null;
-      })}
-    </div>
-  );
+  }, [effectKey, shotCount, arrows, fallback]);
+  return <canvas key={fallback ? "canvas" : "webgl"} ref={canvasRef} className="skill-effect-canvas wind-volley-canvas" aria-hidden="true" />;
 }

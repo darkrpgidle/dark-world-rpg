@@ -53,3 +53,4 @@ test("expired or other-account sessions never satisfy the write predicate", () =
   assert.equal(guardedInsert(db, "old", "new-player"), 0);
   db.close();
 });
+

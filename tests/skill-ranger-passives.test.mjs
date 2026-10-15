@@ -26,11 +26,11 @@ function turn(combat, skill = "normal", now = 0, hits = [{ hit: true }]) {
 test("constant attack speed, critical and dodge bonuses require their own learned passives", () => {
   const combat = ranger(["迅捷手感", "鷹眼", "影步反射"]);
   assert.deepEqual(rangerPassiveStats(combat.build), {
-    attackSpeedBonusPercent: 3, criticalChancePoints: 2, dodgeChancePoints: 2,
+    attackSpeedBonusPercent: 3, criticalChancePoints: 3, dodgeChancePoints: 2,
   });
   const result = turn(combat);
   assert.equal(result.attackSpeedBonusPercent, 3);
-  assert.equal(result.criticalChancePoints, 2);
+  assert.equal(result.criticalChancePoints, 3);
   assert.equal(result.dodgeChancePoints, 2);
   assert.deepEqual(rangerPassiveStats(ranger([]).build), {
     attackSpeedBonusPercent: 0, criticalChancePoints: 0, dodgeChancePoints: 0,
@@ -45,7 +45,7 @@ test("normal critical arms only the next normal bonus; wind momentum lasts four 
   combat = first.combat;
   const second = turn(combat, "normal", 100, [{ hit: false }]);
   assert.equal(second.damageBonusPercent, 4);
-  assert.equal(second.attackSpeedBonusPercent, 1);
+  assert.equal(second.attackSpeedBonusPercent, 2);
   combat = second.combat;
   for (let i = 2; i < 5; i++) combat = turn(combat, "normal", i * 100, [{ hit: false }]).combat;
   assert.equal(combat.passives.windMomentumStacks, 0);
@@ -64,8 +64,8 @@ test("marked rapid fire gets one star-trace and rhythm bonus, while critical dam
   const hits = [{ hit: true, critical: true }, { hit: true, critical: true },
     { hit: true }, { hit: false }, { hit: true }];
   const cast = turn(combat, "疾風連射", 700, hits);
-  assert.equal(cast.damageBonusPercent, 21); // marked 5 + multihit 2 + rhythm 5 + 3 * star trace 3
-  assert.deepEqual(cast.criticalDirectDamageBonusPercentBySegment, [3, 3, 0, 0, 0]);
+  assert.equal(cast.damageBonusPercent, 23); // marked 5 + multihit 4 + rhythm 5 + 3 * star trace 3
+  assert.deepEqual(cast.criticalDirectDamageBonusPercentBySegment, [5, 5, 0, 0, 0]);
   assert.equal(cast.combat.passives.starTraceStacks, 1);
   assert.equal(cast.combat.passives.nextSkillDamagePending, false);
   assert.equal(cast.combat.session.charge.charges["疾風連射"], 1);

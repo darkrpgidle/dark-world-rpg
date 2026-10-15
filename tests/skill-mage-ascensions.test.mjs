@@ -39,7 +39,7 @@ test("ascended frost adds one 70% segment after its original hit against an alre
   assert.deepEqual(result.damageSegmentPercents, [205]);
   assert.deepEqual(result.ascensionDamageEvents,
     [{ id: "極炎霜爆", percent: 70, afterOriginalSegment: 1 }]);
-  assert.equal(result.combat.session.enemy.burn.expiresAt, 3000);
+  assert.equal(result.combat.session.enemy.burn.expiresAt, 5000);
   assert.equal(result.combat.session.enemy.burn.nextTickAt, 1000);
   assert.deepEqual(result.statusApplications, []);
   assert.equal(result.combat.session.charge.ultimateEnergy, 32); // four normal hits only
@@ -55,7 +55,7 @@ test("a frost miss, newly applied burn, expired burn or missing ascension never 
   const preburn = burning(base);
   assert.deepEqual(turn(preburn, "霜火新星", 400, [{ hit: false }], enabled)
     .ascensionDamageEvents, []);
-  const expired = turn(preburn, "霜火新星", 3000, [{ hit: true }], enabled);
+  const expired = turn(preburn, "霜火新星", 5000, [{ hit: true }], enabled);
   assert.deepEqual(expired.ascensionDamageEvents, []);
   assert.equal(expired.combat.session.enemy.burn, undefined);
   assert.deepEqual(turn(preburn, "霜火新星", 400).ascensionDamageEvents, []);
@@ -66,39 +66,39 @@ test("successful frost burn refresh and its one independent afterburst do not mu
   let rolls = 0;
   const result = turn(combat, "霜火新星", 400, [{ hit: true }], new Set(["霜火新星"]),
     () => { rolls++; return 0; });
-  assert.equal(rolls, 1);
+  assert.equal(rolls, 2);
   assert.deepEqual(result.statusApplications, [{ kind: "burn" }]);
   assert.equal(result.ascensionDamageEvents.length, 1);
-  assert.equal(result.combat.session.enemy.burn.expiresAt, 3400);
+  assert.equal(result.combat.session.enemy.burn.expiresAt, 5400);
   assert.equal(result.combat.session.enemy.burn.nextTickAt, 1000);
   assert.equal(result.combat.session.charge.ultimateEnergy, 35); // one status application
 });
 
 test("ascended missile creates one 80% resonance after the third original hit", () => {
-  const combat = ready(mage({ 奧術飛彈: 5, 奧術超載: 1, 星界寂滅: 1 },
-    "奧術飛彈", ["奧術超載"]), 3);
-  const result = turn(combat, "奧術飛彈", 300,
+  const combat = ready(mage({ 閃電鏈: 5, 奧術超載: 1, 星界寂滅: 1 },
+    "閃電鏈", ["奧術超載"]), 3);
+  const result = turn(combat, "閃電鏈", 300,
     [{ hit: true, critical: true }, { hit: true, critical: true }, { hit: true, critical: true }],
-    new Set(["奧術飛彈"]));
-  assert.deepEqual(result.damageSegmentPercents, [72, 72, 72]);
+    new Set(["閃電鏈"]));
+  assert.deepEqual(result.damageSegmentPercents, [100, 100, 100]);
   assert.deepEqual(result.ascensionDamageEvents,
-    [{ id: "星環共鳴", percent: 80, afterOriginalSegment: 3 }]);
+    [{ id: "雷環共鳴", percent: 80, afterOriginalSegment: 3 }]);
   assert.equal(result.combat.session.charge.charges.奧術超載, 1);
-  assert.equal(result.combat.session.charge.charges.奧術飛彈, 1);
+  assert.equal(result.combat.session.charge.charges.閃電鏈, 1);
   assert.equal(result.combat.session.charge.ultimateEnergy, 27); // 24 from normals, one critical event
   assert.deepEqual(result.statusApplications, []);
 });
 
 test("any one missed missile prevents resonance; regular missile and invalid segments do not emit it", () => {
-  const combat = ready(mage({ 奧術飛彈: 1 }, "奧術飛彈"), 3);
-  const enabled = new Set(["奧術飛彈"]);
+  const combat = ready(mage({ 閃電鏈: 1 }, "閃電鏈"), 3);
+  const enabled = new Set(["閃電鏈"]);
   for (let missIndex = 0; missIndex < 3; missIndex++) {
     const hits = Array.from({ length: 3 }, (_, index) => ({ hit: index !== missIndex }));
-    assert.deepEqual(turn(combat, "奧術飛彈", 300, hits, enabled).ascensionDamageEvents, []);
+    assert.deepEqual(turn(combat, "閃電鏈", 300, hits, enabled).ascensionDamageEvents, []);
   }
-  assert.deepEqual(turn(combat, "奧術飛彈", 300,
+  assert.deepEqual(turn(combat, "閃電鏈", 300,
     [{ hit: true }, { hit: true }, { hit: true }]).ascensionDamageEvents, []);
-  assert.equal(turn(combat, "奧術飛彈", 300, [{ hit: true }], enabled), null);
+  assert.equal(turn(combat, "閃電鏈", 300, [{ hit: true }], enabled), null);
 });
 
 test("ascended meteor explodes once for 120% against existing burn, preserving its tick clock", () => {
@@ -107,9 +107,9 @@ test("ascended meteor explodes once for 120% against existing burn, preserving i
   assert.deepEqual(result.damageSegmentPercents, [395]);
   assert.deepEqual(result.ascensionDamageEvents,
     [{ id: "天火墜星", percent: 120, afterOriginalSegment: 1 }]);
-  assert.equal(result.combat.session.enemy.burn.expiresAt, 3000);
+  assert.equal(result.combat.session.enemy.burn.expiresAt, 5800);
   assert.equal(result.combat.session.enemy.burn.nextTickAt, 1000);
-  assert.equal(result.combat.session.charge.ultimateEnergy, 64);
+  assert.equal(result.combat.session.charge.ultimateEnergy, 67);
   assert.equal(result.combat.session.charge.charges.隕星術, 1);
 });
 
@@ -121,7 +121,7 @@ test("meteor's own new burn cannot trigger its explosion; a miss or elapsed burn
   assert.deepEqual(newBurn.ascensionDamageEvents, []);
   const preburn = burning(combat);
   assert.deepEqual(turn(preburn, "隕星術", 800, [{ hit: false }], enabled).ascensionDamageEvents, []);
-  assert.deepEqual(turn(preburn, "隕星術", 3000, [{ hit: true }], enabled).ascensionDamageEvents, []);
+  assert.deepEqual(turn(preburn, "隕星術", 5000, [{ hit: true }], enabled).ascensionDamageEvents, []);
   assert.deepEqual(turn(preburn, "隕星術", 800).ascensionDamageEvents, []);
 });
 
@@ -130,10 +130,11 @@ test("an afterburst and the ember-echo proc remain separate damage events withou
   let rolls = 0;
   const result = turn(combat, "霜火新星", 400, [{ hit: true }], new Set(["霜火新星"]),
     () => { rolls++; return 0; });
-  assert.equal(rolls, 2); // one echo roll and one original frost burn roll
+  assert.equal(rolls, 3); // one echo roll and one original frost burn roll
   assert.deepEqual(result.ascensionDamageEvents,
     [{ id: "極炎霜爆", percent: 70, afterOriginalSegment: 1 }]);
   assert.deepEqual(result.passiveDamageProcs, [{ id: "餘燼回響", percent: 65 }]);
   assert.deepEqual(result.combat.session.usedDamageProcs, ["餘燼回響"]);
   assert.equal(result.combat.session.charge.ultimateEnergy, 35);
 });
+

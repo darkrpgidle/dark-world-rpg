@@ -74,7 +74,7 @@ test("the ascension bonus needs its own ascension, original hit and unexpired st
   assert.equal(turn(marked, "虛空崩解", 900).voidAscensionDamageBonusPercent, 0);
   assert.equal(turn(marked, "虛空崩解", 900, [{ hit: false }], { ascended })
     .voidAscensionDamageBonusPercent, 0);
-  assert.equal(turn(marked, "虛空崩解", 3800, [{ hit: true }], { ascended })
+  assert.equal(turn(marked, "虛空崩解", 5800, [{ hit: true }], { ascended })
     .voidAscensionDamageBonusPercent, 0);
   assert.equal(turn(transitionMageCombat(marked, "normal-kill"), "虛空崩解", 900,
     [{ hit: true }], { ascended }).voidAscensionDamageBonusPercent, 0);

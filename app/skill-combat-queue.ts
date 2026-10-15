@@ -22,10 +22,10 @@ export const SKILL_CHARGE_RULES: Record<SkillClass, Readonly<Record<string, Char
   },
   法師: {
     霜火新星: { event: "primary", threshold: 4 },
-    奧術飛彈: { event: "primary", threshold: 3 },
+    閃電鏈: { event: "primary", threshold: 3 },
     元素蝕印: { event: "primary", threshold: 5, status: "元素蝕印" },
     隕星術: { event: "primary", threshold: 8 },
-    奧術超載: { event: "skillHit", threshold: 6 },
+    奧術超載: { event: "skillHit", threshold: 3 },
     虛空崩解: { event: "primary", threshold: 9 },
   },
 };
@@ -62,6 +62,11 @@ function copyState(state: SkillCombatState): SkillCombatState {
   };
 }
 
+function prioritizeReadyUltimate(state: SkillCombatState): void {
+  if (!state.ultimate || state.ultimateEnergy < 100 || !state.ready.includes(state.ultimate)) return;
+  state.ready = [state.ultimate, ...state.ready.filter((name) => name !== state.ultimate)];
+}
+
 export function recordPrimaryAttack(state: SkillCombatState, event: PrimaryAttackEvent): SkillCombatState {
   const next = copyState(state);
   const hit = event.hits.some((segment) => segment.hit);
@@ -92,6 +97,7 @@ export function recordPrimaryAttack(state: SkillCombatState, event: PrimaryAttac
     return next.slots.indexOf(a) - next.slots.indexOf(b);
   });
   if (next.ultimate && next.ultimateEnergy >= 100 && !next.ready.includes(next.ultimate)) next.ready.push(next.ultimate);
+  prioritizeReadyUltimate(next);
   return next;
 }
 
@@ -100,6 +106,7 @@ export function recordSuccessfulDodge(state: SkillCombatState): SkillCombatState
   if (next.ultimate) {
     next.ultimateEnergy = Math.min(100, next.ultimateEnergy + 3);
     if (next.ultimateEnergy === 100 && !next.ready.includes(next.ultimate)) next.ready.push(next.ultimate);
+    prioritizeReadyUltimate(next);
   }
   return next;
 }
@@ -112,6 +119,7 @@ export function grantUltimateEnergy(state: SkillCombatState, amount: number): Sk
   if (next.ultimate && amount > 0) {
     next.ultimateEnergy = Math.min(100, next.ultimateEnergy + amount);
     if (next.ultimateEnergy === 100 && !next.ready.includes(next.ultimate)) next.ready.push(next.ultimate);
+    prioritizeReadyUltimate(next);
   }
   return next;
 }
@@ -154,7 +162,10 @@ export function nextReadySkill(
   temporarilyBlocked: ReadonlySet<string> = new Set(),
 ): string | null {
   if (!targetAvailable) return null;
-  return state.ready.find((name) => {
+  const ready = state.ultimate && state.ultimateEnergy >= 100 && state.ready.includes(state.ultimate)
+    ? [state.ultimate, ...state.ready.filter((name) => name !== state.ultimate)]
+    : state.ready;
+  return ready.find((name) => {
     const status = SKILL_CHARGE_RULES[state.characterClass][name]?.status;
     return !temporarilyBlocked.has(name) && (!status || !targetStatuses.has(status));
   }) ?? null;

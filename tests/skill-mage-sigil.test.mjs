@@ -55,7 +55,7 @@ test("an unascended mark and a failed burn roll cannot trigger the following-cas
   assert.equal(turn(combat, "normal", 600, { roll: () => 0 }).combat.sigil.enhancedCastsRemaining, 0);
   combat = ready(mage({ 元素蝕印: 1, 焰脈: 5 }, ["元素蝕印"]), "元素蝕印");
   combat = turn(combat, "元素蝕印", 500).combat;
-  assert.deepEqual(turn(combat, "normal", 600, { roll: () => 0.17 }).statusApplications, []);
+  assert.deepEqual(turn(combat, "normal", 600, { roll: () => 0.20 }).statusApplications, []);
   assert.equal(turn(combat, "normal", 600, { hits: [{ hit: false }], roll: () => {
     throw Error("a miss must not roll status");
   } }).combat.sigil.enhancedCastsRemaining, 0);
@@ -67,7 +67,7 @@ test("marked normal attack adds mark points to flame vein and first burn grants 
   let rolls = 0;
   const trigger = turn(combat, "normal", 600, { roll: () => { rolls++; return 0.25; } });
   assert.equal(rolls, 1); // 12% flame vein + 14 points from the existing mark
-  assert.deepEqual(trigger.statusApplications, [{ kind: "burn" }]);
+  assert.deepEqual(trigger.statusApplications, [{ kind: "burn", effectMultiplier: 1.3 }]);
   assert.equal(trigger.sigilAscensionStatusChancePoints, 0);
   assert.equal(trigger.combat.sigil.enhancedCastsRemaining, 3);
   const anotherNormal = turn(trigger.combat, "normal", 700, { roll: () => 0 });
@@ -81,7 +81,7 @@ test("the triggering frost cast does not receive its own 15 points; the next thr
   combat = turn(combat, "元素蝕印", 500).combat;
   combat = ready(combat, "霜火新星", 600);
   const initial = turn(combat, "霜火新星", 1000, { roll: () => 0.60 });
-  assert.equal(initial.burnChancePercent, 62); // 40 + 14 + 8, no 15 yet
+  assert.equal(initial.burnChancePercent, 73.6); // 40 + 14 + 14, no sigil bonus yet
   assert.equal(initial.combat.sigil.enhancedCastsRemaining, 3);
   combat = initial.combat;
   for (let index = 0; index < 3; index++) {
@@ -90,7 +90,7 @@ test("the triggering frost cast does not receive its own 15 points; the next thr
       hits: [{ hit: index !== 1 }], roll: () => 1,
     });
     assert.equal(cast.sigilAscensionStatusChancePoints, 15);
-    assert.equal(cast.burnChancePercent, index === 1 ? 0 : 77);
+    assert.equal(cast.burnChancePercent, index === 1 ? 0 : 90.85);
     assert.equal(cast.combat.sigil.enhancedCastsRemaining, 2 - index);
     combat = cast.combat;
   }
@@ -146,7 +146,7 @@ test("expiry removes mark chance and trigger eligibility while keeping earned pl
   combat = turn(combat, "元素蝕印", 500).combat;
   combat = ready(combat, "霜火新星", 600);
   const expired = turn(combat, "霜火新星", 7500, { roll: () => 0 });
-  assert.equal(expired.burnChancePercent, 20);
+  assert.equal(expired.burnChancePercent, 25);
   assert.equal(expired.combat.session.enemy.elementSigil, undefined);
   assert.equal(expired.combat.sigil.enhancedCastsRemaining, 0);
   assert.equal(expired.combat.sigil.markedAscended, false);

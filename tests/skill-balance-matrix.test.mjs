@@ -43,3 +43,4 @@ test("duplicates, fabricated scenario labels and impossible battle measurements 
     { skillCasts: { "泰坦斷界斬": 1 } }, { skillCasts: { "焰脈": 1 } },
   ]) assert.throws(() => summarizeSkillBalance([{ ...observed, ...change }]), RangeError);
 });
+

@@ -11,7 +11,7 @@ const { createWarriorCombat, transitionWarriorCombat, transitionWarriorNormalKil
   await import("../app/skill-warrior-combat.ts");
 const { createWarriorBuffState, recordWarriorSkillHit, triggerWarriorBloodRoar } =
   await import("../app/skill-warrior-rules.ts");
-const { createWarriorPassiveState, recordWarriorBlock } = await import("../app/skill-warrior-passives.ts");
+const { createWarriorPassiveState } = await import("../app/skill-warrior-passives.ts");
 const { createWarriorDefenseState, recordWarriorSuccessfulBlock } =
   await import("../app/skill-warrior-defense.ts");
 const { createRangerCombat, transitionRangerCombat, transitionRangerNormalKill } =
@@ -235,7 +235,7 @@ test("enemy DoT ticks use wall time and never create a second primary attack or 
   const at3000 = advanceCombatSession(at2500.session, 3000);
   assert.deepEqual(at3000.ticks.map((tick) => tick.at), [3000]);
   assert.deepEqual(at3000.session.charge, originalCharge);
-  assert.deepEqual(advanceCombatSession(at3000.session, 5000).ticks, []);
+  assert.deepEqual(advanceCombatSession(at3000.session, 5000).ticks.map((tick) => tick.at), [4000, 5000]);
   assert.deepEqual(transitionWarriorCombat({
     ...createWarriorCombat(build("戰士", ["血刃斬", "泰坦斷界斬"], ["血刃斬"]), 100),
     session,
@@ -250,7 +250,7 @@ test("all classes share the same four target abnormal categories, independent of
   assert.equal(enemy.bleed.stacks, 2);
   assert.equal(countEnemyAbnormalKinds(enemy), 4);
   assert.equal(countMageAbnormalKinds(enemy), 4);
-  assert.equal(countEnemyAbnormalKinds(advanceEnemyDebuffs(enemy, 4001).state), 1);
+  assert.equal(countEnemyAbnormalKinds(advanceEnemyDebuffs(enemy, 5001).state), 1);
   assert.equal(countEnemyAbnormalKinds(advanceEnemyDebuffs(enemy, 13000).state), 0);
   const ranger = createRangerCombat(build("遊俠", ["穿雲箭"], ["穿雲箭"]), 100);
   assert.equal(countEnemyAbnormalKinds(transitionRangerCombat({
@@ -275,3 +275,4 @@ test("placing a sigil counts for target damage but only a later affliction activ
     assert.equal(triggered.enhancedCastsRemaining, 3);
   }
 });
+

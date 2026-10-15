@@ -1,6 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import {settleWorldBoss,type RewardDb} from '../app/world-boss-rewards';
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -26,6 +27,9 @@ interface ExecutionContext {
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
+  async scheduled(_event:unknown,env:Env,ctx:ExecutionContext){
+    ctx.waitUntil(settleWorldBoss(env.DB as unknown as RewardDb));
+  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
@@ -45,3 +49,4 @@ const worker = {
 };
 
 export default worker;
+

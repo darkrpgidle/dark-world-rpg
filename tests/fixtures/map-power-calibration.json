@@ -1,0 +1,2573 @@
+{
+  "basisCommit": "141bc06efd1924bf47b3ee09e8bb25f581170561",
+  "kind": "formula-simulation",
+  "seedBase": 20261007,
+  "trialsPerFloor": 30,
+  "entryFloors": [
+    1,
+    9,
+    10
+  ],
+  "clearFloors": [
+    20,
+    29,
+    30
+  ],
+  "minimumTimelyWinRate": 0.9,
+  "secondsLimit": 60,
+  "margin": 0.05,
+  "conditions": "Legal balanced skill points; previous/current map gear, normal through legendary, enhancement 0/5/8/10/12/15, fixed random affixes, no/intermediate/advanced redIron and blooddrop gems. Ten set pieces. Full HP and cold skill charges per encounter. No rebirth, ascensions, titles, blessings, epithets or mythic triggers. Not browser acceptance or a guarantee for every equal-score build. Revalidated after map equipment growth smoothing; map recommendations and all monster stats retained. Revalidated for newly rolled scene flat health ×1.25 / defense ×1.4; existing saved rolls are not upgraded. Revalidated after fixed map/tier monster attack and armor calibration against pre-unification commit 8331dab. Old checkpoint level/quality/affix seed retained; enhancements 0..15 and removal of gems searched for the lowest passing sampled score. No monster HP changes.",
+  "maps": [
+    {
+      "mapId": 1,
+      "name": "灰燼墓園",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 1,
+            "cls": "戰士",
+            "level": 1,
+            "quality": "普通",
+            "enhance": 4,
+            "gearMapId": 1,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 2534,
+            "legacyPower": 2350,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 8.551111111111112,
+              "averageHp": 49.26387806356632,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.3
+                },
+                {
+                  "floor": 9,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 9.931666666666667
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 12.421666666666665
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 1,
+            "cls": "戰士",
+            "level": 1,
+            "quality": "傳奇",
+            "enhance": 4,
+            "gearMapId": 1,
+            "affixSeed": 2127,
+            "gemTier": "advanced",
+            "score": 5132,
+            "legacyPower": 4702,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 19.594999999999988,
+              "averageHp": 70.22540243423639,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.67666666666666
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 21.618333333333332
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 28.49000000000001
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 1,
+            "cls": "遊俠",
+            "level": 1,
+            "quality": "良好",
+            "enhance": 0,
+            "gearMapId": 1,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 2651,
+            "legacyPower": 2309,
+            "result": {
+              "wins": 86,
+              "trials": 90,
+              "winRate": 0.9555555555555556,
+              "timelyWinRate": 0.9555555555555556,
+              "averageSeconds": 7.100555555555559,
+              "averageHp": 52.211171388386546,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 2.7000000000000006
+                },
+                {
+                  "floor": 9,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 8.184999999999995
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 10.416666666666664
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 1,
+            "cls": "遊俠",
+            "level": 1,
+            "quality": "史詩",
+            "enhance": 12,
+            "gearMapId": 1,
+            "affixSeed": 874,
+            "gemTier": "advanced",
+            "score": 5441,
+            "legacyPower": 4739,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 14.937777777777768,
+              "averageHp": 85.89822605777297,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.351666666666663
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 14.866666666666664
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 22.595000000000006
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 1,
+            "cls": "法師",
+            "level": 1,
+            "quality": "良好",
+            "enhance": 0,
+            "gearMapId": 1,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 2630,
+            "legacyPower": 2314,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 7.109444444444445,
+              "averageHp": 44.54505686789152,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 2.898333333333332
+                },
+                {
+                  "floor": 9,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 8.353333333333332
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 10.076666666666666
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 1,
+            "cls": "法師",
+            "level": 1,
+            "quality": "史詩",
+            "enhance": 12,
+            "gearMapId": 1,
+            "affixSeed": 874,
+            "gemTier": "advanced",
+            "score": 5293,
+            "legacyPower": 4773,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 15.393333333333334,
+              "averageHp": 78.60482489292013,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.536666666666667
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 15.853333333333333
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 22.789999999999996
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        3000,
+        6000
+      ]
+    },
+    {
+      "mapId": 2,
+      "name": "骸骨荒原",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 2,
+            "cls": "戰士",
+            "level": 22,
+            "quality": "傳奇",
+            "enhance": 0,
+            "gearMapId": 1,
+            "affixSeed": 975,
+            "gemTier": "intermediate",
+            "score": 10056,
+            "legacyPower": 5704,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 12.538888888888886,
+              "averageHp": 74.64460498521333,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.5516666666666663
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 13.281666666666665
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 20.783333333333335
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 2,
+            "cls": "戰士",
+            "level": 12,
+            "quality": "傳奇",
+            "enhance": 0,
+            "gearMapId": 2,
+            "affixSeed": 975,
+            "gemTier": "advanced",
+            "score": 12865,
+            "legacyPower": 7208,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 28.11055555555554,
+              "averageHp": 64.76716404654057,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 22.143333333333324
+                },
+                {
+                  "floor": 29,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 21.90833333333334
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 40.28
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 2,
+            "cls": "遊俠",
+            "level": 12,
+            "quality": "傳奇",
+            "enhance": 8,
+            "gearMapId": 1,
+            "affixSeed": 975,
+            "gemTier": "advanced",
+            "score": 9485,
+            "legacyPower": 5731,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 12.485000000000001,
+              "averageHp": 78.58256462486051,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 2.8533333333333344
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 11.738333333333333
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 22.863333333333333
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 2,
+            "cls": "遊俠",
+            "level": 12,
+            "quality": "傳奇",
+            "enhance": 0,
+            "gearMapId": 2,
+            "affixSeed": 975,
+            "gemTier": "advanced",
+            "score": 13075,
+            "legacyPower": 7242,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 27.38722222222223,
+              "averageHp": 80.20562367328831,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 22.40666666666666
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 19.97166666666666
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 39.78333333333333
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 2,
+            "cls": "法師",
+            "level": 12,
+            "quality": "傳奇",
+            "enhance": 3,
+            "gearMapId": 1,
+            "affixSeed": 975,
+            "gemTier": "advanced",
+            "score": 9780,
+            "legacyPower": 5538,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 11.403333333333327,
+              "averageHp": 81.79666383941193,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.130000000000001
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.589999999999996
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 20.48999999999999
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 2,
+            "cls": "法師",
+            "level": 12,
+            "quality": "傳奇",
+            "enhance": 0,
+            "gearMapId": 2,
+            "affixSeed": 975,
+            "gemTier": "intermediate",
+            "score": 13204,
+            "legacyPower": 6903,
+            "result": {
+              "wins": 86,
+              "trials": 90,
+              "winRate": 0.9555555555555556,
+              "timelyWinRate": 0.9555555555555556,
+              "averageSeconds": 24.758333333333333,
+              "averageHp": 63.32076145151697,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 20.59666666666666
+                },
+                {
+                  "floor": 29,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 19.206666666666663
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 34.47166666666667
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        11000,
+        14000
+      ]
+    },
+    {
+      "mapId": 3,
+      "name": "黑鐵礦坑",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 3,
+            "cls": "戰士",
+            "level": 24,
+            "quality": "良好",
+            "enhance": 8,
+            "gearMapId": 3,
+            "affixSeed": 2329,
+            "gemTier": "advanced",
+            "score": 18426,
+            "legacyPower": 9152,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 9.638333333333334,
+              "averageHp": 71.61777689489254,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.7066666666666648
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.0233333333333325
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 19.185
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 3,
+            "cls": "戰士",
+            "level": 24,
+            "quality": "優秀",
+            "enhance": 10,
+            "gearMapId": 3,
+            "affixSeed": 1076,
+            "gemTier": "advanced",
+            "score": 22850,
+            "legacyPower": 10886,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 12.486666666666656,
+              "averageHp": 58.26876238139922,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 18.409999999999993
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.28666666666667
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 12.763333333333332
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 3,
+            "cls": "遊俠",
+            "level": 29,
+            "quality": "傳奇",
+            "enhance": 14,
+            "gearMapId": 3,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 18324,
+            "legacyPower": 10568,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 8.088333333333335,
+              "averageHp": 64.43979275941165,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.044999999999999
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.554999999999998
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 16.665000000000003
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 3,
+            "cls": "遊俠",
+            "level": 24,
+            "quality": "優秀",
+            "enhance": 14,
+            "gearMapId": 3,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 22176,
+            "legacyPower": 11429,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 12.152222222222212,
+              "averageHp": 59.34075022677552,
+              "suppression": [
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 19.541666666666668
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.405000000000001
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 11.510000000000002
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 3,
+            "cls": "法師",
+            "level": 24,
+            "quality": "史詩",
+            "enhance": 6,
+            "gearMapId": 3,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 18662,
+            "legacyPower": 9070,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 8.69777777777778,
+              "averageHp": 78.73129149442565,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.2916666666666665
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.713333333333334
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 18.088333333333328
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 3,
+            "cls": "法師",
+            "level": 29,
+            "quality": "優秀",
+            "enhance": 10,
+            "gearMapId": 3,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 22422,
+            "legacyPower": 10241,
+            "result": {
+              "wins": 86,
+              "trials": 90,
+              "winRate": 0.9555555555555556,
+              "timelyWinRate": 0.9555555555555556,
+              "averageSeconds": 11.711111111111109,
+              "averageHp": 53.425027502750254,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 18.055
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.965000000000001
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 11.113333333333333
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        20000,
+        24000
+      ]
+    },
+    {
+      "mapId": 4,
+      "name": "毒霧沼澤",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 4,
+            "cls": "戰士",
+            "level": 36,
+            "quality": "優秀",
+            "enhance": 5,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 29900,
+            "legacyPower": 12977,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 11.116111111111111,
+              "averageHp": 74.46670474851335,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.298333333333333
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.0633333333333335
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 22.986666666666668
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 4,
+            "cls": "戰士",
+            "level": 36,
+            "quality": "良好",
+            "enhance": 10,
+            "gearMapId": 4,
+            "affixSeed": 1177,
+            "gemTier": "advanced",
+            "score": 37826,
+            "legacyPower": 15435,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 14.337777777777774,
+              "averageHp": 65.30866093740477,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 21.448333333333334
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.425000000000001
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 15.140000000000002
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 4,
+            "cls": "遊俠",
+            "level": 36,
+            "quality": "普通",
+            "enhance": 9,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 27575,
+            "legacyPower": 13487,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 10.24888888888889,
+              "averageHp": 76.4403624456107,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.343333333333332
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.665000000000001
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 22.738333333333337
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 4,
+            "cls": "遊俠",
+            "level": 36,
+            "quality": "優秀",
+            "enhance": 15,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "intermediate",
+            "score": 37942,
+            "legacyPower": 17892,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 13.798333333333337,
+              "averageHp": 65.99421648848283,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 22.399999999999995
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.881666666666664
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 14.113333333333333
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 4,
+            "cls": "法師",
+            "level": 36,
+            "quality": "良好",
+            "enhance": 5,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 29188,
+            "legacyPower": 12792,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 9.665000000000001,
+              "averageHp": 79.60875603864733,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 3.6616666666666666
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.578333333333334
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 20.755
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 4,
+            "cls": "法師",
+            "level": 41,
+            "quality": "傳奇",
+            "enhance": 15,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 36746,
+            "legacyPower": 17649,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 13.132222222222222,
+              "averageHp": 59.260554912019394,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 20.826666666666668
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.498333333333333
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 13.071666666666667
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        32000,
+        40000
+      ]
+    },
+    {
+      "mapId": 5,
+      "name": "永夜密林",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 5,
+            "cls": "戰士",
+            "level": 60,
+            "quality": "良好",
+            "enhance": 7,
+            "gearMapId": 4,
+            "affixSeed": 2531,
+            "gemTier": "advanced",
+            "score": 46368,
+            "legacyPower": 15659,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 14.83333333333333,
+              "averageHp": 65.80966243457793,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.566666666666667
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.833333333333335
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 32.1
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 5,
+            "cls": "戰士",
+            "level": 60,
+            "quality": "良好",
+            "enhance": 15,
+            "gearMapId": 4,
+            "affixSeed": 2531,
+            "gemTier": "advanced",
+            "score": 63816,
+            "legacyPower": 20608,
+            "result": {
+              "wins": 86,
+              "trials": 90,
+              "winRate": 0.9555555555555556,
+              "timelyWinRate": 0.9555555555555556,
+              "averageSeconds": 19.053333333333335,
+              "averageHp": 61.804981031589705,
+              "suppression": [
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 31.268333333333327
+                },
+                {
+                  "floor": 29,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 7.156666666666667
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 18.735000000000003
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 5,
+            "cls": "遊俠",
+            "level": 50,
+            "quality": "普通",
+            "enhance": 15,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 47671,
+            "legacyPower": 18503,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 13.239444444444452,
+              "averageHp": 79.98914847440311,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.07
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.535
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 30.11333333333334
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 5,
+            "cls": "遊俠",
+            "level": 50,
+            "quality": "傳奇",
+            "enhance": 9,
+            "gearMapId": 5,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 60251,
+            "legacyPower": 22727,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 19.849444444444444,
+              "averageHp": 59.1660893804069,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 33.153333333333336
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.9399999999999995
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 20.454999999999995
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 5,
+            "cls": "法師",
+            "level": 50,
+            "quality": "普通",
+            "enhance": 15,
+            "gearMapId": 4,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 45357,
+            "legacyPower": 18746,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 12.761111111111111,
+              "averageHp": 83.50247095885017,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.308333333333334
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.236666666666667
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 28.738333333333333
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 5,
+            "cls": "法師",
+            "level": 55,
+            "quality": "傳奇",
+            "enhance": 15,
+            "gearMapId": 5,
+            "affixSeed": 0,
+            "gemTier": null,
+            "score": 57545,
+            "legacyPower": 25856,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 17.63666666666667,
+              "averageHp": 59.68705880228928,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 28.18166666666667
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.131666666666667
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 18.59666666666666
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        51000,
+        68000
+      ]
+    },
+    {
+      "mapId": 6,
+      "name": "惡魔城塞",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 6,
+            "cls": "戰士",
+            "level": 69,
+            "quality": "傳奇",
+            "enhance": 11,
+            "gearMapId": 5,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 83296,
+            "legacyPower": 26490,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 15.017777777777777,
+              "averageHp": 80.26218631411433,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.903333333333333
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.026666666666667
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 32.123333333333335
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 6,
+            "cls": "戰士",
+            "level": 69,
+            "quality": "優秀",
+            "enhance": 15,
+            "gearMapId": 5,
+            "affixSeed": 1379,
+            "gemTier": "intermediate",
+            "score": 110116,
+            "legacyPower": 30027,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 21.005,
+              "averageHp": 62.62884794701135,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 31.988333333333326
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.391666666666667
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 22.634999999999994
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 6,
+            "cls": "遊俠",
+            "level": 84,
+            "quality": "優秀",
+            "enhance": 6,
+            "gearMapId": 5,
+            "affixSeed": 1379,
+            "gemTier": "advanced",
+            "score": 80488,
+            "legacyPower": 24233,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 14.770000000000001,
+              "averageHp": 79.79351144735486,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.656666666666668
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.3933333333333335
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 34.260000000000005
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 6,
+            "cls": "遊俠",
+            "level": 74,
+            "quality": "普通",
+            "enhance": 13,
+            "gearMapId": 6,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 106207,
+            "legacyPower": 34099,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 22.05444444444445,
+              "averageHp": 56.74753175365564,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 36.25666666666667
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.453333333333335
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 23.453333333333337
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 6,
+            "cls": "法師",
+            "level": 69,
+            "quality": "良好",
+            "enhance": 12,
+            "gearMapId": 6,
+            "affixSeed": 1379,
+            "gemTier": null,
+            "score": 77324,
+            "legacyPower": 29726,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 13.309999999999999,
+              "averageHp": 67.12936884502645,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 4.825
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.486666666666667
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 29.618333333333332
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 6,
+            "cls": "法師",
+            "level": 64,
+            "quality": "史詩",
+            "enhance": 12,
+            "gearMapId": 6,
+            "affixSeed": 0,
+            "gemTier": "intermediate",
+            "score": 100645,
+            "legacyPower": 34468,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 21.165,
+              "averageHp": 53.8039046027768,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 33.19333333333333
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.031666666666668
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 23.27
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        88000,
+        116000
+      ]
+    },
+    {
+      "mapId": 7,
+      "name": "星界廢墟",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 7,
+            "cls": "戰士",
+            "level": 76,
+            "quality": "史詩",
+            "enhance": 5,
+            "gearMapId": 7,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 131709,
+            "legacyPower": 36952,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 18.435555555555556,
+              "averageHp": 83.01126514684739,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.03
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.263333333333334
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 40.013333333333335
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 7,
+            "cls": "戰士",
+            "level": 86,
+            "quality": "良好",
+            "enhance": 12,
+            "gearMapId": 7,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 179977,
+            "legacyPower": 46083,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 27.715555555555547,
+              "averageHp": 68.31285730693844,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 42.71833333333333
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.291666666666666
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 30.13666666666667
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 7,
+            "cls": "遊俠",
+            "level": 81,
+            "quality": "傳奇",
+            "enhance": 5,
+            "gearMapId": 7,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 119610,
+            "legacyPower": 39017,
+            "result": {
+              "wins": 89,
+              "trials": 90,
+              "winRate": 0.9888888888888889,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 20.33055555555555,
+              "averageHp": 76.76614965761902,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 5.893333333333333
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.4666666666666694
+                },
+                {
+                  "floor": 10,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 47.63166666666666
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 7,
+            "cls": "遊俠",
+            "level": 86,
+            "quality": "優秀",
+            "enhance": 13,
+            "gearMapId": 7,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 169645,
+            "legacyPower": 50874,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 30.120000000000008,
+              "averageHp": 72.1685360276851,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 47.53666666666665
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.000000000000002
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 34.823333333333345
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 7,
+            "cls": "法師",
+            "level": 81,
+            "quality": "優秀",
+            "enhance": 8,
+            "gearMapId": 6,
+            "affixSeed": 1480,
+            "gemTier": "advanced",
+            "score": 118125,
+            "legacyPower": 33494,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 0.9666666666666667,
+              "averageSeconds": 20.822222222222226,
+              "averageHp": 78.67347232207045,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.360000000000001
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.505
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 48.60166666666668
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 7,
+            "cls": "法師",
+            "level": 96,
+            "quality": "良好",
+            "enhance": 12,
+            "gearMapId": 7,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 164013,
+            "legacyPower": 47458,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 27.94166666666667,
+              "averageHp": 71.87329862430941,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 46.028333333333336
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 9.121666666666668
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 28.674999999999997
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        139000,
+        189000
+      ]
+    },
+    {
+      "mapId": 8,
+      "name": "霜火王座",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 8,
+            "cls": "戰士",
+            "level": 88,
+            "quality": "良好",
+            "enhance": 9,
+            "gearMapId": 8,
+            "affixSeed": 1581,
+            "gemTier": "intermediate",
+            "score": 218452,
+            "legacyPower": 52285,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 22.090555555555557,
+              "averageHp": 74.85947744895954,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 9.024999999999999
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.933333333333334
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 46.31333333333335
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 8,
+            "cls": "戰士",
+            "level": 98,
+            "quality": "良好",
+            "enhance": 14,
+            "gearMapId": 8,
+            "affixSeed": 2834,
+            "gemTier": "intermediate",
+            "score": 308647,
+            "legacyPower": 68047,
+            "result": {
+              "wins": 86,
+              "trials": 90,
+              "winRate": 0.9555555555555556,
+              "timelyWinRate": 0.9444444444444444,
+              "averageSeconds": 31.946666666666655,
+              "averageHp": 54.0683665259199,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 0.9666666666666667,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 47.980000000000004
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 12.693333333333335
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 35.16666666666667
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 8,
+            "cls": "遊俠",
+            "level": 88,
+            "quality": "優秀",
+            "enhance": 2,
+            "gearMapId": 8,
+            "affixSeed": 2834,
+            "gemTier": "advanced",
+            "score": 187411,
+            "legacyPower": 51552,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 23.877777777777776,
+              "averageHp": 94.13021945305326,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.7849999999999975
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 9.856666666666664
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 53.991666666666674
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 8,
+            "cls": "遊俠",
+            "level": 91,
+            "quality": "史詩",
+            "enhance": 10,
+            "gearMapId": 8,
+            "affixSeed": 1581,
+            "gemTier": "intermediate",
+            "score": 344452,
+            "legacyPower": 69312,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 33.49333333333335,
+              "averageHp": 90.28967202252774,
+              "suppression": [
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 50.760000000000005
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 11.219999999999997
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 38.5
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 8,
+            "cls": "法師",
+            "level": 93,
+            "quality": "傳奇",
+            "enhance": 6,
+            "gearMapId": 8,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 195136,
+            "legacyPower": 55346,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 22.777222222222225,
+              "averageHp": 85.37315631675241,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.518333333333334
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 9.785
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 50.02833333333333
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 8,
+            "cls": "法師",
+            "level": 98,
+            "quality": "史詩",
+            "enhance": 12,
+            "gearMapId": 8,
+            "affixSeed": 2834,
+            "gemTier": null,
+            "score": 302705,
+            "legacyPower": 73283,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 28.57166666666667,
+              "averageHp": 56.70992919754196,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 42.239999999999995
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.033333333333333
+                },
+                {
+                  "floor": 30,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 33.44166666666666
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        230000,
+        362000
+      ]
+    },
+    {
+      "mapId": 9,
+      "name": "時墟深淵",
+      "classResults": [
+        {
+          "cls": "戰士",
+          "entry": {
+            "mapId": 9,
+            "cls": "戰士",
+            "level": 96,
+            "quality": "良好",
+            "enhance": 13,
+            "gearMapId": 9,
+            "affixSeed": 0,
+            "gemTier": "advanced",
+            "score": 396420,
+            "legacyPower": 89869,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 21.73222222222222,
+              "averageHp": 93.87172990262589,
+              "suppression": [
+                "none"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 9
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.195
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 46.001666666666665
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 9,
+            "cls": "戰士",
+            "level": 96,
+            "quality": "優秀",
+            "enhance": 14,
+            "gearMapId": 9,
+            "affixSeed": 2935,
+            "gemTier": "intermediate",
+            "score": 507342,
+            "legacyPower": 102783,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9555555555555556,
+              "averageSeconds": 34.66111111111112,
+              "averageHp": 75.56134170347431,
+              "suppression": [
+                "none",
+                "light",
+                "medium"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 47.77333333333333
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 12.583333333333332
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 43.62666666666666
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "遊俠",
+          "entry": {
+            "mapId": 9,
+            "cls": "遊俠",
+            "level": 96,
+            "quality": "史詩",
+            "enhance": 0,
+            "gearMapId": 9,
+            "affixSeed": 1682,
+            "gemTier": "advanced",
+            "score": 375157,
+            "legacyPower": 72892,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 1,
+              "averageSeconds": 21.516666666666666,
+              "averageHp": 96.21443319635158,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 6.601666666666668
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.678333333333335
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 49.27
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 9,
+            "cls": "遊俠",
+            "level": 100,
+            "quality": "傳奇",
+            "enhance": 3,
+            "gearMapId": 9,
+            "affixSeed": 2935,
+            "gemTier": "advanced",
+            "score": 555726,
+            "legacyPower": 92278,
+            "result": {
+              "wins": 88,
+              "trials": 90,
+              "winRate": 0.9777777777777777,
+              "timelyWinRate": 0.9777777777777777,
+              "averageSeconds": 33.56499999999998,
+              "averageHp": 83.37334267769924,
+              "suppression": [
+                "light",
+                "medium",
+                "heavy"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 43.91666666666666
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 10.48
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9333333333333333,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 46.298333333333325
+                }
+              ]
+            }
+          }
+        },
+        {
+          "cls": "法師",
+          "entry": {
+            "mapId": 9,
+            "cls": "法師",
+            "level": 96,
+            "quality": "傳奇",
+            "enhance": 2,
+            "gearMapId": 9,
+            "affixSeed": 2935,
+            "gemTier": null,
+            "score": 445008,
+            "legacyPower": 78513,
+            "result": {
+              "wins": 90,
+              "trials": 90,
+              "winRate": 1,
+              "timelyWinRate": 0.9888888888888889,
+              "averageSeconds": 23.42666666666667,
+              "averageHp": 79.87752539876597,
+              "suppression": [
+                "none",
+                "light"
+              ],
+              "byFloor": [
+                {
+                  "floor": 1,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 7.5166666666666675
+                },
+                {
+                  "floor": 9,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 8.948333333333334
+                },
+                {
+                  "floor": 10,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9666666666666667,
+                  "averageSeconds": 53.81499999999998
+                }
+              ]
+            }
+          },
+          "clear": {
+            "mapId": 9,
+            "cls": "法師",
+            "level": 96,
+            "quality": "傳奇",
+            "enhance": 0,
+            "gearMapId": 9,
+            "affixSeed": 2935,
+            "gemTier": "advanced",
+            "score": 499927,
+            "legacyPower": 86989,
+            "result": {
+              "wins": 87,
+              "trials": 90,
+              "winRate": 0.9666666666666667,
+              "timelyWinRate": 0.9444444444444444,
+              "averageSeconds": 36.62944444444445,
+              "averageHp": 83.05151772131654,
+              "suppression": [
+                "light",
+                "medium",
+                "heavy"
+              ],
+              "byFloor": [
+                {
+                  "floor": 20,
+                  "winRate": 1,
+                  "timelyWinRate": 0.9333333333333333,
+                  "averageSeconds": 51.74666666666667
+                },
+                {
+                  "floor": 29,
+                  "winRate": 1,
+                  "timelyWinRate": 1,
+                  "averageSeconds": 11.25
+                },
+                {
+                  "floor": 30,
+                  "winRate": 0.9,
+                  "timelyWinRate": 0.9,
+                  "averageSeconds": 46.891666666666666
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "recommendedAssessedPower": [
+        468000,
+        584000
+      ]
+    }
+  ]
+}

@@ -86,7 +86,7 @@ export const monsterImages: Record<string, string> = {
   "時墟主宰・真身": "/monsters/時墟主宰・真身.webp",
   "墓園騎士・殘影": "/monsters/墓園騎士・殘影.webp",
   "墓園騎士・真身": "/monsters/墓園騎士・真身.webp",
-  "深淵王": "/monsters/world-boss/deep-abyss-king.png",
+  "深淵王": "/monsters/world-boss/deep-abyss-king.webp",
 };
 
 function personalBossPowerAtFloor(map: (typeof maps)[number], floor: number) {
@@ -145,7 +145,7 @@ export const worldBosses = [
     level: 50,
     hp: 12_000_000,
     accent: "#985cff",
-    image: "/monsters/world-boss/deep-abyss-king.png",
+    image: "/monsters/world-boss/deep-abyss-king.webp",
     active: true,
     skill: "萬觸葬界",
     recommendedPower: 140_000,
@@ -191,21 +191,21 @@ export type NavItem = typeof navItems[number];
 
 export const skillsByClass: Record<GameClass, {name:string; desc:string; level:number; max:number; cost:number}[]> = {
   戰士: [
-    { name: "裂地斬", desc: "", level: 3, max: 10, cost: 2 },
-    { name: "鮮血怒吼", desc: "", level: 2, max: 8, cost: 2 },
-    { name: "鋼鐵壁壘", desc: "", level: 4, max: 10, cost: 1 },
-    { name: "處決", desc: "", level: 0, max: 5, cost: 3 },
+    { name: "裂地斬", desc: "10% 觸發，造成 180% 傷害並忽略防禦 35%，持續 4 次攻擊。", level: 3, max: 10, cost: 2 },
+    { name: "鮮血怒吼", desc: "每場戰鬥一次：生命低於 40% 時自動觸發，接下來 5 次攻擊提高傷害並獲得吸血；裝備血神的心臟時改為 7 次，最後一擊追加血爆。", level: 2, max: 8, cost: 2 },
+    { name: "鋼鐵壁壘", desc: "被動提高防禦，受到攻擊時有機率完全格擋。", level: 4, max: 10, cost: 1 },
+    { name: "處決", desc: "每 10 次攻擊施放一次追加傷害。Lv1 160%／Lv2 180%／Lv3 200%／Lv4 220%／Lv5 250%。", level: 0, max: 5, cost: 3 },
   ],
   遊俠: [
-    { name: "穿雲箭", desc: "", level: 3, max: 10, cost: 2 },
-    { name: "疾風連射", desc: "", level: 2, max: 8, cost: 2 },
-    { name: "獵手本能", desc: "", level: 4, max: 10, cost: 1 },
-    { name: "致命標記", desc: "", level: 0, max: 5, cost: 3 },
+    { name: "穿雲箭", desc: "6% 觸發，造成 180% 傷害並忽略敵人 35% 防禦。", level: 3, max: 10, cost: 2 },
+    { name: "疾風連射", desc: "8% 觸發，連續射出 5 支箭；每支箭在命中時獨立結算傷害。技能等級提高每箭傷害，裝備千羽風暴時改為 7 支箭。", level: 2, max: 8, cost: 2 },
+    { name: "獵手本能", desc: "被動：暴擊率提高（2%＋技能等級），閃避值提高（2＋技能等級）；每次暴擊有（6%＋技能等級）機率追加 1 次攻擊。裝備白銀獵神之瞳時追加機率提高至 20%，追加攻擊再次暴擊會強化下一擊暴傷。", level: 4, max: 10, cost: 1 },
+    { name: "致命標記", desc: "觸發後，前 5 次攻擊逐次追加傷害；第 6 下引爆。Lv.1～5：每次 +10%／+14%／+18%／+22%／+24%，爆炸 140%／160%／180%／200%／220%；魅惑女王的契約使爆炸 +50%。", level: 0, max: 5, cost: 3 },
   ],
   法師: [
-    { name: "霜火新星", desc: "", level: 3, max: 10, cost: 2 },
-    { name: "奧術回響", desc: "", level: 2, max: 8, cost: 2 },
-    { name: "魔力護盾", desc: "", level: 4, max: 10, cost: 1 },
-    { name: "隕星術", desc: "", level: 0, max: 5, cost: 3 },
+    { name: "霜火新星", desc: "12% 觸發，對單一敵人造成 200% 傷害；灼燒 5 秒，每秒造成敵人最大生命 3%。", level: 3, max: 10, cost: 2 },
+    { name: "奧術回響", desc: "10% 觸發，將本次技能傷害以 60% 再施放一次；裝備阿卡夏・禁忌書頁時，每施放 4 次技能讓下一個主動技能免費回響。", level: 2, max: 8, cost: 2 },
+    { name: "魔力護盾", desc: "受到攻擊時有機率觸發，降低下一次受到的傷害。", level: 4, max: 10, cost: 1 },
+    { name: "隕星術", desc: "8% 觸發，對單一敵人造成 400% 傷害；對首領額外提高 25%。", level: 0, max: 5, cost: 3 },
   ],
 };

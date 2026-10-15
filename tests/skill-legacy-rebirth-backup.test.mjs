@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +17,7 @@ const sample = () => ({
 });
 
 async function withExports(run) {
-  const dir = await mkdtemp(join(process.cwd(), "legacy-rebirth-check-"));
+  const dir = await mkdtemp(join(tmpdir(), "legacy-rebirth-check-"));
   try {
     const source = join(dir, "source.json");
     const recovered = join(dir, "recovered.json");

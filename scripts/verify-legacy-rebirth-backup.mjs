@@ -85,3 +85,4 @@ if (process.argv.length !== 4) {
     process.exitCode = 2;
   }
 }
+

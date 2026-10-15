@@ -29,3 +29,4 @@ export function settleBossDamageEvent(ledger: BossDamageLedger, rawDamage: numbe
     newVictory: result.defeated,
   };
 }
+

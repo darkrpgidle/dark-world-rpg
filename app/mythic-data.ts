@@ -397,3 +397,4 @@ export function catalogBonus(items: Array<{ mythicId?: string; legendaryId?: str
     return total;
   }, {} as CatalogBonus);
 }
+

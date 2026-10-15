@@ -21,3 +21,4 @@ export function settleCombatHealth(remainingPercent: number, maximumHealth: numb
     defeated,
   };
 }
+

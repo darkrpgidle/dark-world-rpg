@@ -12,9 +12,9 @@ const { beginSkillBattleCutover, settleCutoverAction } = await import("../app/sk
 const { settleCombatHealth } = await import("../app/skill-health-settlement.ts");
 
 for (const [characterClass, name, multiplier, defenseIgnore, burnChance] of [
-  ["戰士", "裂地斬", 1.65, 15, 0],
-  ["遊俠", "穿雲箭", 1.5, 20, 0],
-  ["法師", "霜火新星", 1.55, 0, 20],
+  ["戰士", "裂地斬", 1.5, 30, 0],
+  ["遊俠", "穿雲箭", 1.65, 20, 0],
+  ["法師", "霜火新星", 1.55, 0, 25],
 ]) {
   test(`${characterClass} equipped basic skill charges on actions, lands once through tower and boss HP settlement`, () => {
     const build = { ranks: { [name]: 1 }, activeSlots: [name, null, null] };

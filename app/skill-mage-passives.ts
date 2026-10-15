@@ -14,11 +14,12 @@ function value(build: SkillBuild, name: MagePassiveName, key: string): number {
   return mageSkillRankValue(values, rank);
 }
 
-// The stage-21 HP and shield adapter consumes these values when a fresh
-// shield is created. An existing shield is never retroactively refilled.
+// The incoming-attack adapter consumes these values after an unshielded hit.
+// A passive shield protects against later attacks, never the triggering hit.
 export function magePassiveStats(build: SkillBuild) {
   return {
-    maxHealthBonusPercent: value(build, "星界護體", "maxHealthBonus"),
+    incomingShieldChancePercent: value(build, "星界護體", "incomingShieldChancePercent"),
+    incomingShieldMaxHealthPercent: value(build, "星界護體", "incomingShieldMaxHealthPercent"),
     initialShieldBonusPercent: value(build, "屏障續航", "initialShieldBonus"),
   };
 }
@@ -71,14 +72,20 @@ export function resolveMagePassiveAttack(build: SkillBuild, input: MagePassiveAt
 
   return {
     statuses,
+    directDamageMultiplier: directHit
+      ? (1 + value(build, "奧術感知", "activeDirectDamageBonus") / 100)
+        * (1 + (targetBurning ? value(build, "燃燼導引", "activeDirectDamageVsBurn") : 0) / 100)
+        * (1 + (input.shieldValue > 0 ? value(build, "護盾轉流", "activeDirectDamageWithShield") : 0) / 100)
+        * (1 + abnormalCount * value(build, "元素共振", "activeDirectDamagePerStatus") / 100)
+      : 1,
     directDamageBonusPercent: directHit
       ? value(build, "奧術感知", "activeDirectDamageBonus")
         + (targetBurning ? value(build, "燃燼導引", "activeDirectDamageVsBurn") : 0)
         + (input.shieldValue > 0 ? value(build, "護盾轉流", "activeDirectDamageWithShield") : 0)
         + abnormalCount * value(build, "元素共振", "activeDirectDamagePerStatus")
       : 0,
-    activeStatusChancePoints: input.kind === "skill"
-      ? value(build, "精密咒式", "activeStatusChancePoints") : 0,
+    activeStatusChanceBonus: input.kind === "skill"
+      ? value(build, "精密咒式", "activeStatusChanceBonus") : 0,
     ultimateEnergyGain: activeHit ? value(build, "奧術循環", "ultimateEnergyPerSuccessfulCast") : 0,
     damageCandidates,
     abnormalCount,

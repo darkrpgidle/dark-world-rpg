@@ -30,10 +30,11 @@ test("ground split uses its exact rank and arms shock only for the next action",
   assert.deepEqual(combat.session.charge.ready, ["裂地斬"]);
   combat.session.enemy.armorBreak = { kind: "armorBreak", expiresAt: 5000, stacks: 1, strength: 15 };
   const cast = turn(combat, "裂地斬", 400, { ascended: new Set(["裂地斬"]) });
-  assert.equal(cast.baseDamagePercent, 165);
+  assert.equal(cast.baseDamagePercent, 150);
   assert.deepEqual(cast.extraDamagePercents, []);
-  assert.deepEqual(cast.statusApplications, [{ kind: "armorBreak", strength: 15 }]);
+  assert.deepEqual(cast.statusApplications, [{ kind: "armorBreak", strength: 30, durationSeconds: 5 }]);
   assert.equal(cast.combat.buffs.groundShockPending, true);
+  assert.equal(cast.combat.session.enemy.armorBreak.expiresAt, 5400);
   assert.deepEqual(turn(cast.combat, "normal", 500).extraDamagePercents, [60]);
 });
 
@@ -73,9 +74,21 @@ test("a wrong queued skill cannot bypass slot order or consume the charge", () =
   assert.deepEqual(combat.session.charge.ready, ["血刃斬"]);
 });
 
-test("marked target adds bleed chance only when blood brand is learned", () => {
+test("blood brand exposes the target to increased damage while marked", () => {
   let combat = warrior(["血刃斬"]);
   for (let i = 0; i < 3; i++) combat = turn(combat, "normal", i * 100).combat;
-  combat.session.enemy.bloodBrand = { kind: "bloodBrand", expiresAt: 5000, stacks: 1, strength: 0 };
-  assert.equal(turn(combat, "血刃斬", 300, { roll: () => 0.9 }).bleedChancePercent, 20);
+  combat.session.enemy.bloodBrand = { kind: "bloodBrand", expiresAt: 5000, stacks: 1, strength: 30 };
+  const markedHit = turn(combat, "血刃斬", 300, { roll: () => 0.9 });
+  assert.equal(markedHit.bleedChancePercent, 20);
+  assert.equal(markedHit.targetDamageTakenBonusPercent, 30);
+});
+
+test("blood brand applies the ranked vulnerability and its ranked duration", () => {
+  const combat = warrior(["血戰烙印"], ["血戰烙印"]);
+  combat.session.charge.ready = ["血戰烙印"];
+  const cast = turn(combat, "血戰烙印", 0);
+  assert.deepEqual(cast.statusApplications, [{
+    kind: "bloodBrand", level: 1, durationSeconds: 6, strength: 15,
+  }]);
+  assert.equal(cast.combat.session.enemy.bloodBrand.expiresAt, 6000);
 });

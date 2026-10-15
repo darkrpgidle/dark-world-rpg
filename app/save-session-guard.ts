@@ -7,3 +7,4 @@ export function activeSaveSession(tokenHash: string, accountId: string, now = ne
     WHERE token_hash = ${tokenHash} AND account_id = ${accountId} AND expires_at > ${now}
   )`;
 }
+

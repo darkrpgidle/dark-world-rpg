@@ -2,28 +2,28 @@
 // Bleed damage per second remains configurable after balance testing.
 import { balanceConfig } from "./balance-config";
 export const WARRIOR_ACTIVE_RULES = {
-  裂地斬: { category: "basic", damage: [165, 176, 187, 204, 220], armorBreak: [15, 18, 21, 25, 30], ascension: "地脈崩裂" },
-  血刃斬: { category: "basic", damage: [143, 154, 165, 176, 193], bleedChance: [20, 25, 30, 35, 40], ascension: "猩紅撕裂" },
-  不屈戰意: { category: "defense", blockChance: [15, 18, 21, 24, 28], counterChance: [10, 12, 14, 17, 20], enemyAttacksRequired: 4, affectedEnemyAttacks: 3, ascension: "鋼魂壁壘" },
-  血戰烙印: { category: "status", durationSeconds: [6, 7, 8, 9, 10], bleedChanceBonus: [10, 13, 16, 19, 22], ascension: "血祭印記" },
+  裂地斬: { category: "basic", damage: [150, 175, 200, 225, 250], armorBreak: [30, 35, 40, 45, 50], armorBreakDurationSeconds: [5, 5, 5, 5, 5], ascension: "地脈崩裂" },
+  血刃斬: { category: "basic", damage: [130, 140, 150, 160, 175], bleedChance: [20, 25, 30, 35, 40], bleedDurationSeconds: [5, 5, 5, 5, 5], ascension: "猩紅撕裂" },
+  不屈戰意: { category: "defense", blockChance: [15, 21, 27, 34, 40], counterChance: [25, 31, 38, 44, 50], enemyAttacksRequired: 4, affectedEnemyAttacks: 3, ascension: "鋼魂壁壘" },
+  血戰烙印: { category: "status", durationSeconds: [6, 7.5, 9, 10.5, 12], weaknessDamageBonus: [15, 19, 23, 27, 30], ascension: "血祭印記" },
   鮮血怒吼: { category: "burst", damageBonus: [25, 32, 39, 47, 55], lifesteal: [10, 15, 20, 25, 30], healthBelow: 40, attacks: 5, ascension: "血怒終焉" },
-  狂戰姿態: { category: "mechanic", attackSpeedBonus: [10, 14, 18, 22, 26], damageBonus: [8, 11, 14, 17, 20], defensePenalty: 15, attacks: 8, ascension: "無盡狂怒" },
+  狂戰姿態: { category: "mechanic", attackSpeedBonus: [10, 14, 18, 22, 26], ...balanceConfig.skillRework.warrior.active.狂戰姿態, defensePenalty: 15, attacks: 8, ascension: "無盡狂怒" },
   碎甲猛擊: { category: "burst", damage: [240, 265, 290, 320, 350], armorBreak: [20, 24, 28, 32, 36],
     ...balanceConfig.skillRework.warrior.active.碎甲猛擊, ascension: "崩鎧重擊" },
   泰坦斷界斬: { category: "ultimate", damage: [400, 450, 500, 560, 630], armorBreak: [20, 24, 28, 32, 36], ascension: "天地斷絕" },
 } as const;
 
 export const WARRIOR_PASSIVE_RULES = {
-  鐵骨: { maxHealthBonus: [3, 5, 7, 9, 12] },
-  裂傷本能: { basicBleedChance: [4, 6, 8, 10, 12] },
-  破鎧追擊: { damageVsArmorBreak: [6, 9, 12, 15, 18] },
-  堅盾反射: { nextAttackExtraDamage: [20, 28, 36, 44, 55] },
-  血氣汲取: { lifestealVsBleed: [2, 3, 4, 5, 6] },
-  重刃專精: { basicAndBurstDamage: [5, 7, 9, 12, 16] },
-  逆境鋼心: { damageReductionBelow40Hp: [4, 6, 8, 10, 12] },
+  鐵骨: { defenseBonus: [20, 50, 80, 115, 150] },
+  裂傷本能: { extraBleedChance: [5, 8, 10, 13, 15] },
+  破鎧追擊: { damageVsArmorBreak: [8, 12, 16, 20, 24] },
+  堅盾反射: { nextAttackExtraDamage: [20, 30, 40, 50, 60] },
+  血氣汲取: { lifestealVsBleed: [5, 8, 10, 12, 15] },
+  重刃專精: { basicAndBurstDamage: [4, 6, 8, 10, 12] },
+  逆境鋼心: { damageReductionBelow40Hp: [6, 9, 12, 15, 18] },
   血痕累積: { damagePerStack: [2, 3, 4, 5, 6], maxStacks: 3, missesToClear: 3 },
   格擋精通: { blockChancePoints: [3, 5, 7, 9, 11], nextCounterDamage: [10, 15, 20, 25, 30] },
-  戰慄重擊: { burstDamageVsArmorBreak: [8, 11, 14, 17, 20] },
+  過度失血: { ...balanceConfig.skillRework.warrior.passive.過度失血 },
   絕境怒火: { directDamageBelow40Hp: [8, 11, 14, 17, 20] },
   泰坦餘震: { nextAttackExtraDamage: [35, 45, 55, 65, 80] },
 } as const;
@@ -66,11 +66,11 @@ export function createWarriorBuffState(): WarriorBuffState {
 }
 
 export function triggerWarriorBloodRoar(
-  state: WarriorBuffState, rank: number, healthPercent: number, ascended: boolean,
+  state: WarriorBuffState, rank: number, healthPercent: number, ascended: boolean, attacks = 5,
 ): WarriorBuffState | null {
   warriorSkillRankValue(WARRIOR_ACTIVE_RULES.鮮血怒吼.damageBonus, rank);
   if (state.bloodRoarUsed || !Number.isFinite(healthPercent) || healthPercent >= 40) return null;
-  return { ...state, bloodRoarUsed: true, bloodRoarRemaining: 5, bloodRoarRank: rank, bloodRoarAscended: ascended };
+  return { ...state, bloodRoarUsed: true, bloodRoarRemaining: attacks, bloodRoarRank: rank, bloodRoarAscended: ascended };
 }
 
 export function triggerWarriorStance(state: WarriorBuffState, rank: number, ascended: boolean): WarriorBuffState {
@@ -120,4 +120,3 @@ export function consumeWarriorPrimaryAttack(
     defensePenaltyPercent: stance ? 15 : 0,
   };
 }
-

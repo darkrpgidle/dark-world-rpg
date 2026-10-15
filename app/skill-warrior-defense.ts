@@ -98,3 +98,4 @@ export function recordWarriorCounter(combat: WarriorCombat, hit = true) {
     counterDamageEvent: hit ? { id: "反擊" as const, damageBonusPercent: bonus } : null,
   };
 }
+

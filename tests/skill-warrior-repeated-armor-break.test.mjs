@@ -74,10 +74,10 @@ test("new target, expired break, missed attack and ordinary skill cannot convert
 test("conversion remains separate from passive damage and refreshes the known skill preview", () => {
   const state = combat(1);
   state.build.ranks["破鎧追擊"] = 1;
-  state.build.ranks["戰慄重擊"] = 1;
+  state.build.ranks["過度失血"] = 1;
   const result = cast(state);
   assert.equal(result.repeatedArmorBreakBonusPercent, 40);
-  assert.equal(result.bonusDamagePercent, 14);
+  assert.equal(result.bonusDamagePercent, 8);
   assert.equal(result.effectiveBaseDamagePercent, 336);
   assert.match(skillDisplay("戰士", "碎甲猛擊").ascensionEffect, /破防率 ×2.*\+60%/);
 });

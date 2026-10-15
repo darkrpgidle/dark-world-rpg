@@ -41,3 +41,4 @@ test("sequential boss hits preserve remaining HP even before a UI render", () =>
   assert.equal(counter.newVictory, true);
   assert.equal(settleBossDamageEvent(counter.ledger, 10).newVictory, false);
 });
+

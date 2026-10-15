@@ -4,7 +4,11 @@ import test, { after } from "node:test";
 import { createServer } from "vite";
 
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const characterPowerSource = await readFile(new URL("../app/character-power.ts", import.meta.url), "utf8");
+const affixSource = await readFile(new URL("../app/equipment-affixes.ts", import.meta.url), "utf8");
 const data = await readFile(new URL("../app/game-data.ts", import.meta.url), "utf8");
+const floatLayerSource = await readFile(new URL("../app/combat-damage-layer.tsx", import.meta.url), "utf8");
+const floatEventsSource = await readFile(new URL("../app/combat-float-events.ts", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const balanceSource = await readFile(new URL("../app/balance.ts", import.meta.url), "utf8");
 const balanceConfigSource = await readFile(new URL("../app/balance-config.ts", import.meta.url), "utf8");
@@ -21,11 +25,13 @@ const vite = await createServer({
   root: new URL("..", import.meta.url).pathname,
   server: { middlewareMode: true },
 });
-const { dropPowerRange, enhancementBonusPercent, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, equipmentReforgeCost, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
+const { dropPowerRange, enhancementBonusPercent, enhancementFailureLevel, enhancementGoldCost, enhancementStoneCost, enhancementStoneDismantleYield, enhancementStoneDropChance, equipmentReforgeCost, evadeChanceFromRatings, gamblePackageReward, healthFromPercent, healthPercentFromDamage, hitChanceFromRatings, monsterRatingsForMap, realmSuppression, towerCombatValues } = await vite.ssrLoadModule(
   "/app/balance.ts",
 );
 const { balanceConfig } = await vite.ssrLoadModule("/app/balance-config.ts");
 const { settleCombatHealth } = await vite.ssrLoadModule("/app/skill-health-settlement.ts");
+const { equippedSetGroups, equippedSetCountAtThreshold, equippedSetAttackMultiplier, equippedSetOfflineMultiplier } = await vite.ssrLoadModule("/app/set-bonuses.ts");
+const { normalizeIdleSnapshot } = await vite.ssrLoadModule("/app/idle-rewards.ts");
 const {
   createEquipmentSockets,
   drillSocket,
@@ -99,7 +105,7 @@ test("renders inventory filters and mobile equipment detail", () => {
 
 test("keeps reforge open for repeated rolls", () => {
   const reforgeBody = page.slice(
-    page.indexOf("const reforge ="),
+    page.indexOf("const submitEquipmentAction ="),
     page.indexOf("const sellCurrentItem ="),
   );
   assert.doesNotMatch(reforgeBody, /setReforgeOpen\(false\)/);
@@ -115,8 +121,9 @@ test("increases general and targeted reforge costs by 1.25 per attempt", () => {
   assert.deepEqual(equipmentReforgeCost(2, true), { gold: 2813, stones: 5 });
   assert.deepEqual(equipmentReforgeCost(-1), { gold: 600, stones: 1 });
 });
-test("blocks players during maintenance while preserving GM access", () => {
-  assert.match(maintenanceSource, /MAINTENANCE_MODE = true/);
+test("keeps the public site in normal mode after reopening", () => {
+  assert.match(maintenanceSource, /MAINTENANCE_MODE = false/);
+  assert.match(page, /useState\(MAINTENANCE_MODE\)/);
   assert.match(authSource, /MAINTENANCE_MODE && !existing\.isGm/);
   assert.match(authSource, /body\.action === "register"[\s\S]*MAINTENANCE_MODE/);
   assert.match(authUtilsSource, /MAINTENANCE_MODE && !context\.account\.isGm/);
@@ -153,7 +160,9 @@ test("blood roar is a once-per-battle low-health five-attack lifesteal buff", ()
   assert.match(page, /const bonuses = \[20, 26, 32, 38, 44, 50, 55, 60\]/);
   assert.match(page, /Math\.ceil\(8 \* 1\.2 \*\* \(boundedLevel - 1\)\)/);
   assert.match(page, /const bloodRoarStateRef = useRef\(\{ battleKey: "", remaining: 0, used: false \}\)/);
-  assert.match(page, /if \(!battleOn \|\| playerClass !== "戰士" \|\| playerHp >= 40\) return/);
+  assert.match(page, /const bloodRoarLevel = skillReworkBuild\.ranks\["鮮血怒吼"\] \?\? 0/);
+  assert.match(page, /if \(liveCombatRef.current \|\| !battleOn \|\| playerClass !== "戰士" \|\| playerHp >= 40 \|\| bloodRoarLevel <= 0\) return/);
+  assert.doesNotMatch(page, /skills\.find\(\(skill\) => skill\.name === "鮮血怒吼"/);
   assert.match(page, /queueSkillVisual\(\{ name: "鮮血怒吼", key: Date\.now\(\) \}\)/);
   assert.match(page, /生命低於 40% → 鮮血怒吼立刻發動/);
   assert.match(page, /bloodRoarStateRef\.current\.used = true;/);
@@ -197,10 +206,31 @@ test("names only actual set drops after their set and lists every worn set", () 
 });
 
 test("stacks the two-piece attack bonus once for each equipped set", () => {
-  assert.match(page, /function equippedSetAttackMultiplier\(gear: Item\[\]\)[\s\S]*?maps\.filter\([\s\S]*?length >= 2[\s\S]*?1 \+ twoPieceSetCount \* \(SET_ATTACK_BONUS - 1\)/);
+  assert.match(page, /calculateEquippedSetAttackMultiplier\(gear, SET_ATTACK_BONUS - 1\)/);
   assert.match(page, /const setAttackMultiplier = equippedSetAttackMultiplier\(gear\)/);
   assert.match(page, /const activeSetAttackMultiplier = equippedSetAttackMultiplier\(equippedGear\)/);
   assert.match(page, /activeSetAttackBonusPct = Math\.round\(\(activeSetAttackMultiplier - 1\) \* 100\)/);
+  const mixedSets = [
+    { set: "灰燼套裝" }, { set: "灰燼套裝" },
+    { set: "霜痕套裝" }, { set: "霜痕套裝" },
+    { set: "霜痕套裝" }, { set: "霜痕套裝" },
+  ];
+  assert.deepEqual(equippedSetGroups(mixedSets), [
+    { name: "霜痕套裝", count: 4 },
+    { name: "灰燼套裝", count: 2 },
+  ]);
+  assert.equal(equippedSetCountAtThreshold(mixedSets, 2), 2);
+  assert.equal(equippedSetAttackMultiplier(mixedSets, 0.1), 1.2);
+  assert.equal(equippedSetOfflineMultiplier(mixedSets, 0.1), 1.1);
+  const twoFourPieceSets = [
+    ...Array.from({ length: 4 }, () => ({ set: "灰燼套裝" })),
+    ...Array.from({ length: 4 }, () => ({ set: "霜痕套裝" })),
+  ];
+  assert.equal(equippedSetOfflineMultiplier(twoFourPieceSets, 0.1), 1.2);
+  assert.equal(normalizeIdleSnapshot({ setBonus: 1.2 })?.setBonus, 1.2);
+  assert.match(page, /setNumericBonuses/);
+  assert.match(page, /className=\{group\.count >= 2 \? "active" : ""\}/);
+  assert.match(css, /\.set-bonus span\.active[\s\S]*?#f2c65e/);
 });
 
 test("uses non-overlapping equipment rails", () => {
@@ -228,7 +258,8 @@ test("starts new characters without equipment or demo battle history", () => {
 
 test("renders detailed canvas skill effects without moving card portraits", () => {
   assert.match(page, /skillVisualEffects\.map/);
-  assert.match(page, /<SkillEffectCanvas key=\{`\$\{effect\.name\}-\$\{effect\.key\}`\} name=\{effect\.name\} effectKey=\{effect\.key\}/);
+  assert.match(page, /name=\{effect\.name\}[\s\S]*effectKey=\{effect\.key\}[\s\S]*onComplete=/);
+  assert.match(skillCanvasSource, /onCompleteRef\.current\?\.\(effectKey\)/);
   assert.match(skillCanvasSource, /requestAnimationFrame/);
   assert.match(skillCanvasSource, /裂地斬/);
   assert.match(skillCanvasSource, /疾風連射/);
@@ -262,7 +293,8 @@ test("limits each account to one class and reserves unique nicknames", async () 
 });
 
 test("rejects a cloud save belonging to another class", () => {
-  assert.match(page, /const savedClass = save\.playerClass \?\? inferredClass/);
+  assert.match(page, /const savedClass = save\.playerClass/);
+  assert.doesNotMatch(page, /inferClassFromSkills/);
   assert.match(page, /savedClass && savedClass !== playerClass/);
   assert.match(page, /已阻止錯誤職業存檔/);
   assert.match(page, /setBattleOn\(false\)/);
@@ -298,7 +330,10 @@ test("newest login keeps save authority while old windows pause", async () => {
   assert.match(page, /已停止戰鬥與存檔/);
   assert.match(page, /LOGIN_INSTANCE_STORAGE_KEY/);
   assert.match(page, /x-dark-world-login-id/);
-  assert.doesNotMatch(page, /window\.location\.reload\(\)/);
+  const rejection = page.match(/if \(response.status === 409 && result\?\.error === "save_integrity_rejected"\) \{[\s\S]*?\n          \}/)?.[0];
+  assert.ok(rejection, "only an integrity rejection may force a cloud resync");
+  assert.match(rejection, /setSaveReady\(false\)/);
+  assert.doesNotMatch(page.replace(rejection, ""), /window\.location\.reload\(\)/);
   assert.doesNotMatch(page, /onReloadSave/);
   assert.doesNotMatch(page, /gameRevision/);
   assert.match(page, /if \(result\?\.accepted === false\) \{[\s\S]*?setSaveStatus\("雲端已同步"\)/);
@@ -357,8 +392,15 @@ test("derives combat power from actual stats and enhancement", () => {
 test("raises real tower monster health without changing player damage formulas", () => {
   assert.deepEqual(balanceConfig.mapFloors.monsterHealth.combatMultiplier, { normal: 0.78, elite: 1.05, guardian: 1.45, boss: 0.48 });
   assert.deepEqual(balanceConfig.combat.monsterDamageReductionByMap, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  assert.deepEqual(balanceConfig.combat.evasionModel.monsterEvasionBonusByMap, [0, 0, 1, 2, 3, 4, 5, 6, 7, 8]);
-  assert.equal(balanceConfig.combat.evasionModel.monsterEvasionPerMap, 22);
+  assert.deepEqual(balanceConfig.combat.evasionModel.monsterEvasionRatingByMap, [0, 42, 65, 97, 122, 147, 173, 198, 223, 249]);
+  assert.deepEqual(balanceConfig.combat.evasionModel.monsterEvasionBonusPercentByMap, [0, 0, 0, 0, 0, 15, 15, 25, 25, 25]);
+  assert.deepEqual(balanceConfig.combat.evasionModel.monsterAccuracyRatingByMap, [0, 100, 100, 115, 130, 145, 160, 175, 190, 205]);
+  assert.deepEqual(monsterRatingsForMap(1), { accuracy: 100, evasion: 42 });
+  assert.deepEqual(monsterRatingsForMap(3), { accuracy: 115, evasion: 97 });
+  assert.deepEqual(monsterRatingsForMap(5), { accuracy: 145, evasion: 169 });
+  assert.deepEqual(monsterRatingsForMap(6), { accuracy: 160, evasion: 199 });
+  assert.deepEqual(monsterRatingsForMap(7), { accuracy: 175, evasion: 248 });
+  assert.deepEqual(monsterRatingsForMap(9), { accuracy: 205, evasion: 311 });
   assert.match(page, /function monsterCombatHealthMultiplier/);
 });
 
@@ -434,14 +476,20 @@ test("softens the tenth-floor attack checkpoints on every map", () => {
 });
 
 test("world boss deals one damage per hit at 1.25 attacks per second", () => {
-  assert.deepEqual(balanceConfig.combat.worldBoss, {
+  assert.deepEqual({damagePerHit:balanceConfig.combat.worldBoss.damagePerHit,attacksPerSecond:balanceConfig.combat.worldBoss.attacksPerSecond}, {
     damagePerHit: 1,
     attacksPerSecond: 1.25,
   });
   assert.equal(100000 / (balanceConfig.combat.worldBoss.attacksPerSecond * 100), 800);
-  assert.match(page, /const bossActs = bossClock >= bossInterval/);
+  assert.match(page, /let bossActs = !enemyControl.frozen && cadence\.enemy >= bossInterval/);
   assert.match(page, /activeBossBattle\.mode === "world"\s*\?\s*balanceConfig\.combat\.worldBoss\.damagePerHit/);
   assert.match(page, /const executionDamage = 999_999/);
+});
+
+test("ultimate animations freeze both battle loops until their completion callback", () => {
+  assert.equal((page.match(/ultimateAnimationLockRef\.current !== null\) return;/g) ?? []).length, 2);
+  assert.match(page, /finishUltimateAnimation = \(eventKey: number\)/);
+  assert.match(page, /奧義蓄能 \{liveCombatRef\.current\.combat\.session\.charge\.ultimateEnergy\}／100/);
 });
 
 test("offers an exit after a finished world boss attempt when retry remains available", () => {
@@ -451,7 +499,7 @@ test("offers an exit after a finished world boss attempt when retry remains avai
 test("keeps equipment attack from being multiplied a second time", () => {
   const towerCall = page.slice(
     page.indexOf("const combatValues = towerCombatValues({"),
-    page.indexOf("const bossDamageMultiplier =", page.indexOf("const combatValues = towerCombatValues({")),
+    page.indexOf("const baseHpDamage =", page.indexOf("const combatValues = towerCombatValues({")),
   );
   assert.doesNotMatch(towerCall, /characterStats\.attack\s*\/\s*baseCharacterStats\.attack/);
   assert.match(towerCall, /playerAttack:\s*offensiveAttack/);
@@ -523,18 +571,19 @@ test("uses the confirmed monster drop quality distribution", () => {
   assert.doesNotMatch(battleDropBody, /roll > 0\.18/);
 });
 
-test("displays player and monster damage through one shared raw-number model", () => {
-  const sharedDamageFloat = page.slice(
-    page.indexOf("{battleHitGroups.length > 0 && ("),
-    page.indexOf("{dotDamageGroups.map"),
-  );
-  assert.match(sharedDamageFloat, /damage-float player-damage-float/);
-  assert.match(sharedDamageFloat, /battleHitGroups\.map/);
-  assert.doesNotMatch(sharedDamageFloat, /activeBossBattle|boss-damage-float/);
-  assert.match(page, /hits: \[\{ damage: shownBossMain, critical: liveAction\?\.critical \?\? bossValues\.critical \}\]/);
+test("displays player and monster damage as matching raw numbers", () => {
+  assert.equal((page.match(/<CombatDamageLayer/g) ?? []).length, 1);
+  assert.match(page, /groups: battleHitGroups, elementals: setElementalHits, dots: dotDamageGroups/);
+  assert.match(page, /player: playerHitFeedback, enemy: enemyHitFeedback/);
+  assert.match(floatLayerSource, /Math.round\(event.damage\).toLocaleString\(\)/);
+  assert.match(floatEventsSource, /damage: hit.damage/);
+  assert.match(floatEventsSource, /damage: text \? undefined : injury.damage/);
+  assert.doesNotMatch(page, /className="titan-damage-float"|className=\{`damage-float player-damage-float/);
+  assert.match(page, /hits: \[\{ damage: shownBossMain - groundShockDisplayed - tailwindEchoDisplayed - hunterBurstDisplayed - frostfireAfterburstDisplayed, critical: liveAction\?\.critical \?\? bossValues\.critical(?:,\s*label:[^\n]+)? \}\]/);
+  assert.match(page, /queueGroundShockNumber\(next, groundShockDisplayed\)/);
   assert.match(page, /critical: isCritical,/);
   assert.doesNotMatch(page, /bossDamageGroups|rangerWindVolleyDamage|boss-combo-hit|volley-damage-float/);
-  assert.match(page, /enemyHitFeedback\.damage/);
+  assert.match(floatEventsSource, /input.player \?\? \(!input.boss \? input.enemy : null\)/);
   assert.match(page, /對首領造成 \$\{playerDamage\} 傷害/);
   assert.doesNotMatch(page, /首領 -\{lastBossDamage\}%/);
   assert.doesNotMatch(page, /enemyHitFeedback\.damage\}%/);
@@ -549,7 +598,7 @@ test("keeps skill cards and battle information unambiguous", () => {
   assert.match(skillConstellationSource, /getContext\("webgl"/);
   assert.doesNotMatch(page, /目前戰鬥使用的技能/);
   assert.match(page, /遠征祝福不會在首領戰生效/);
-  assert.match(page, /enemyHitFeedback\.damage/);
+  assert.match(page, /enemy: enemyHitFeedback/);
   assert.match(page, /離線掛機收益/);
   assert.match(page, /本次遠征戰利品/);
 });
@@ -566,9 +615,9 @@ test("uses level fifty for the new ultimate and does not count damage triggers i
 });
 
 test("shows rapid multi-hit and critical combat feedback", () => {
-  assert.match(page, /const \[battleHits, setBattleHits\]/);
+  assert.match(page, /<CombatDamageLayer/);
   assert.match(page, /setBattleHitGroups\(\(current\) =>/);
-  assert.match(page, /className=\{`combo-hit/);
+  assert.match(floatEventsSource, /group.hits.forEach/);
   assert.match(page, /className=\{`fighter player .*rapid/);
   assert.match(css, /@keyframes rapid-strike/);
   assert.match(css, /@keyframes combo-damage/);
@@ -577,7 +626,7 @@ test("shows rapid multi-hit and critical combat feedback", () => {
   assert.match(css, /@keyframes critical-flare/);
   assert.match(css, /@keyframes critical-punch/);
   assert.match(page, /const \[enemyHitFeedback, setEnemyHitFeedback\]/);
-  assert.match(page, /className=\{`enemy-damage-float/);
+  assert.match(floatEventsSource, /target: "player"/);
   assert.match(css, /@keyframes enemy-damage/);
   assert.match(css, /@keyframes attack-impact-a/);
   assert.match(css, /@keyframes attack-impact-b/);
@@ -641,16 +690,16 @@ test("equipment power rises consistently across all nine maps", () => {
 
 test("ships all ninety map equipment icons and maps drops to them", async () => {
   const expected = [
-    "belt.png",
-    "boots.png",
-    "bracer.png",
-    "chest.png",
-    "cloak.png",
-    "gloves.png",
-    "helmet.png",
-    "necklace.png",
-    "ring.png",
-    "weapon.png",
+    "belt.webp",
+    "boots.webp",
+    "bracer.webp",
+    "chest.webp",
+    "cloak.webp",
+    "gloves.webp",
+    "helmet.webp",
+    "necklace.webp",
+    "ring.webp",
+    "weapon.webp",
   ];
   for (let mapId = 1; mapId <= 9; mapId++) {
     const files = await readdir(
@@ -659,7 +708,7 @@ test("ships all ninety map equipment icons and maps drops to them", async () => 
     assert.deepEqual(files.sort(), expected);
   }
   assert.match(page, /const equipmentSlotSlugs/);
-  assert.match(page, /return `\/equipment\/map-\$\{mapId\}\/\$\{slot\}\.png`/);
+  assert.match(page, /return `\/equipment\/map-\$\{mapId\}\/\$\{slot\}\.webp`/);
   assert.match(page, /<EquipmentIcon item=\{it\} className="bag-equipment-art"/);
   assert.match(page, /<EquipmentIcon item=\{currentItem\} className="detail-equipment-art"/);
   assert.match(css, /\.item-grid \.bag-equipment-art \{[^}]*left:\s*50%;[^}]*top:\s*50%;[^}]*transform:\s*translate\(-50%, -50%\)/s);
@@ -675,52 +724,54 @@ test("caps all scene equipment at legendary and reserves mythic gear", () => {
 });
 
 test("allows mythic equipment to roll five affixes", () => {
-  assert.match(page, /const MAX_AFFIXES_BY_QUALITY = \[0, 1, 2, 3, 4, 5\]/);
-  assert.match(page, /const affixCount = MAX_AFFIXES_BY_QUALITY/);
+  assert.match(affixSource, /const MAX_AFFIXES_BY_QUALITY = \[0, 1, 2, 3, 4, 5\]/);
+  assert.match(affixSource, /const affixCount = MAX_AFFIXES_BY_QUALITY/);
   assert.match(page, /const affixes = rollAffixes\(upgraded\)/);
   assert.match(page, /\.\.\.upgraded,\s*affixes,/);
 });
 
 test("implements the confirmed rebirth reset and permanent growth rules", () => {
-  assert.match(page, /const MAX_REBIRTHS = 20/);
+  assert.match(page, /MAX_REBIRTHS, REBIRTH_REWARD_PER_TURN, clampRebirthCount/);
   assert.match(page, /const canRebirth = level >= 100 && \(mapBestFloors\[9\] \?\? 0\) >= MAP_FLOORS/);
-  assert.match(page, /setRebirthPoints\(\(value\) => value \+ 2\)/);
+  assert.match(page, /setRebirthPoints\(\(value\) => value \+ REBIRTH_REWARD_PER_TURN\.talentPoints\)/);
   assert.match(page, /setItems\(\[\]\)/);
   assert.match(page, /setLoadouts\(\{ 1: \[\], 2: \[\] \}\)/);
   assert.match(page, /setGold\(save\.gold/);
   assert.match(page, /setYuanbao\(save\.yuanbao/);
-  assert.match(page, /equipmentDrop: baseCharacterStats\.equipmentDrop \+ rebirthTier \* 5/);
-  assert.match(page, /expBonus: baseCharacterStats\.expBonus \+ rebirthTier \* 20/);
-  assert.match(page, /goldBonus: baseCharacterStats\.goldBonus \+ rebirthTier \* 20/);
-  assert.match(page, /highQualityDrop: rebirthTier \* 3/);
+  assert.match(page, /equipmentDrop: baseCharacterStats\.equipmentDrop \+ rebirthTier \* REBIRTH_REWARD_PER_TURN\.equipmentDrop/);
+  assert.match(page, /expBonus: baseCharacterStats\.expBonus \+ rebirthTier \* REBIRTH_REWARD_PER_TURN\.experience/);
+  assert.match(page, /goldBonus: baseCharacterStats\.goldBonus \+ rebirthTier \* REBIRTH_REWARD_PER_TURN\.gold/);
+  assert.match(page, /resourceDrop: baseCharacterStats\.resourceDrop \+ rebirthTier \* REBIRTH_REWARD_PER_TURN\.resourceDrop/);
+  assert.match(page, /highQualityDrop: rebirthTier \* REBIRTH_REWARD_PER_TURN\.highQualityDrop/);
+  assert.match(page, /rebirthCount >= MAX_REBIRTHS \? "輪迴已滿" : "開始輪迴"/);
   assert.match(page, /rebirthTalentDefs/);
 });
 
 test("gives every equipment slot a distinct core affix profile", () => {
-  assert.match(page, /武器: \[flat\("攻擊"\)/);
-  assert.match(page, /胸甲: \[flat\("防禦"\)/);
-  assert.match(page, /鞋子: \[percentage\("閃避", 0\.45\)/);
-  assert.match(page, /項鍊: \[percentage\("經驗", 0\.6\)/);
-  assert.match(page, /戒指: \[percentage\("暴擊", 0\.55\)/);
-  assert.match(page, /腰帶: \[flat\("生命"\)/);
-  assert.match(page, /披風: \[percentage\("傷害減免", 0\.45\)/);
-  assert.match(page, /const affixCount = MAX_AFFIXES_BY_QUALITY/);
+  assert.match(affixSource, /武器: \[flat\("攻擊"\)/);
+  assert.match(affixSource, /胸甲: \[flat\("防禦"\)/);
+  assert.match(affixSource, /鞋子: \[rating\("閃避"\)/);
+  assert.match(affixSource, /項鍊: \[percentage\("經驗", 0\.6\)/);
+  assert.match(affixSource, /戒指: \[percentage\("暴擊", 0\.55\)/);
+  assert.match(affixSource, /腰帶: \[flat\("生命"\)/);
+  assert.match(affixSource, /披風: \[percentage\("傷害減免", 0\.45\)/);
+  assert.match(affixSource, /const affixCount = MAX_AFFIXES_BY_QUALITY/);
 });
 
 test("applies specialized utility affixes to actual rewards and combat", () => {
-  assert.match(page, /result\.expBonus \+= value/);
-  assert.match(page, /result\.goldBonus \+= value/);
-  assert.match(page, /result\.bossDamage \+= value/);
-  assert.match(page, /result\.damageReduction \+= value/);
+  assert.match(characterPowerSource, /result\.expBonus \+= value/);
+  assert.match(characterPowerSource, /result\.goldBonus \+= value/);
+  assert.match(characterPowerSource, /result\.bossDamage \+= value/);
+  assert.match(characterPowerSource, /result\.damageReduction \+= value/);
   assert.match(page, /1 \+ characterStats\.expBonus \/ 100/);
   assert.match(page, /1 \+ characterStats\.goldBonus \/ 100/);
-  assert.match(page, /1 \+ characterStats\.bossDamage \/ 100/);
+  assert.match(page, /bossDamage: characterStats\.bossDamage/);
   assert.match(page, /balanceConfig\.progression\.damageReductionCap/);
   for (const stat of ["技能傷害", "首領減傷", "資源掉落率", "元寶掉率"]) {
-    assert.match(page, new RegExp(`result\\.${stat === "元寶掉率" ? "yuanbaoDrop" : stat === "資源掉落率" ? "resourceDrop" : stat === "技能傷害" ? "skillDamage" : "bossReduction"} \\+= value`));
+    assert.match(characterPowerSource, new RegExp(`result\\.${stat === "元寶掉率" ? "yuanbaoDrop" : stat === "資源掉落率" ? "resourceDrop" : stat === "技能傷害" ? "skillDamage" : "bossReduction"} \\+= value`));
   }
-  assert.match(page, /percentageFixed\("元寶掉率"\)/);
-  assert.equal((page.match(/percentageFixed\("元寶掉率"\)/g) ?? []).length, 2);
+  assert.match(affixSource, /percentageFixed\("元寶掉率"\)/);
+  assert.equal((affixSource.match(/percentageFixed\("元寶掉率"\)/g) ?? []).length, 2);
   assert.match(page, /資源掉落率會同時提高強化石與洗鍊石掉落機率/);
   assert.match(page, /resourceDrop\.yuanbao/);
   assert.deepEqual(balanceConfig.equipment.affixes.percentQualityBands.元寶掉率, [[1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3]]);
@@ -735,19 +786,20 @@ test("separates inherent equipment stats from random affixes", () => {
 });
 
 test("uses disjoint quality bands for flat and percentage affixes", () => {
-  assert.match(page, /const flatQualityBands = balanceConfig/);
+  assert.match(affixSource, /const flatQualityBands = balanceConfig/);
   assert.deepEqual(balanceConfig.equipment.affixes.flatQualityMultipliers[0], [0.08, 0.12]);
   assert.deepEqual(balanceConfig.equipment.affixes.flatQualityMultipliers[4], [0.3, 0.4]);
   assert.deepEqual(balanceConfig.equipment.affixes.percentQualityBands.暴擊[4], [4, 8]);
-  assert.match(page, /affixSchemaVersion: 7/);
+  assert.match(characterPowerSource, /affixSchemaVersion: 7/);
   assert.match(page, /normalizeSceneItem/);
   assert.match(page, /只會產生\$\{currentItem\.quality\}數值區間/);
 });
 
 test("preserves duplicate affixes through save normalization", () => {
-  assert.match(page, /洗鍊允許同一種詞綴重複出現/);
-  assert.match(page, /affixes: cleanAffixes\.slice\(0, maxAffixes\)/);
-  assert.doesNotMatch(page, /const uniqueAffixes = cleanAffixes\.filter/);
+  assert.match(characterPowerSource, /洗鍊允許同一種詞綴重複出現/);
+  assert.match(characterPowerSource, /const cleanAffixes = canonicalAffixes\(/);
+  assert.match(characterPowerSource, /affixes: cleanAffixes,/);
+  assert.doesNotMatch(characterPowerSource, /const uniqueAffixes = cleanAffixes\.filter/);
 });
 
 test("shows the same damage that is removed from the monster's real hp", () => {
@@ -764,11 +816,13 @@ test("shows the same damage that is removed from the monster's real hp", () => {
   assert.deepEqual(settleCombatHealth(40, 17050, 1023), {
     actualDamage: 1023, percentDamage: 6, remainingPercent: 34, defeated: false,
   });
-  assert.match(page, /settleCombatHealth\(h, enemyMaximumHealth, finalHpDamage\)/);
+  assert.match(page, /settleCombatHealth\(h, enemyMaximumHealth, cutover.damage\)/);
+  assert.match(page, /ledger: \{ \.\.\.actionLedger, lastActionSequence: currentAction - 1 \}/);
+  assert.equal((page.match(/enableRework: true,[\s\S]{0,40}reworkReady: true/g) ?? []).length, 2);
   assert.match(page, /Math\.round\(healthSettlement\.actualDamage\)/);
-  assert.match(page, /currentEnemyHealth\.toLocaleString\(\).*currentEnemyMaximumHealth\.toLocaleString\(\).*HP/s);
+  assert.match(page, /healthFromPercent\(presentedEnemyPercent,currentEnemyMaximumHealth\)\.toLocaleString\(\).*currentEnemyMaximumHealth\.toLocaleString\(\).*HP/s);
   assert.match(page, /共 \$\{totalDisplayedDamage\.toLocaleString\(\)\} 傷害/);
-  assert.match(page, /settleBossHit\(calculatedPlayerDamage, "attack"\)/);
+  assert.match(page, /settleBossHit\(calculatedPlayerDamage, "attack",liveAction\?\.name==="疾風連射"\?next:undefined\)/);
   assert.match(page, /settleBossHit\(liveTickDamage, "burn"\)/);
   assert.match(page, /settleBossHit\(rawBurnDamage, "burn"\)/);
   assert.match(page, /settleBossHit\(counter, "attack"\)/);
@@ -807,9 +861,9 @@ test("raises inherent gear power through map five and preserves a mythic gap lat
   assert.deepEqual(balanceConfig.equipment.baseScaleByMap, [0, 2, 2.9, 6.15, 8.7, 12.15, 13.4, 17, 23, 32]);
   assert.deepEqual(balanceConfig.equipment.baseQualityMultipliers, [1, 1.06, 1.12, 1.18, 1.24, 1.3]);
   assert.match(balanceConfigSource, /普通到神話的基礎能力總差距為 30%/);
-  assert.match(page, /qualityMultiplier/);
-  assert.match(page, /scale \* qualityMultiplier/);
-  assert.match(page, /canonicalBase\(name\) \* multiplier \* qualityMinimum/);
+  assert.match(page, /sharedEquipmentBaseStats\(item, enhanceLevel\)/);
+  assert.match(affixSource, /scale \* qualityMultiplier/);
+  assert.match(affixSource, /canonicalBase\(name\) \* multiplier \* qualityMinimum/);
   assert.deepEqual(balanceConfig.equipment.affixes.flatQualityMultipliers[4], [0.3, 0.4]);
   assert.deepEqual(balanceConfig.equipment.affixes.flatQualityMultipliers[5], [0.45, 0.6]);
 });
@@ -823,26 +877,34 @@ test("uses three distinct ten-floor power bands without cluttering map cards", (
   assert.match(page, /map\.phasePower\[1\] \* balanceConfig/);
   assert.equal(balanceConfig.combat.guardianCheckpoints.floor10.defense, 1.15);
   assert.equal(balanceConfig.combat.guardianCheckpoints.floor20.attack, 1.4);
-  assert.match(page, /建議戰力 \{map\.power\[0\]/);
+  assert.match(page, /建議戰力 \{formatAssessedPower\(recommendedPower\[0\]/);
   assert.doesNotMatch(page, /前十層戰力|中十層戰力|後十層戰力/);
 });
 
-test("caps dodge at forty percent and applies map accuracy", () => {
-  assert.equal(balanceConfig.progression.dodgeCap, 40);
+test("keeps dodge as an uncapped rating and applies map accuracy", () => {
+  assert.deepEqual(balanceConfig.equipment.affixes.ratingQualityBands.命中[5], [12, 15]);
+  assert.deepEqual(balanceConfig.equipment.affixes.ratingQualityBands.閃避[5], [5, 10]);
+  assert.deepEqual(balanceConfig.equipment.affixes.ratingMapGrowth, { 命中: 0.5, 閃避: 0.35 });
   assert.equal(balanceConfig.combat.evasionModel.accuracyMultiplier, 1);
   assert.equal(balanceConfig.combat.evasionModel.evasionMultiplier, 0.12);
   assert.ok(Math.abs(hitChanceFromRatings(100, 1000) - 100 / 2.2) < 1e-9);
   assert.ok(Math.abs(evadeChanceFromRatings(100, 1000) - (100 - 100 / 2.2)) < 1e-9);
+  assert.ok(evadeChanceFromRatings(240, 800) > evadeChanceFromRatings(240, 400));
   assert.match(page, /hitChanceFromRatings\(characterStats\.hit, monsterEvasionRating\)/);
   assert.match(page, /evadeChanceFromRatings\(monsterAccuracyRating, playerEvasionRating\)/);
-  assert.match(page, /Math\.min\(DODGE_CAP, Math\.max\(0, characterStats\.dodge\)\)/);
-  assert.match(page, /\[0, 0, 3, 6, 9, 12, 16, 20, 24, 28\]/);
+  assert.match(page, /Math\.max\(0, characterStats\.dodge\) \* evasionRules\.statToRating/);
+  assert.match(affixSource, /ratingQualityBands\[name\]/);
+  assert.doesNotMatch(page, /DODGE_CAP|dodgeCap/);
+  assert.match(page, /monsterRatingsForMap\(mapId\)/);
+  assert.ok(hitChanceFromRatings(141, monsterRatingsForMap(9).evasion) < hitChanceFromRatings(141, 226));
+  assert.ok(hitChanceFromRatings(175, monsterRatingsForMap(9).evasion) > hitChanceFromRatings(141, monsterRatingsForMap(9).evasion));
+  assert.ok(evadeChanceFromRatings(monsterRatingsForMap(9).accuracy, 260) > evadeChanceFromRatings(240, 260));
 });
 
 test("centralizes adjustable game balance in one configuration file", () => {
   assert.match(balanceConfigSource, /唯一的遊戲平衡設定檔/);
   assert.match(balanceConfigSource, /experienceMultiplier: 3/);
-  assert.match(balanceConfigSource, /dodgeCap: 40/);
+  assert.match(balanceConfigSource, /ratingQualityBands/);
   assert.match(balanceConfigSource, /flatQualityMultipliers/);
   assert.match(balanceConfigSource, /realmSuppression/);
   assert.match(data, /balanceConfig\.maps\[index\]/);
@@ -864,8 +926,8 @@ test("buys the yuanbao reforge bundle through the save service", () => {
 
 test("buys cosmetic unlocks through the save service", () => {
   assert.deepEqual(balanceConfig.economy.yuanbaoCosmetics, {
-    "title-ash": 80, "title-abyss": 180,
-    "appearance-ember": 120, "appearance-arcane": 180, "appearance-abyss": 300,
+    "title-ash": 200, "title-abyss": 2000,
+    "appearance-ember": 500, "appearance-arcane": 1500, "appearance-abyss": 4500,
   });
   assert.match(page, /shop_cosmetic/);
   assert.ok(!page.includes("setOwnedTitles((current) => current.includes(title)"));

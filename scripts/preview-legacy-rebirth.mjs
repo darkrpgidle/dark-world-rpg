@@ -33,3 +33,4 @@ if (process.argv.length !== 3) {
     process.exitCode = 2;
   }
 }
+

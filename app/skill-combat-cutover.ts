@@ -47,3 +47,4 @@ export function settleCutoverAction(
   const result = settleSkillDamageAction(action.rework.ledger, action.sequence, action.rework.segments);
   return { mode: "rework" as const, damage: result.appliedDamage, ...result };
 }
+

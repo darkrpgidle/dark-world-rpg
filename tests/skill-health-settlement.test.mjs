@@ -39,3 +39,4 @@ test("misses, chip damage and corrupt numerical inputs cannot create free damage
   assert.throws(() => settleCombatHealth(100, 100, Infinity), RangeError);
   assert.throws(() => settleCombatHealth(100, 100, -1), RangeError);
 });
+

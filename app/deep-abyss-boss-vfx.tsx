@@ -3,10 +3,10 @@
 import { useEffect, useRef } from "react";
 
 const TENTACLE_SOURCES = [
-  "/vfx/world-boss/abyss-tentacle-main.png",
-  "/vfx/world-boss/abyss-tentacle-sweep.png",
-  "/vfx/world-boss/abyss-tentacle-eye.png",
-  "/vfx/world-boss/abyss-tentacle-claw.png",
+  "/vfx/world-boss/abyss-tentacle-main.webp",
+  "/vfx/world-boss/abyss-tentacle-sweep.webp",
+  "/vfx/world-boss/abyss-tentacle-eye.webp",
+  "/vfx/world-boss/abyss-tentacle-claw.webp",
 ] as const;
 
 type Point = { x: number; y: number };

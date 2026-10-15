@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { deathEvents, gameSaves } from "../../../../db/schema";
-import { currentAccount } from "../../auth-utils";
+import { gameSaves } from "../../../../db/schema";
+import { currentLogin } from "../../auth-utils";
+import { activeSaveSession } from "../../../save-session-guard";
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{20,80}$/.test(value);
 const validClass = new Set(["戰士", "遊俠", "法師"]);
@@ -13,8 +14,9 @@ const boundedInteger = (value: unknown, minimum: number, maximum: number) => {
 };
 
 export async function POST(request: Request) {
-  const account = await currentAccount(request);
-  if (!account) return Response.json({ error: "not_authenticated" }, { status: 401 });
+  const login = await currentLogin(request);
+  const account = login.account;
+  if (!account) return Response.json({ error: login.error ?? "not_authenticated" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as {
     playerId?: string;
@@ -43,15 +45,11 @@ export async function POST(request: Request) {
   if (save.accountId !== account.id)
     return Response.json({ error: "save_belongs_to_other_account" }, { status: 403 });
 
-  await db.insert(deathEvents).values({
-    playerId,
-    accountId: account.id,
-    mapId,
-    floor,
-    playerClass,
-    playerLevel,
-    combatPower,
-    occurredAt: new Date().toISOString(),
-  });
+  const inserted = await db.run(sql`
+    INSERT INTO death_events (player_id, account_id, map_id, floor, player_class, player_level, combat_power, occurred_at)
+    SELECT ${playerId}, ${account.id}, ${mapId}, ${floor}, ${playerClass}, ${playerLevel}, ${combatPower}, ${new Date().toISOString()}
+    WHERE ${activeSaveSession(login.sessionId!, account.id)}
+  `);
+  if ((inserted.meta?.changes ?? 0) !== 1) return Response.json({ error: "session_replaced" }, { status: 401 });
   return Response.json({ ok: true });
 }

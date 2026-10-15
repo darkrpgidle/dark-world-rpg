@@ -36,6 +36,9 @@ export function isValidSkillAscensions(state: SkillAscensionState, characterClas
 }
 
 export function restoreSkillAscensions(saved: unknown, characterClass: SkillClass): SkillAscensionState {
+  if (characterClass === "法師" && saved && typeof saved === "object" && Array.isArray((saved as SkillAscensionState).choices)) {
+    saved = { ...saved, choices: (saved as SkillAscensionState).choices.map((name) => name === "奧術飛彈" ? "閃電鏈" : name) };
+  }
   if (!isValidSkillAscensions(saved as SkillAscensionState, characterClass)) return createSkillAscensions();
   const state = saved as SkillAscensionState;
   return { rebirthCount: state.rebirthCount, choices: [...state.choices] as AscensionChoices, selectionOpen: state.selectionOpen };
@@ -73,3 +76,4 @@ export function enabledAscensions(state: SkillAscensionState, characterClass: Sk
   if (!isValidSkillAscensions(state, characterClass) || state.selectionOpen) return [];
   return state.choices.filter((choice): choice is string => choice !== null);
 }
+

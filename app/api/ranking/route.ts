@@ -1,12 +1,17 @@
+import { assessedRankingPower } from "../../ranking-power";
+import {settleWorldBoss,worldBossRanking} from "../../world-boss-rewards";
+import { saveDisplay } from "../../save-field-schema";
 import { getDb } from "../../../db";
 import { accounts, gameSaves } from "../../../db/schema";
 import { eq } from "drizzle-orm";
 
-const WORLD_BOSS_RESET_VERSION = "2026-09-14-60s";
 
 export async function GET() {
   const db = await getDb();
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  await settleWorldBoss(db.$client);
+  const cycleRanks=await worldBossRanking(db.$client);
+  const worldScores=new Map(cycleRanks.map(r=>[r.account_id,r.damage]));
+  const worldPositions=new Map(cycleRanks.map((r,i)=>[r.account_id,i]));
   const gmIds = new Set(
     (await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.isGm, true))).map(
       (account) => account.id,
@@ -16,10 +21,11 @@ export async function GET() {
     (row) => !row.accountId || !gmIds.has(row.accountId),
   );
   const rankEntries = rows.map((row) => {
-    const save = JSON.parse(row.payload) as {
+    const save = saveDisplay((()=>{try{return JSON.parse(row.payload);}catch{return {};}})()) as {
       playerName?: string; playerClass?: string; level?: number; combatPower?: number; rebirthCount?: number;
       mapId?: number; wave?: number; highestFloor?: number; unlockedMapId?: number;
       dailyDate?: string; worldDamage?: number; worldBossResetVersion?: string;
+      selectedAppearance?: string;
       mapBestFloors?: Record<string, number>;
       items?: Array<Record<string, unknown>>;
       loadouts?: Record<string, number[]>;
@@ -58,19 +64,20 @@ export async function GET() {
       name: save.playerName ?? "無名旅人",
       cls: save.playerClass ?? "戰士",
       level: save.level ?? 1,
-      power: save.combatPower ?? 0,
+      power: assessedRankingPower(save),
       rebirth: save.rebirthCount ?? 0,
-      worldDamage:
-        save.worldBossResetVersion === WORLD_BOSS_RESET_VERSION && save.dailyDate === today
-          ? Math.max(0, Number(save.worldDamage ?? 0))
-          : 0,
+      worldDamage:worldScores.get(row.accountId??'')??0,
+      worldPosition:worldPositions.get(row.accountId??'')??100,
       currentMapId: Math.max(1, Math.min(9, Number(save.mapId ?? 1))),
       currentFloor: Math.max(1, Math.min(30, Number(save.wave ?? 1))),
       highestFloor: Math.max(1, Math.min(30, Number(save.highestFloor ?? save.wave ?? 1))),
       unlockedMapId: Math.max(1, Math.min(9, Number(save.unlockedMapId ?? 1))),
       mapBestFloors: bestFloors,
       equippedItems: getLoadoutItems(save.activeLoadout === 2 ? loadoutTwo : loadoutOne),
-      portrait: `/characters/${save.playerClass === "戰士" ? "warrior" : save.playerClass === "遊俠" ? "ranger" : "mage"}${(save.rebirthCount ?? 0) > 0 ? "-rebirth-avatar" : "-head"}.png`,
+      portrait: `/characters/${save.playerClass === "戰士" ? "warrior" : save.playerClass === "遊俠" ? "ranger" : "mage"}${(save.rebirthCount ?? 0) > 0 ? "-rebirth-avatar" : "-head"}.webp`,
+      appearance: ["ember-aura", "arcane-aura", "abyss-aura"].includes(save.selectedAppearance ?? "")
+        ? save.selectedAppearance
+        : "none",
     };
   });
   const ranks = [...rankEntries]
@@ -78,7 +85,7 @@ export async function GET() {
     .slice(0, 100);
   const worldRanks = [...rankEntries]
     .filter((entry) => entry.worldDamage > 0)
-    .sort((a, b) => b.worldDamage - a.worldDamage || b.power - a.power)
+    .sort((a, b) => a.worldPosition-b.worldPosition)
     .slice(0, 100)
     .map(({ name, cls, level, power, rebirth, portrait, worldDamage }) => ({
       name,
@@ -89,5 +96,5 @@ export async function GET() {
       portrait,
       damage: worldDamage,
     }));
-  return Response.json({ ranks, worldRanks });
+  return Response.json({ ranks, worldRanks }, { headers: { "Cache-Control": "no-store" } });
 }
