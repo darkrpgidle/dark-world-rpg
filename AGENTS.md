@@ -41,3 +41,10 @@
 4. 是否部署
 
 除非被要求，不貼完整程式碼、不重述需求、不輸出長篇分析。
+
+
+## GameDev Agent Skills
+- 本專案已將精選跨引擎技能放入 `.agents/skills/`；適用範圍請讀 `docs/GAMEDEV_SKILLS.md`。
+- 依任務讀取對應 SKILL.md：效能 `performance-optimization`、戰鬥回饋 `game-feel`、存檔 `save-systems`、介面 `game-ui-ux`、素材 `create-game-assets`、數值裝備 `rpg`。
+- 本專案為 React/TypeScript Web RPG，通用 router 如無法識別引擎，直接使用跨引擎技能，禁止誤用 Unity/Godot/Phaser API。
+- 原有戰鬥、存檔、測試與不自動部署等 AGENTS.md 規則優先於第三方技能。
