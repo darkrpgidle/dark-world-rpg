@@ -1,3 +1,4 @@
+import {invalidRealMode} from "./real-mode-progress";
 import {safeLoadouts} from "./equipment-save-policy";
 type RecordValue=Record<string,unknown>;
 const record=(v:unknown):v is RecordValue=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -10,6 +11,7 @@ const booleans=['battleOn','dailyRewardClaimed','autoSalvage','protectSetGear','
 export function invalidSaveField(value:unknown):string|null {
  if(!record(value))return 'save';
  const s=value;
+ if("realMode" in s&&invalidRealMode(s.realMode))return "realMode";
  for(const key of integers)if(key in s&&!integer(s[key]))return key;
  for(const key of numbers)if(key in s&&(typeof s[key]!=='number'||!Number.isFinite(s[key])))return key;
  for(const key of strings)if(key in s&&!text(s[key]))return key;
@@ -43,7 +45,9 @@ export function invalidSaveField(value:unknown):string|null {
  };
  if('items' in s&&(!Array.isArray(s.items)||s.items.length>4000||s.items.some(itemError)))return 'items';
  if('mails' in s){if(!Array.isArray(s.mails)||s.mails.length>200)return 'mails';for(const m of s.mails){if(!record(m))return 'mails';for(const key of ['title','body'])if(key in m&&!text(m[key],10000))return 'mails';if('id' in m&&!(integer(m.id)||text(m.id,100)&&Boolean(m.id))||'claimed' in m&&typeof m.claimed!=='boolean')return 'mails';if('rewards' in m){if(!record(m.rewards))return 'mails';for(const key of ['gold','stones','yuanbao'])if(key in m.rewards&&!integer(m.rewards[key]))return 'mails';if('resourcesClaimed' in m.rewards&&typeof m.rewards.resourcesClaimed!=='boolean')return 'mails';if('items' in m.rewards&&(!Array.isArray(m.rewards.items)||m.rewards.items.some(itemError)))return 'mails';}}}
- if('gemInventory' in s&&(!Array.isArray(s.gemInventory)||s.gemInventory.length>100||s.gemInventory.some(g=>!record(g)||!text(g.gemId)||!text(g.tier)||!integer(g.quantity))))return 'gemInventory';
+ if('gemPowder' in s&&!integer(s.gemPowder))return 'gemPowder';
+ if('_gemRevision' in s&&!integer(s._gemRevision))return '_gemRevision';
+ if('gemInventory' in s&&(!Array.isArray(s.gemInventory)||s.gemInventory.length>160||s.gemInventory.some(g=>!record(g)||!text(g.gemId)||!text(g.tier)||!integer(g.quantity)||('locked' in g&&typeof g.locked!=='boolean'))))return 'gemInventory';
  if('logs' in s&&(!Array.isArray(s.logs)||s.logs.length>5000||s.logs.some(l=>!record(l)||!integer(l.id)||!text(l.time)||!text(l.type)||!text(l.text,10000))))return 'logs';
  // Reject dangerous object keys and excessively nested extension fields too.
  let nodes=0;

@@ -26,9 +26,11 @@ export function estimateEquipmentSkillContribution(
   const ids = [...new Set(gear.map(findEquipmentDefinition)
     .filter(definition => definition?.kind === "skill-mythic" && definition.className === characterClass)
     .map(definition => definition!.id))].sort();
-  if (!ids.length) return base;
+  const gemBonuses={gemBasicDamage:stats.gemBasicDamage??0,gemDotDamage:stats.gemDotDamage??0,gemShieldBonus:stats.gemShieldBonus??0,gemThorns:stats.gemThorns??0};
+  const hasGems=Object.values(gemBonuses).some(value=>value>0);
+  if (!ids.length&&!hasGems) return base;
   const build = restoreSkillBuild(savedBuild, characterClass, level);
-  if (!Object.keys(build.ranks).length) return base;
+  if (!Object.keys(build.ranks).length&&!hasGems) return base;
   const ascensions = restoreSkillAscensions(savedAscensions, characterClass);
   // Dimensionless HP/attack and defense/attack preserve HP explosions and armor counters.
   // Rounded ratios bound cache variety without using current HP, buffs or random live state.
@@ -41,11 +43,11 @@ export function estimateEquipmentSkillContribution(
     critDamage: rounded(bounded(stats.critDamage, 0, 1000)),
     lifesteal: rounded(bounded(stats.lifesteal, 0, 100)),
   };
-  const key = JSON.stringify([characterClass, level, build, ascensions, ids, context]);
+  const key = JSON.stringify([characterClass, level, build, ascensions, ids, context,gemBonuses]);
   let ratios = cache.get(key);
   if (!ratios) {
     const rules = balanceConfig.character.powerAssessment;
-    function sample(equippedItems: Equipment[], seedStart: number) {
+    function sample(equippedItems: Equipment[], seedStart: number,withGems=false) {
       let seed = seedStart;
       const roll = () => ((seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296);
       const battle = syncLiveCombat(null, "equipment-assessment", "training", build, characterClass, level, ascensions);
@@ -67,7 +69,7 @@ export function estimateEquipmentSkillContribution(
           playerClock %= interval;
           const action = resolveLiveCombatAttack(battle, { now, healthPercent: health / context.hp * 100,
             attack: 100, hitChance: 100, criticalChance: context.crit,
-            criticalDamage: context.critDamage, equippedItems, roll });
+            criticalDamage: context.critDamage,...(withGems?gemBonuses:{}), equippedItems, roll });
           const cost = health * action.currentHealthCostPercent / 100;
           health = Math.max(1, health - cost);
           received += cost;
@@ -92,12 +94,12 @@ export function estimateEquipmentSkillContribution(
           const raw = context.hp * rules.equipmentIncomingHealthShare;
           const defense = resolveLiveEnemyAttack(battle, { healthPercent: health / context.hp * 100,
             maxHealth: context.hp, damage: raw, defense: context.defense,
-            baseDodgeChance: 0, equippedItems, roll });
+            baseDodgeChance: 0,...(withGems?gemBonuses:{}), equippedItems, roll });
           received += defense.damage;
           health -= defense.damage;
           damage += defense.counterDamagePercent * (1 - armorMitigation(100, 100));
           const burst = defense.equipmentDamage ?? 0;
-          damage += burst;
+          damage += burst + defense.reflectedDamage;
           skillDamage += burst;
           if (health <= 0) health = context.hp;
         }
@@ -109,7 +111,7 @@ export function estimateEquipmentSkillContribution(
     const items = ids.map(mythicId => ({ mythicId }));
     for (let trial = 0; trial < rules.equipmentSampleTrials; trial++) {
       const seed = 20261011 + trial * 100003;
-      const before = sample([], seed), after = sample(items, seed);
+      const before = sample([], seed), after = sample(items, seed,true);
       for (const field of Object.keys(plain) as (keyof typeof plain)[]) {
         plain[field] += before[field];
         equipped[field] += after[field];

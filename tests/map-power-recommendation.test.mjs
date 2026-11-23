@@ -16,7 +16,7 @@ test('map advice is fixed across players and rises with chapter difficulty',()=>
   assert.ok(range[0]<range[1]);
   if(i)for(let endpoint=0;endpoint<2;endpoint++)assert.ok(range[endpoint]>maps[i-1].recommendedAssessedPower[endpoint]);
  }
- assert.match(page,/const recommendedPower = map\.recommendedAssessedPower;/);
+ assert.match(page,/const recommendedPower = realMode\?[\s\S]*?:map\.recommendedAssessedPower;/);
  assert.doesNotMatch(page,/assessedPowerAtSuppressionThreshold|suppressionRequirements/);
  assert.match(page,/建議戰力 \{formatAssessedPower\(recommendedPower\[0\]\)\}～/);
  assert.match(page,/assessedCombatPower < recommendedPower\[0\]/);
@@ -37,5 +37,6 @@ test('display advice does not alter legacy combat requirements or checkpoint HP'
  assert.doesNotMatch(balance,/recommendedAssessedPower/);
  assert.match(page,/currentSuppression = realmSuppression\(combatPower, currentRecommendedPower\)/);
  assert.match(page,/saveSchemaVersion: 7,[\s\S]*?playerClass,\s*combatPower,/);
- assert.equal(page.split('recommendedAssessedPower').length-1,1);
+ assert.match(page,/recommendedAssessedPower:maps\[8\]\.recommendedAssessedPower/);
+ assert.match(page,/const currentRecommendedPower = realMode\?Math\.round\(balanceConfig\.maps\[8\]\.bossPower/);
 });

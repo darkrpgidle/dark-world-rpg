@@ -85,6 +85,7 @@ export function calculateCharacterStats(
     yuanbaoDrop: 0,
     // 暴擊傷害是暴擊時的總加成；基礎 +50% 代表暴擊倍率 ×1.5。
     critDamage: 50,
+    gemThorns: 0, gemDotDamage: 0, gemBasicDamage: 0, gemShieldBonus: 0,
     hpPct: 0,
     attackPct: 0,
     defensePct: 0,
@@ -151,6 +152,12 @@ export function calculateCharacterStats(
       if (name === "吸血") result.lifesteal += value;
       if (name === "經驗") result.expBonus += value;
       if (name === "金幣") result.goldBonus += value;
+      if (name === "暴擊傷害") result.critDamage += value;
+      if (name === "技能傷害") result.skillDamage += value;
+      if (name === "反傷") result.gemThorns += value;
+      if (name === "持續傷害") result.gemDotDamage += value;
+      if (name === "普攻傷害") result.gemBasicDamage += value;
+      if (name === "護盾量") result.gemShieldBonus += value;
     }
   }
   const skill = calculateSkillEffects(skills);

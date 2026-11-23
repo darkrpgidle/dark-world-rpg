@@ -47,6 +47,6 @@ test("tower and boss route dedicated callbacks, delay victory and clean pending 
  assert.equal((s.match(/queueSkyRainNumbers\(next, liveAction,/g)||[]).length,2);
  assert.match(s,/const victoryRef = liveAction.name === "星界寂滅" \? pendingAstralVictoryRef : pendingSkyVictoryRef/);assert.match(s,/pendingSkyVictoryRef.current.set\(skyKey/);
  assert.match(s,/pendingSkyDamageRef.current.clear\(\); pendingSkyVictoryRef.current.clear\(\)/);
- assert.match(s,/if \(!monsterActs \|\| liveAction\?\.name === "蒼穹箭雨" \|\| liveAction\?\.name === "星界寂滅"\)/);
+ assert.match(s,/if \(!monsterActs \|\| !realMode && \(liveAction\?\.name === "蒼穹箭雨" \|\| liveAction\?\.name === "星界寂滅"\)\)/);
  assert.match(s,/onImpact=\{publishSkyRainImpact\} onComplete=\{finishSkyRainVisual\}/);
 });

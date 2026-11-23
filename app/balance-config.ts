@@ -6,6 +6,18 @@
  */
 
 export const balanceConfig = {
+  realMode: {
+    chapters: [
+      { health: 1.30, attack: 1.20, defense: 1.15, power: 1.20, reward: 1.50 },
+      { health: 1.95, attack: 1.55, defense: 1.40, power: 1.50, reward: 1.75 },
+      { health: 2.95, attack: 2.00, defense: 1.75, power: 1.90, reward: 2.00 },
+      { health: 4.45, attack: 2.60, defense: 2.20, power: 2.40, reward: 2.25 },
+    ],
+    floorGrowth: 0.008,
+    tier: { normal: 1, elite: 1.08, guardian: 1.20, boss: 1.35 },
+    accuracyGrowth: 0.08,
+    evasionGrowth: 0.06,
+  },
   // 三職共用異常與法師技能數值，供正式戰鬥及介面共用。
   skillRework: {
     // 第 27 批試行：每秒基礎持續傷害以施加時的面板攻擊為基準。
@@ -441,22 +453,30 @@ export const balanceConfig = {
       advanced: { label: "高階", mapFrom: 7, dropChance: 0.001 },
     },
     fusion: {
-      materialCount: 3,
-      beginnerToIntermediateSuccess: 0.5,
-      intermediateToAdvancedSuccess: 0.3,
+      materialCount: 2,
+      beginnerToIntermediateSuccess: 1,
+      intermediateToAdvancedSuccess: 1,
       failureKeepsOneMaterial: true,
     },
+    successRates: [1, 1, 1, 1, 0.8, 0.65, 0.5, 0.35, 0.25],
+    powderExchangeCost: 4,
     values: {
-      redIron: { stat: "攻擊%", beginner: 3, intermediate: 5, advanced: 8 },
-      azureGuard: { stat: "防禦%", beginner: 3, intermediate: 5, advanced: 8 },
-      emeraldLife: { stat: "生命%", beginner: 4, intermediate: 7, advanced: 10 },
-      thunderlight: { stat: "攻速", beginner: 3, intermediate: 5, advanced: 8 },
-      eagleEye: { stat: "命中", beginner: 3, intermediate: 6, advanced: 10 },
-      phantom: { stat: "閃避", beginner: 2, intermediate: 4, advanced: 6 },
-      sunburst: { stat: "暴擊", beginner: 2, intermediate: 4, advanced: 6 },
-      blooddrop: { stat: "吸血", beginner: 1, intermediate: 3, advanced: 5 },
-      wisdom: { stat: "經驗", beginner: 4, intermediate: 7, advanced: 10 },
-      greed: { stat: "金幣", beginner: 4, intermediate: 7, advanced: 10 },
+      redIron: { stat: "攻擊%", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      azureGuard: { stat: "防禦%", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      emeraldLife: { stat: "生命%", beginner: 4, intermediate: 7, advanced: 10, lv4: 14, lv5: 19, lv6: 24, lv7: 30, lv8: 36, lv9: 43, lv10: 50 },
+      thunderlight: { stat: "攻速", beginner: 3, intermediate: 5, advanced: 8, lv4: 10, lv5: 12, lv6: 14, lv7: 16, lv8: 18, lv9: 21, lv10: 24 },
+      eagleEye: { stat: "命中", beginner: 3, intermediate: 6, advanced: 10, lv4: 15, lv5: 21, lv6: 28, lv7: 36, lv8: 45, lv9: 55, lv10: 66 },
+      phantom: { stat: "閃避", beginner: 2, intermediate: 4, advanced: 6, lv4: 9, lv5: 12, lv6: 16, lv7: 20, lv8: 25, lv9: 30, lv10: 36 },
+      sunburst: { stat: "暴擊", beginner: 2, intermediate: 4, advanced: 6, lv4: 8, lv5: 10, lv6: 12, lv7: 14, lv8: 16, lv9: 18, lv10: 20 },
+      blooddrop: { stat: "吸血", beginner: 1, intermediate: 3, advanced: 5, lv4: 6, lv5: 7, lv6: 8, lv7: 9, lv8: 10, lv9: 11, lv10: 12 },
+      wisdom: { stat: "經驗", beginner: 4, intermediate: 7, advanced: 10, lv4: 14, lv5: 19, lv6: 24, lv7: 30, lv8: 36, lv9: 43, lv10: 50 },
+      greed: { stat: "金幣", beginner: 4, intermediate: 7, advanced: 10, lv4: 14, lv5: 19, lv6: 24, lv7: 30, lv8: 36, lv9: 43, lv10: 50 },
+      thorns: { stat: "反傷", beginner: 2, intermediate: 3, advanced: 5, lv4: 7, lv5: 10, lv6: 13, lv7: 16, lv8: 20, lv9: 25, lv10: 30 },
+      corrosion: { stat: "持續傷害", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      rift: { stat: "暴擊傷害", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      battlewill: { stat: "普攻傷害", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      arcana: { stat: "技能傷害", beginner: 3, intermediate: 5, advanced: 8, lv4: 11, lv5: 15, lv6: 19, lv7: 24, lv8: 29, lv9: 34, lv10: 40 },
+      bastion: { stat: "護盾量", beginner: 4, intermediate: 7, advanced: 10, lv4: 14, lv5: 19, lv6: 24, lv7: 30, lv8: 36, lv9: 43, lv10: 50 },
     },
   },
 } as const;

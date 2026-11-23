@@ -1,3 +1,4 @@
+import {validateRealModeTransition} from "./real-mode-progress";
 import {canonicalAffixes,affixName,affixOptions,type Item as AffixItem} from "./equipment-affixes";
 import {invalidLoadout} from "./equipment-save-policy";
 import {normalizeEquipmentSockets} from "./gem-system";
@@ -113,6 +114,7 @@ export function validateSaveTransition(incoming: Save, server: Save, now: number
     if (!integer(next.mapId) || number(next.mapId) < 1 || number(next.mapId) > number(next.unlockedMapId)
       || !integer(next.wave) || number(next.wave) < 1 || number(next.wave) > 30) fail("invalid_map_position");
   }
+  try{next.realMode=validateRealModeTransition(next,server,reborn);}catch(error){fail(error instanceof Error?error.message:"invalid_real_mode");}
   const oldRoster = roster(server), newRoster = roster(next);
   if(invalidLoadout(next))fail("invalid_equipment_loadout");
   const oldItems = new Map<unknown, Save[]>();
@@ -142,7 +144,7 @@ export function validateSaveTransition(incoming: Save, server: Save, now: number
       if (!blessed && (number(item.power) < range.minimum || number(item.power) > range.maximum)) fail("forged_equipment_power");
       if (old) fail("changed_equipment_power");
     }
-    if (!old) { added++; if(number(item.reforgeCount)>0)fail("unissued_reforge"); if (map > number(next.unlockedMapId)) fail("forged_new_equipment"); }
+    if (!old) { added++; if(number(item.reforgeCount)>0)fail("unissued_reforge"); if (map > (object(next.realMode).unlocked===true?9:number(next.unlockedMapId))) fail("forged_new_equipment"); }
     else {
       if(normalizeEquipmentSockets(item.sockets).socketCount!==normalizeEquipmentSockets(old.sockets).socketCount)fail("unissued_drill");
       const oldIdentity = identity(old), nextIdentity = identity(item);
@@ -211,7 +213,7 @@ export function validateSaveTransition(incoming: Save, server: Save, now: number
   const at = number(oldGuard.at, Number.isFinite(savedAt) ? Math.min(savedAt, number(server.lastSeenAt, savedAt)) : now);
   const elapsed = Math.min(90, Math.max(0, (now - at) / 1000));
   // Broad legitimate ceilings; repeated writes share a spent server-side budget.
-  const map = Math.max(1, Math.min(9, unlocked));
+  const map = object(next.realMode).unlocked===true?9:Math.max(1, Math.min(9, unlocked));
   const goldPerKill = balanceConfig.economy.gold.monsterDropBaseByMap[map - 1] * 1.87 * 8 * 8;
   const expPerKill = balanceConfig.maps[map - 1].exp[1] * 12 * balanceConfig.progression.experienceMultiplier * 2 * 8;
   const rates: Record<Credit, number> = { gold: goldPerKill * 8, experience: expPerKill * 8,
@@ -249,6 +251,7 @@ export function validateSaveTransition(incoming: Save, server: Save, now: number
     if (!integer(floor) || floor > 30 || (id > number(next.unlockedMapId) && floor > 0)) fail("invalid_best_floor");
     progressedFloors += Math.max(0, number(floor) - number(object(server.mapBestFloors)[String(id)]));
   }
+  if(!reborn){const real=object(next.realMode),prior=object(server.realMode);for(let id=1;id<=4;id++)progressedFloors+=Math.max(0,number(object(real.bestFloors)[String(id)])-number(object(prior.bestFloors)[String(id)]));}
   const goldSpent = Math.max(0, number(server.gold) - number(next.gold));
   const stonesSpent = Math.max(0, number(server.enhanceStones) - number(next.enhanceStones));
   const goldShopStones = Math.floor(goldSpent / 100_000) * 50;
@@ -286,6 +289,15 @@ export function validateSaveTransition(incoming: Save, server: Save, now: number
     if (!Number.isSafeInteger(value)) fail("invalid_gem_total");
     return value;
   };
+  const highGems = (save:Save) => {
+    const counts=new Map<string,number>();
+    const add=(gem:Save,count:number)=>{if(GEM_TIERS.indexOf(gem.tier as typeof GEM_TIERS[number])>=3){const key=`${gem.gemId}:${gem.tier}`;counts.set(key,(counts.get(key)??0)+count);}};
+    for(const gem of array(save.gemInventory))add(gem,number(gem.quantity));
+    for(const item of roster(save))for(const entry of array(object(item.sockets).gems))add(entry,1);
+    return counts;
+  };
+  const issuedHigh=highGems(server);
+  for(const [key,count] of highGems(next))if(count>(issuedHigh.get(key)??0))fail("unissued_gem_upgrade");
   cost.gems = Math.max(0, gemValue(next) - gemValue(server));
   for (const field of credits) if (cost[field] > available[field] + 0.000001) fail(`excessive_${field}`);
   const maximumPower = 50_000 + level * 3000 + array(next.items).reduce((sum, item) => sum + number(item.power) * 100, 0);

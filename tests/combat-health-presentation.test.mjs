@@ -48,7 +48,7 @@ test('one shared due-event callback drives both HP displays and terminal transit
  assert.match(page,/pendingEnemyDefeatRef\.current=\{token:activeBossBattle,queuedAt:performance.now\(\),volleyKey,finish:\(\)=>resolveBossVictory/);
  assert.match(layer,/const shown=model\.current\.tick/);
  assert.match(layer,/damageShown\.current\?\.\(shown,previous\.current\.token\)/);
- assert.equal((page.match(/showCounterDamage\(settled.actualDamage,/g)||[]).length,2);
+ assert.equal((page.match(/showCounterDamage\(settled.actualDamage,/g)||[]).length,3);
  assert.match(page,/showCounterDamage\(counterSettlement.actualDamage,/);
 });
 

@@ -25,6 +25,7 @@ export type LiveCombatBattle = {
   characterClass: SkillClass; build: SkillBuild; ascended: ReadonlySet<string>;
   combat: WarriorCombat | RangerCombat | MageCombat;
   dotAttack: { bleed: number; burn: number };
+  gemDotSnapshot?: {bleed:number;burn:number};
   fallenCityDamagePending: number; hunterEyeCritDamagePending: boolean;
   queenCarryForNextTarget: boolean; queenCarry: number;
   akashaStacks: number; akashaReady: boolean;   executionEnergyRemainder: number;
@@ -55,7 +56,7 @@ export type LiveCombatAction = {
   currentHealthCostPercent: number;
   bloodRoarActivated: boolean;
 };
-type AttackOptions = { now: number; healthPercent: number; attack: number;
+type AttackOptions = { gemBasicDamage?:number; gemDotDamage?:number; now: number; healthPercent: number; attack: number;
   hitChance: number; criticalChance: number; criticalDamage: number; roll?: () => number;
   equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[] };
 
@@ -84,6 +85,7 @@ export function syncLiveCombat(
           : transitionMageCombat(previous.combat as MageCombat, "normal-kill");
       previous.target = target;
       previous.dotAttack = { bleed: 0, burn: 0 };
+      previous.gemDotSnapshot = {bleed:0,burn:0};
       previous.emberEchoes = [];
       previous.fissureNormalsRemaining = 0;
       previous.queenCarry = previous.queenCarryForNextTarget ? 2 : 0;
@@ -169,7 +171,8 @@ function liveTickDamage(battle: LiveCombatBattle, tick: DebuffTick): number {
     ? warriorPassiveBleedDamageBonusPercent(battle.build) : 0;
   return calculateDebuffTickRawDamage({ ...tick,
     ...(bonus > 0 ? { bleedDamageBonusPercent: 100 * ((1 + (tick.bleedDamageBonusPercent ?? 0) / 100) * (1 + bonus / 100) - 1) } : {}),
-  }, tick.kind === "freeze" ? tick.attackSnapshot ?? 0 : battle.dotAttack[tick.kind]);
+  }, tick.kind === "freeze" ? tick.attackSnapshot ?? 0 : battle.dotAttack[tick.kind])
+    * (tick.kind === "bleed" || tick.kind === "burn" ? 1 + (battle.gemDotSnapshot?.[tick.kind] ?? 0) / 100 : 1);
 }
 
 function segmentCount(name: string | null): number {
@@ -181,6 +184,7 @@ function segmentCount(name: string | null): number {
 export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: AttackOptions): LiveCombatAction {
   const name = nextLiveSkill(battle, options.now);
   const random = options.roll ?? Math.random;
+  const basicGemMultiplier = (name: string | null) => name === null ? 1 + (options.gemBasicDamage ?? 0) / 100 : 1;
   const hasMythic = (id: string) => hasCatalogItem(options.equippedItems ?? [], id);
   const energyBefore = battle.combat.session.charge.ultimateEnergy;
   const ranger = battle.characterClass === "遊俠" ? battle.combat as RangerCombat : null;
@@ -274,7 +278,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       if (quarters >= 4) battle.combat.session = { ...battle.combat.session,
         charge: grantUltimateEnergy(battle.combat.session.charge, Math.floor(quarters / 4)) };
     }
-    damagePercent = percent(result.effectiveBaseDamagePercent * (1 + result.bonusDamagePercent / 100));
+    damagePercent = percent(result.effectiveBaseDamagePercent * (1 + result.bonusDamagePercent / 100)) * basicGemMultiplier(name);
     for (const [extraIndex, extra] of result.extraDamagePercents.entries()) {
       if (!hits.some((part) => part.hit) || random() * 100 >= options.hitChance) continue;
       const extraDamage = extra * (random() * 100 < critChance ? 1 + options.criticalDamage / 100 : 1);
@@ -319,6 +323,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       percent(value * (1 + result.damageBonusPercent / 100) +
         (result.criticalDirectDamageBonusPercentBySegment[index] ?? 0) +
         (index === 8 ? result.mainArrowDamageBonusPercent : 0), index));
+    for (let i=0;i<segmentDamages.length;i++) segmentDamages[i] *= basicGemMultiplier(name);
     damagePercent = segmentDamages.reduce((sum, value) => sum + value, 0);
     if (name === "疾風連射") hits.forEach((part, index) =>
       volleyArrows.push({ ...part, damagePercent: segmentDamages[index] ?? 0, sixth: false }));
@@ -387,6 +392,7 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     const originalPercents = segments.map((value, index) => percent(value * (1 + bonus / 100) * result.passiveDirectDamageMultiplier * (1 + result.skillEfficiencyBonusPercent / 100) * (1 - result.skillDamagePenaltyPercent / 100) *
       (index === segments.length - 1 && name === "星界寂滅"
         ? 1 + result.finalExplosionDamageBonusPercent / 100 : 1), index));
+    for (let i=0;i<originalPercents.length;i++) originalPercents[i] *= basicGemMultiplier(name);
     damagePercent = originalPercents.reduce((sum, value) => sum + value, 0);
     if (name === "星界寂滅") hits.forEach((part, index) => astralSegments.push({ ...part,
       damagePercent: originalPercents[index] ?? 0, label: index === 6 ? "寂滅尾爆" : "星界光束" }));
@@ -466,8 +472,11 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
       if (hunterExplosion) hunterExplosion.damagePercent *= multiplier;
     }
   }
-  for (const kind of statuses) if (kind === "bleed" || kind === "burn")
+  for (const kind of statuses) if (kind === "bleed" || kind === "burn") {
     battle.dotAttack[kind] = options.attack;
+    battle.gemDotSnapshot ??= {bleed:0,burn:0};
+    battle.gemDotSnapshot[kind] = options.gemDotDamage ?? 0;
+  }
   const bloodBrandExpiresAt = battle.characterClass === "戰士"
     ? (battle.combat as WarriorCombat).session.enemy.bloodBrand?.expiresAt ?? null : null;
   return { name, hits, damagePercent, defenseIgnore, lifestealPercent, bloodRoarEmpowered, stanceEmpowered,
@@ -476,9 +485,9 @@ export function resolveLiveCombatAttack(battle: LiveCombatBattle, options: Attac
     tailwindEcho, tailwindChargeRecovered, hunterMark, hunterExplosion, frostfireAfterburst, meteorAfterburst, lightningSegments, volleyArrows, starbreakChargeRecovered, skyArrows, astralSegments, equipmentHits, currentHealthCostPercent, bloodRoarActivated };
 }
 
-export function resolveLiveEnemyAttack(
+function resolveLiveEnemyAttackInternal(
   battle: LiveCombatBattle, input: { healthPercent: number; maxHealth: number; damage: number;
-    baseDodgeChance?: number; defense?: number;
+    baseDodgeChance?: number; defense?: number; gemShieldBonus?:number; gemThorns?:number;
     equippedItems?: { mythicId?: string; legendaryId?: string; name?: string }[]; roll?: () => number },
 ): { damage: number; counterDamagePercent: number; blocked: boolean; dodged: boolean;
   equipmentDamage?: number;
@@ -545,11 +554,11 @@ export function resolveLiveEnemyAttack(
   const activation = tryActivateMageShield(combat, {
     currentHealth: input.maxHealth * input.healthPercent / 100,
     maxHealth: input.maxHealth,
-    ascended: battle.ascended.has("魔力護盾"),
+    ascended: battle.ascended.has("魔力護盾"), shieldBonusPercent:input.gemShieldBonus,
   });
   battle.combat = activation.combat;
   const shielded = recordMageIncomingAttack(battle.combat as MageCombat, [input.damage], {
-    maxHealth: input.maxHealth, roll: random,
+    maxHealth: input.maxHealth, roll: random, shieldBonusPercent:input.gemShieldBonus,
   });
   battle.combat = shielded.combat;
   return { damage: shielded.remainingDamage, counterDamagePercent: 0, blocked: false, dodged: false, unyielding: null,
@@ -557,4 +566,10 @@ export function resolveLiveEnemyAttack(
       ? input.maxHealth * balanceConfig.equipment.skillMythics.eternalCore.maxHealthBurstPercent / 100 : 0,
     manaShield: { activated: activation.activated, absorbed: shielded.absorbedDamage > 0,
       broke: shielded.shieldBroke, stacked: shielded.passiveShieldActivated } };
+}
+
+export function resolveLiveEnemyAttack(battle: LiveCombatBattle, input: Parameters<typeof resolveLiveEnemyAttackInternal>[1]) {
+ const result = resolveLiveEnemyAttackInternal(battle,input);
+ const effective = result.dodged || result.blocked ? 0 : battle.characterClass === "法師" ? input.damage : result.damage;
+ return {...result, reflectedDamage:Math.max(0,effective) * Math.min(100,Math.max(0,input.gemThorns??0))/100};
 }

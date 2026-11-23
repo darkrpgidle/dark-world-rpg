@@ -1,3 +1,4 @@
+import {applyGemAction,preserveGemSave,type GemAction} from "../../gem-save-policy";
 import { affectedRows } from "../../d1-write-result";
 import {damageEventStatement,deliverWorldBossMail,worldBossClaimStatements} from "../../world-boss-rewards";
 import {isDuplicateSaveSnapshot} from "../../save-sync-disposition";
@@ -106,7 +107,7 @@ function prepareAuthoritativePayload(
   // Only repair an inherited configuration already present in the canonical
   // old save. Newly submitted illegal ids/slots still fail validation.
   const inherited=serverSave?repairInheritedLoadout(next,serverSave):next;
-  const guarded = preserveServerResourceRevision(serverSave?preserveEquipmentSave(inherited,serverSave):inherited, serverSave);
+  const guarded = preserveServerResourceRevision(preserveGemSave(serverSave?preserveEquipmentSave(inherited,serverSave):inherited,serverSave), serverSave);
   if (!guarded) return null;
   const protectedSave = preserveServerSkillSave(preserveServerShopPurchases(preserveServerOnlineYuanbao(preserveServerDailyHuntClaim(guarded, serverSave), serverSave), serverSave), serverSave);
   if (!protectedSave || !serverSave) return null;
@@ -236,7 +237,8 @@ export async function POST(request: Request) {
     payload?: unknown;
     expectedUpdatedAt?: string | null;
     equipmentAction?: EquipmentAction;
-    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "shop_cosmetic" | "skill" | "equipment";
+    gemAction?: GemAction;
+    action?: "settle_idle" | "claim_idle" | "claim_daily" | "heartbeat_online" | "shop_reforge" | "shop_cosmetic" | "skill" | "equipment" | "gem";
     dailyDate?: string;
     dailyKills?: number;
     skillAction?: SkillSaveAction;
@@ -413,6 +415,25 @@ export async function POST(request: Request) {
       current = latest;
     }
     return jsonNoStore({ error: "claim_retry_required" }, 503);
+  }
+  if(body.action === "gem"){
+    if(!existing[0])return jsonNoStore({error:"save_not_found"},404);
+    let current=existing[0];
+    for(let attempt=0;attempt<4;attempt++){
+      const saved=JSON.parse(current.payload) as Record<string,unknown>;
+      const applied=applyGemAction(saved,body.gemAction!);
+      if(!applied)return jsonNoStore({error:"gem_action_rejected"},409);
+      if(!applied.accepted)return jsonNoStore({ok:true,accepted:false,summary:applied.summary,gemInventory:applied.save.gemInventory??[],gemPowder:applied.save.gemPowder??0,gemRevision:applied.save._gemRevision??0,items:applied.save.items,updatedAt:current.updatedAt});
+      const payload=JSON.stringify({...applied.save,_saveSessionId:sessionId});
+      if(payload.length>240000)return jsonNoStore({error:"save is too large"},413);
+      const updatedAt=nextUpdatedAt(current.updatedAt);
+      const changed=await db.update(gameSaves).set({payload,updatedAt}).where(and(eq(gameSaves.playerId,playerId),eq(gameSaves.updatedAt,current.updatedAt),writerCondition()));
+      if(affectedRows(changed)>0)return jsonNoStore({ok:true,accepted:true,summary:applied.summary,gemInventory:applied.save.gemInventory,gemPowder:applied.save.gemPowder,gemRevision:applied.save._gemRevision,items:applied.save.items,updatedAt});
+      if(await writerRevoked())return replacedResponse();
+      const [latest]=await db.select({accountId:gameSaves.accountId,payload:gameSaves.payload,updatedAt:gameSaves.updatedAt}).from(gameSaves).where(and(eq(gameSaves.playerId,playerId),eq(gameSaves.accountId,account.id))).limit(1);
+      if(!latest)return jsonNoStore({error:"save_not_found"},404);current=latest;
+    }
+    return jsonNoStore({error:"gem_retry_required"},503);
   }
   if(body.action === "equipment"){
     if(!existing[0])return jsonNoStore({error:"save_not_found"},404);

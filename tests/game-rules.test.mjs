@@ -63,33 +63,24 @@ test("drops map-gated gems and applies the documented fusion outcomes", () => {
     gemId: "redIron",
     tier: "beginner",
   });
-  const inventory = [{ gemId: "redIron", tier: "beginner", quantity: 3 }];
-  const success = fuseGem(inventory, "redIron", "beginner", () => 0);
-  assert.equal(success.success, true);
-  assert.deepEqual(success.inventory, [{ gemId: "redIron", tier: "intermediate", quantity: 1 }]);
-  const failure = fuseGem(inventory, "redIron", "beginner", () => 0.99);
-  assert.equal(failure.success, false);
-  assert.deepEqual(failure.inventory, [{ gemId: "redIron", tier: "beginner", quantity: 1 }]);
-  const mixedInventory = [
-    { gemId: "redIron", tier: "beginner", quantity: 1 },
-    { gemId: "azureGuard", tier: "beginner", quantity: 1 },
-    { gemId: "phantom", tier: "beginner", quantity: 1 },
-  ];
-  const mixedSuccess = fuseGemSelection(mixedInventory, mixedInventory, (() => { const rolls = [0, 0.6]; return () => rolls.shift() ?? 0; })());
-  assert.equal(mixedSuccess.success, true);
-  assert.deepEqual(mixedSuccess.inventory, [{ gemId: "azureGuard", tier: "intermediate", quantity: 1 }]);
-  const mixedFailure = fuseGemSelection(mixedInventory, mixedInventory, (() => { const rolls = [0.99, 0.9]; return () => rolls.shift() ?? 0; })());
-  assert.equal(mixedFailure.success, false);
-  assert.deepEqual(mixedFailure.inventory, [{ gemId: "phantom", tier: "beginner", quantity: 1 }]);
+  const inventory = [{gemId:"redIron",tier:"beginner",quantity:2}];
+  const success=fuseGem(inventory,"redIron","beginner",()=>0.99);
+  assert.equal(success.success,true);
+  assert.deepEqual(success.inventory,[{gemId:"redIron",tier:"intermediate",quantity:1}]);
+  const failure=fuseGem([{gemId:"redIron",tier:"lv5",quantity:2}],"redIron","lv5",()=>0.99);
+  assert.equal(failure.success,false);
+  assert.deepEqual(failure.inventory,[{gemId:"redIron",tier:"lv5",quantity:1}]);
+  assert.equal(fuseGemSelection([{gemId:"redIron",tier:"beginner",quantity:1},{gemId:"phantom",tier:"beginner",quantity:1}],
+    [{gemId:"redIron",tier:"beginner"},{gemId:"phantom",tier:"beginner"}],()=>0),null);
   assert.doesNotMatch(page, /裝備合成/);
   assert.doesNotMatch(page, /equipmentFusionGroups/);
   assert.doesNotMatch(page, /equipmentFusionSelection/);
   assert.doesNotMatch(page, /equipment-fusion-bag/);
-  assert.doesNotMatch(page, /寶石工坊/);
+  assert.doesNotMatch(page, /自動混合/);
   assert.match(page, /tab === "寶石"/);
-  assert.match(page, /寶石系統/);
+  assert.match(page, /<GemPanel/);
   assert.match(css, /\.gem-magic-circle/);
-  assert.match(page, /自動放入同名 ×3/);
+  assert.doesNotMatch(page, /自動放入同名 ×3/);
   assert.match(page, /裝備鑲嵌/);
 });
 
@@ -191,7 +182,7 @@ test("publishes the nine-region power guidance", () => {
 
 test("each unlocked map runs its own thirty-floor loop", () => {
   assert.equal(balanceConfig.progression.mapFloors, 30);
-  assert.match(page, /const \[unlockedMapId, setUnlockedMapId\]/);
+  assert.match(page, /const \[normalUnlockedMapId, setNormalUnlockedMapId\]/);
   assert.match(page, /setUnlockedMapId\(\(value\) =>/);
   assert.match(page, /enterMap\(map\.id\)/);
   assert.match(page, /10\/20F 守關 · 30F 首領/);
@@ -356,8 +347,8 @@ test("server checkpoints use canonical saves and the GM view refreshes automatic
 });
 
 test("cloud saves cannot be starved by continuous combat and keep bubble progress", () => {
-  assert.match(page, /const SAVE_DEBOUNCE_MS = 1_400/);
-  assert.match(page, /const SAVE_MAX_INTERVAL_MS = 20_000/);
+  assert.match(page, /const SAVE_DEBOUNCE_MS = 5_000/);
+  assert.match(page, /const SAVE_MAX_INTERVAL_MS = 30_000/);
   assert.match(page, /const lastSaveStartedAtRef = useRef\(0\)/);
   assert.match(page, /const saveCadenceStartedAtRef = useRef\(0\)/);
   assert.match(page, /Math\.min\(SAVE_DEBOUNCE_MS, maxWait\)/);
@@ -378,10 +369,11 @@ test("derives combat power from actual stats and enhancement", () => {
     Array.from({ length: 16 }, (_, level) => enhancementBonusPercent(level)),
     [0, 3, 6, 9, 12, 17, 22, 27, 32, 37, 47, 57, 67, 77, 87, 97],
   );
-  assert.match(page, /for \(const stat of equipmentBaseStats\(item\)\)/);
+  assert.match(page, /const current = calculateCharacterStats\(playerClass, level, gear, statSkills\)/);
   assert.doesNotMatch(page, /power: it\.power \+ 24/);
-  assert.match(page, /實際戰力/);
-  assert.match(page, /裝備評級/);
+  assert.match(page, /const currentItemPowerDifference = currentItem \? powerDifferenceForItem\(currentItem\) : 0/);
+  assert.match(page, /綜合戰力 \{currentItemPowerDifference >= 0 \? "\+" : ""\}/);
+  assert.doesNotMatch(page, /裝備評級/);
   assert.doesNotMatch(page, /current\.resourceDrop \* 4/);
   assert.doesNotMatch(page, /current\.yuanbaoDrop \* 12/);
   assert.equal(balanceConfig.combat.tierDefense.boss, 1.62);
@@ -732,7 +724,7 @@ test("allows mythic equipment to roll five affixes", () => {
 
 test("implements the confirmed rebirth reset and permanent growth rules", () => {
   assert.match(page, /MAX_REBIRTHS, REBIRTH_REWARD_PER_TURN, clampRebirthCount/);
-  assert.match(page, /const canRebirth = level >= 100 && \(mapBestFloors\[9\] \?\? 0\) >= MAP_FLOORS/);
+  assert.match(page, /const canRebirth = level >= 100 && \(normalMapBestFloors\[9\] \?\? 0\) >= MAP_FLOORS/);
   assert.match(page, /setRebirthPoints\(\(value\) => value \+ REBIRTH_REWARD_PER_TURN\.talentPoints\)/);
   assert.match(page, /setItems\(\[\]\)/);
   assert.match(page, /setLoadouts\(\{ 1: \[\], 2: \[\] \}\)/);
@@ -838,7 +830,9 @@ test("stops tower combat on the lethal frame", () => {
   assert.match(page, /if \(towerDeathPendingRef\.current\) return/);
   assert.ok((page.match(/towerDeathPendingRef\.current = true/g) ?? []).length >= 2);
   assert.equal((page.match(/setBattleOn\(false\);\s*setCausePrompt\("生命歸零 → 戰鬥已停止"\)/g) ?? []).length, 2);
-  assert.equal((page.match(/finishRun\("death", wave\), 0/g) ?? []).length, 2);
+  // Death still stops on this tick and submits at delay 0; real-mode callbacks
+  // additionally verify encounter ownership before submitting the summary.
+  assert.equal((page.match(/window\.setTimeout\(\(\) => \{[^}]*finishRun\("death", wave\);[^}]*\}, 0\)/g) ?? []).length, 2);
   assert.doesNotMatch(page, /finishRun\("death", wave\), 120/);
   assert.match(page, /if \(savedPlayerHp <= 0\)/);
   assert.equal((page.match(/settleCombatHealth\(playerHealth, characterStats\.hp, monsterDamage\)/g) ?? []).length, 2);
@@ -895,7 +889,7 @@ test("keeps dodge as an uncapped rating and applies map accuracy", () => {
   assert.match(page, /Math\.max\(0, characterStats\.dodge\) \* evasionRules\.statToRating/);
   assert.match(affixSource, /ratingQualityBands\[name\]/);
   assert.doesNotMatch(page, /DODGE_CAP|dodgeCap/);
-  assert.match(page, /monsterRatingsForMap\(mapId\)/);
+  assert.match(page, /monsterRatingsForMap\(realMode\?9:mapId\)/);
   assert.ok(hitChanceFromRatings(141, monsterRatingsForMap(9).evasion) < hitChanceFromRatings(141, 226));
   assert.ok(hitChanceFromRatings(175, monsterRatingsForMap(9).evasion) > hitChanceFromRatings(141, monsterRatingsForMap(9).evasion));
   assert.ok(evadeChanceFromRatings(monsterRatingsForMap(9).accuracy, 260) > evadeChanceFromRatings(240, 260));
@@ -965,7 +959,7 @@ test("defines distinct monster combat profiles", () => {
   );
   assert.match(balanceConfigSource, /monsterProfiles: \{/);
   assert.match(balanceConfigSource, /腐骨鼠: \{ health: 0\.72, attack: 0\.68, defense: 0\.62, speed: 1\.28 \}/);
-  assert.match(balanceSource, /monsterAttackSpeed: profile\.speed \* 100/);
+  assert.match(balanceSource, /monsterAttackSpeed: originalProfile\.speed \* 100/);
   assert.match(profileBlock, /const currentEnemyBaseName = baseMonsterName\(enemyName\)/);
 });
 

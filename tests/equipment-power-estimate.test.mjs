@@ -100,13 +100,16 @@ test('previously negative axe, hunter eye and shield core replacements now inclu
 });
 
 
-test('actual bag power sorting follows replacement gains even when standalone ratings disagree',()=>{
+test('actual bag power sorting follows the same replacement gain shown in equipment details',()=>{
  const page=readFileSync(new URL('../app/page.tsx',import.meta.url),'utf8');
  const start=page.indexOf('const visibleBagItems ='),end=page.indexOf('// 批次分解後',start);
- const fn=Function('bagItems','bagCategory','bagSort','defensiveSlots','accessorySlots','unseenItemIds','qualityOrder','items','powerDifferenceForItem','equipmentDisplayRating',stripTypeScriptTypes(page.slice(start,end))+';return visibleBagItems;');
+ const fn=Function('bagItems','bagCategory','bagSort','defensiveSlots','accessorySlots','unseenItemIds','qualityOrder','items','powerDifferenceForItem',stripTypeScriptTypes(page.slice(start,end))+';return visibleBagItems;');
  const gear=[{id:1,slot:'武器'},{id:2,slot:'武器'}];
- const sorted=fn(gear,'全部','戰力',new Set(),new Set(),[],[],gear,g=>g.id===1?-100:100,g=>g.id===1?9999:1);
+ const sorted=fn(gear,'全部','戰力',new Set(),new Set(),[],[],gear,g=>g.id===1?-100:100);
  assert.deepEqual(sorted.map(g=>g.id),[2,1]);
+ assert.doesNotMatch(page,/equipmentDisplayRating|equipmentCombatRating|裝備評級/);
+ assert.match(page,/\{equipped\.includes\(currentItem\.id\) \? "卸下後" : "穿上後"\}/);
+ assert.match(page,/powerDifference=\{powerDifferenceForItem\(lootInspect\.item\)\}/);
 });
 
 

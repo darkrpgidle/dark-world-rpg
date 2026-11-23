@@ -14,7 +14,7 @@ const maxInterval=Number(page.match(/const SAVE_MAX_INTERVAL_MS = ([\d_]+)/)[1].
 function fixture(){
  let now=1000, timerId=0;const timers=new Map(),storage=new Map(),requests=[];
  const statuses=[],battles=[],reloads=[];
- const env={worldBossMailDeliveryId:'delivery-test',saveReady:true,playerId:'test-player',sessionSuperseded:false,adminOpen:false,
+ const env={normalWave:1,normalMapId:1,normalUnlockedMapId:1,normalMapBestFloors:{1:1},realProgress:{version:1,unlocked:false,acknowledged:false,mode:'normal',mapId:1,wave:1,unlockedMapId:1,bestFloors:{1:0},completedRuns:0},worldBossMailDeliveryId:'delivery-test',saveReady:true,playerId:'test-player',sessionSuperseded:false,adminOpen:false,
   skillActionBusy:false,offlineClaimPending:false,equipmentBusy:false,
   activeBossBattle:null,enemyHp:100,playerHp:100,battleOn:true,
   SAVE_DEBOUNCE_MS:debounce,SAVE_MAX_INTERVAL_MS:maxInterval,
@@ -33,10 +33,10 @@ function fixture(){
  // Supply the page's payload state, while preserving the explicit controls above.
  const payload=effect.slice(effect.indexOf('const payload = {'),effect.indexOf('saveJsonWithTimeout("/api/save"'));
  for(const match of payload.matchAll(/^        (\w+),$/gm))if(!(match[1] in env))env[match[1]]=0;
- for(const name of ['saveInFlight','saveQueued','prioritySave','offlineClaimPending','skillActionInFlight','equipmentBusy','equipmentPending','towerDeathPending','integrityRecoveryUsed'])env[`${name}Ref`]={current:false};
+ for(const name of ['saveInFlight','saveQueued','prioritySave','offlineClaimPending','skillActionInFlight','equipmentBusy','equipmentPending','gemPending','towerDeathPending','integrityRecoveryUsed'])env[`${name}Ref`]={current:false};
  for(const name of ['lastSaveStartedAt','saveSequence','saveRetryAfter','saveFailureCount'])env[`${name}Ref`]={current:0};
  for(const name of ['saveRequestId','saveClientId','lastIdleClaimId'])env[`${name}Ref`]={current:null};
- env.idleStorageClockRef={current:{epoch:0}};
+ env.idleStorageClockRef={current:{epoch:0}};env.lastSavedGemInventoryRef={current:[]};env.gemPowder=0;env.gemRevision=0;env.gemInventory=[];
  env.AbortController=AbortController;
  env.Math=Object.assign(Object.create(Math),{random:()=>0.5});
  vm.createContext(env);
@@ -60,7 +60,7 @@ test('unanswered autosave times out, releases the guard and schedules a bounded 
  assert.equal(f.env.saveRetryTick,1);
  assert.equal(f.statuses.at(-1),'等待連線');
  assert.equal(f.requests[0].options.signal.aborted,true);
- f.render();await f.advance(1400);assert.equal(f.requests.length,2);
+ f.render();await f.advance(debounce);assert.equal(f.requests.length,2);
  await f.success(1);await f.success(0);
  assert.equal(f.env.saveInFlightRef.current,false);
  assert.equal(f.battles.length,0);assert.equal(f.reloads.length,0);
@@ -68,7 +68,7 @@ test('unanswered autosave times out, releases the guard and schedules a bounded 
 
 test('when service answers again, 100 queued changes collapse to one latest snapshot and stop retrying',async()=>{
  const f=fixture();f.render();await f.advance(debounce);
- for(let i=1;i<=100;i++){f.env.gold=i;f.env.wave=i;f.render();}
+ for(let i=1;i<=100;i++){f.env.gold=i;f.env.wave=i;f.env.normalWave=i;f.render();}
  assert.equal(f.requests.length,1);
  await f.advance(10000);await f.success();
  assert.equal(f.env.saveInFlightRef.current,false);assert.equal(f.env.saveRetryTick,1);
@@ -105,7 +105,7 @@ test('headers arrive but JSON body stalls: deadline releases the lock and a late
  assert.equal(f.env.saveInFlightRef.current,false);assert.equal(f.statuses.at(-1),'等待連線');
  completeBody({ok:true,accepted:false,save:{gold:0}});await f.flush();
  assert.equal(f.reloads.length,0);assert.equal(f.battles.length,0);assert.equal(f.statuses.at(-1),'等待連線');
- f.render();await f.advance(1400);await f.success(1);assert.equal(f.statuses.at(-1),'雲端已同步');
+ f.render();await f.advance(debounce);await f.success(1);assert.equal(f.statuses.at(-1),'雲端已同步');
 });
 
 test('repeated failures back off and never allow multiple logical saves in flight',async()=>{
@@ -113,9 +113,39 @@ test('repeated failures back off and never allow multiple logical saves in fligh
  for(let n=0;n<7;n++){
   f.requests[n].reject(new TypeError('offline'));await f.flush();
   const pause=Math.min(30000,1000*2**Math.min(5,n));
-  f.render();await f.advance(Math.max(1400,pause)-1);assert.equal(f.requests.length,n+1);
+  f.render();await f.advance(Math.max(debounce,pause)-1);assert.equal(f.requests.length,n+1);
   await f.advance(1);assert.equal(f.requests.length,n+2);
   assert.equal(f.env.saveInFlightRef.current,true);
  }
  await f.success(7);assert.equal(f.env.saveFailureCountRef.current,0);assert.equal(f.env.saveRetryAfterRef.current,0);
+});
+
+test('real-world autosave retains ordinary position alongside the independent real snapshot',async()=>{
+ const f=fixture();f.env.normalMapId=9;f.env.normalWave=17;f.env.normalUnlockedMapId=9;f.env.normalMapBestFloors={9:30};f.env.mapId=2;f.env.wave=3;
+ f.env.realProgress={...f.env.realProgress,unlocked:true,acknowledged:true,mode:'real',mapId:2,wave:3,unlockedMapId:2,bestFloors:{1:30,2:3}};
+ f.render();await f.advance(debounce);assert.equal(f.requests.length,1);const saved=JSON.parse(f.requests[0].options.body).save;
+ assert.equal(saved.mapId,9);assert.equal(saved.wave,17);assert.equal(saved.realMode.mapId,2);assert.equal(saved.realMode.wave,3);assert.equal(saved.realMode.mode,'real');
+});
+
+test('ordinary changes wait five quiet seconds and continuous changes save by thirty seconds',async()=>{
+ assert.equal(debounce,5000);assert.equal(maxInterval,30000);
+ const f=fixture();let cleanup=f.render();
+ await f.advance(debounce-1);assert.equal(f.requests.length,0);
+ await f.advance(1);await f.success();
+ for(let second=1;second<=30;second++){
+  cleanup?.();f.env.gold=second;cleanup=f.render();await f.advance(1000);
+  assert.equal(f.requests.length,second===30?2:1);
+ }
+ assert.equal(JSON.parse(f.requests[1].options.body).save.gold,30);
+ await f.success(1);
+});
+
+test('priority saves still bypass debounce; equipment operations keep snapshots paused',async()=>{
+ const f=fixture();f.env.equipmentBusy=true;f.env.equipmentBusyRef.current=true;
+ f.env.prioritySaveRef.current=true;f.render();await f.advance(maxInterval);
+ assert.equal(f.requests.length,0);
+ f.env.equipmentBusy=false;f.env.equipmentBusyRef.current=false;f.render();await f.advance(0);
+ assert.equal(f.requests.length,1);await f.success();
+ f.env.prioritySaveRef.current=true;f.env.equipmentPendingRef.current={id:'unconfirmed'};
+ f.render();await f.advance(maxInterval);assert.equal(f.requests.length,1);
 });

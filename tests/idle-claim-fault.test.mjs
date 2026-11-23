@@ -132,10 +132,10 @@ test('actual browser claim handler retries a lost committed response and 32 simu
   const begin = page.indexOf('const claimOfflineReport = async () => {');
   const finish = page.indexOf('const enhance =', begin);
   assert.ok(begin >= 0 && finish > begin);
-  const stats = { fetches: 0, gold: 0, stones: 0, experienceGrants: 0, successfulReports: 0 };
+  const stats = { fetches: 0, gold: 0, stones: 0, experienceGrants: 0, experience: 0, successfulReports: 0 };
   const noop = () => {};
   const context = {
-    offlineClaimPendingRef: { current: false }, equipmentBusyRef: { current: false }, equipmentPendingRef: { current: false },
+    gemActionBusyRef: { current: false },gemPendingRef: { current: null },offlineClaimPendingRef: { current: false }, equipmentBusyRef: { current: false }, equipmentPendingRef: { current: false },
     pendingIdleClaimIdRef: { current: null }, saveInFlightRef: { current: false }, lastIdleClaimIdRef: { current: null },
     storedSeconds: 3600, saveUpdatedAt: new Date(at).toISOString(), loginId: 'login-1', playerId: 'player',
     crypto: { randomUUID: () => id }, loginHeaders: () => ({}),
@@ -147,10 +147,10 @@ test('actual browser claim handler retries a lost committed response and 32 simu
     },
     window: { setTimeout: resolve => setTimeout(resolve, 0) },
     characterStats: { goldBonus: 0, expBonus: 0 }, offlineSetMultiplier: 1,
-    currentMap: { exp: [10, 10] }, EXPERIENCE_MULTIPLIER: 1, newcomerExperienceFactor: () => 1,
+    currentMap: { exp: [999, 999] }, offlineMap: { exp: [10, 10] }, normalMapId: 1, EXPERIENCE_MULTIPLIER: 1, newcomerExperienceFactor: () => 1,
     mapId: 1, level: 1, Math: Object.assign(Object.create(Math), { random: () => 1 }),
     rollGemDrop: () => null, rollDrillingStoneDrop: () => false,
-    grantExperience: () => stats.experienceGrants++,
+    grantExperience: amount => { stats.experienceGrants++; stats.experience += amount; },
     setGold: update => { stats.gold = update(stats.gold); },
     setEnhanceStones: update => { stats.stones = update(stats.stones); },
     setOfflineClaimPending: noop, resetStoredTime: noop, setSaveUpdatedAt: noop, setSaveStatus: noop,
@@ -165,6 +165,7 @@ test('actual browser claim handler retries a lost committed response and 32 simu
   assert.equal(stats.gold, 920);
   assert.equal(stats.stones, 6);
   assert.equal(stats.experienceGrants, 1);
+  assert.equal(stats.experience, 3000, "offline rewards use the saved ordinary map even while a real map is active");
   assert.equal(stats.successfulReports, 1);
   assert.equal(context.pendingIdleClaimIdRef.current, null);
   assert.equal(context.offlineClaimPendingRef.current, false);

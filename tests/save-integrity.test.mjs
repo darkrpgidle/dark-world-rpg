@@ -196,3 +196,29 @@ test('new scene drops with boosted flat health and defense pass the same server 
   rejected({...next,items:[{...g,affixes:[`${name} +99999999`]}]},'forged_affix_value',previous);
  }
 });
+
+
+test('real mode saves independent progress without changing ordinary gates or allowing unearned entry',()=>{
+ const previous={...baseline(),mapId:9,unlockedMapId:9,wave:17,mapBestFloors:{9:30},finalBossDefeated:true};
+ const realm={version:1,unlocked:true,acknowledged:true,mode:'real',mapId:1,wave:2,unlockedMapId:1,bestFloors:{1:2},completedRuns:0};
+ const saved=check({...previous,realMode:realm,dailyKills:1},previous);
+ assert.equal(saved.mapId,9);assert.equal(saved.wave,17);assert.equal(saved.realMode.wave,2);assert.equal(saved.realMode.mode,'real');
+ const legacy={...saved};delete legacy.realMode;const restored=check(legacy,saved);assert.equal(restored.realMode.mode,'normal');assert.equal(restored.realMode.bestFloors[1],2);
+ rejected({...baseline(),realMode:realm},'unearned_real_mode');
+ rejected({...previous,realMode:{...realm,unlockedMapId:4,mapId:4}},'real_map_unlock_jump',previous);
+});
+test('earned real access carries endgame drops across world switches while unearned accounts retain their equipment gate',()=>{
+ const realm={version:1,unlocked:true,acknowledged:true,mode:'real',mapId:1,wave:1,unlockedMapId:1,bestFloors:{1:0},completedRuns:0};
+ const previous={...baseline(),realMode:realm};const endgame={...item(),mapId:9,power:dropPowerRange(9,0).minimum,name:'時墟武器'};
+ assert.equal(check({...previous,items:[endgame],dailyKills:1},previous).items[0].mapId,9);
+ assert.equal(check({...previous,realMode:{...realm,mode:'normal'},items:[endgame],dailyKills:1},previous).items[0].mapId,9);
+ rejected({...baseline(),items:[endgame]},'forged_new_equipment');
+});
+
+test('generic snapshots cannot invent level four gems even within the ordinary drop credit budget',()=>{
+ const previous=baseline();
+ assert.throws(()=>check({...previous,gemInventory:[{gemId:'redIron',tier:'lv4',quantity:1}]},previous,1000),e=>e.reason==='unissued_gem_upgrade');
+ const issued={...previous,gemInventory:[{gemId:'redIron',tier:'lv4',quantity:1}]};
+ assert.equal(check(issued,issued,1000).gemInventory[0].tier,'lv4');
+ assert.throws(()=>check({...issued,gemInventory:[{gemId:'rift',tier:'lv4',quantity:1}]},issued,1000),e=>e.reason==='unissued_gem_upgrade');
+});

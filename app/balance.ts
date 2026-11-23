@@ -1,4 +1,5 @@
 import { balanceConfig } from "./balance-config";
+import {realModeScale} from "./real-mode-progress";
 import { armorThreshold, armorMitigation, monsterArmorRating, additiveDamageMultiplier } from "./combat-math";
 
 export type CombatTier = "normal" | "elite" | "guardian" | "boss";
@@ -249,6 +250,7 @@ export function towerCombatValues({
   firstChapterTuning = true,
   secondChapterTuning = false,
   calibrateMonsterStats = true,
+  realModeChapter = 0,
 }: {
   combatPower: number;
   recommendedPower: number;
@@ -278,15 +280,20 @@ export function towerCombatValues({
   firstChapterTuning?: boolean;
   secondChapterTuning?: boolean;
   calibrateMonsterStats?: boolean;
+  realModeChapter?: number;
 }) {
+  const real = realModeChapter > 0 ? realModeScale(realModeChapter, localFloor, tier) : null;
+  const enemyTier = real ? "boss" : tier;
   const originalProfile = monsterProfile(monsterName);
+  if(real){mapId=9;localFloor=30;recommendedPower=Math.round(balanceConfig.maps[8].bossPower*real.power);firstChapterTuning=false;secondChapterTuning=false;}
+  const enemyProfile = real ? monsterProfile("時墟主宰") : originalProfile;
   const chapter = balanceConfig.firstChapter;
   const useChapter = mapId === 1 && firstChapterTuning;
   const profile = useChapter ? {
     ...originalProfile,
     attack: 1 + (originalProfile.attack - 1) * chapter.profileVariation,
     defense: 1 + (originalProfile.defense - 1) * chapter.profileVariation,
-  } : originalProfile;
+  } : enemyProfile;
   const combatRecommendedPower = mapId === 2 && secondChapterTuning
     ? secondChapterOriginalCombatPower(localFloor) : recommendedPower;
   const suppression = realmSuppression(combatPower, combatRecommendedPower);
@@ -297,17 +304,17 @@ export function towerCombatValues({
       : tier === "guardian" && localFloor === 10
         ? balanceConfig.combat.guardianCheckpoints.floor10
         : { defense: 1, attack: 1 };
-  const calibrationTier = tier === "guardian" && localFloor === 10 ? "guardian10" : tier;
+  const calibrationTier = real ? "boss" : tier === "guardian" && localFloor === 10 ? "guardian10" : tier;
   const calibration = (calibrateMonsterStats
     ? balanceConfig.combat.monsterCalibrationByMap[mapId - 1]?.[calibrationTier] : undefined)
     ?? { attack: 1, defense: 1 };
-  const checkpointDefense = useChapter ? 1 : checkpoint.defense;
+  const checkpointDefense = real || useChapter ? 1 : checkpoint.defense;
   const tierDefense =
-    (useChapter ? chapter.tierDefense[tier] * chapter.defenseScale : balanceConfig.combat.tierDefense[tier]) *
+    (useChapter ? chapter.tierDefense[tier] * chapter.defenseScale : balanceConfig.combat.tierDefense[enemyTier]) *
     checkpointDefense *
     lateGameScale.defense *
     profile.defense *
-    suppression.defenseMultiplier * calibration.defense;
+    suppression.defenseMultiplier * calibration.defense * (real?.defense ?? 1);
   const mapDamageReduction =
     balanceConfig.combat.monsterDamageReductionByMap[mapId] ?? 0;
   const defenseThreshold = armorThreshold(mapId, localFloor);
@@ -344,29 +351,29 @@ export function towerCombatValues({
     ),
     );
   const tierAttack =
-    (useChapter ? chapter.tierAttack[tier] * chapter.attackScale : balanceConfig.combat.tierAttack[tier]) *
-    (useChapter ? 1 : checkpoint.attack) *
+    (useChapter ? chapter.tierAttack[tier] * chapter.attackScale : balanceConfig.combat.tierAttack[enemyTier]) *
+    (real || useChapter ? 1 : checkpoint.attack) *
     lateGameScale.attack *
     (!useChapter && localFloor % 10 === 0
       ? 1 - balanceConfig.combat.monsterDamage.milestoneAttackReduction
       : 1);
   const ordinaryPressure =
-    tier === "normal" ? balanceConfig.combat.monsterDamage.normalPressure : 1;
+    enemyTier === "normal" ? balanceConfig.combat.monsterDamage.normalPressure : 1;
   const monsterAttack =
     (monsterStats.baseAttack +
       Math.max(0, localFloor - 1) * monsterStats.floorAttackGrowth +
       Math.max(0, mapId - 1) * monsterStats.mapAttackGrowth) *
     tierAttack *
     ordinaryPressure *
-    profile.attack;
+    profile.attack * (real?.attack ?? 1);
   const monsterAttackScale =
-    tier === "normal" ? monsterStats.normalAttackScale : monsterStats.attackScale;
+    enemyTier === "normal" ? monsterStats.normalAttackScale : monsterStats.attackScale;
   const progressionDamageFloor =
     combatRecommendedPower *
     monsterStats.recommendedPowerAttackScale *
     tierAttack *
     ordinaryPressure *
-    profile.attack;
+    profile.attack * (real?.attack ?? 1);
   const monsterDamage = Math.max(
     balanceConfig.combat.monsterDamage.minimum,
     Math.round(
@@ -380,7 +387,7 @@ export function towerCombatValues({
   return {
     playerDamage,
     monsterDamage,
-    monsterAttackSpeed: profile.speed * 100,
+    monsterAttackSpeed: originalProfile.speed * 100,
     monsterProfile: profile,
     monsterAttack,
     progressionDamageFloor,

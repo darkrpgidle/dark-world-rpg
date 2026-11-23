@@ -1996,7 +1996,7 @@ body {
   color: #d3d9d5;
   padding: 8px;
 }
-.bag-power-delta { position: absolute; left: 4px; bottom: 3px; font-size: 9px; }
+.bag-power-delta { position: absolute; left: 4px; bottom: 3px; font-size: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 1px 3px #000; }
 .bag-power-delta.gain { color: #64c98c; }
 .bag-power-delta.loss { color: #d66a6a; }
 .mobile-detail-close,
@@ -6617,3 +6617,34 @@ body {
 }
 .titan-ultimate-slash { z-index: 4; }
 .titan-ultimate-wound { z-index: 5; }
+
+/* Real-world chapters preserve the shared stage and portrait geometry. */
+.game-shell.real-mode-world{--accent:#b38ad5;--gold:#b9a0d2;background-color:#0f0c17}
+.real-mode-world .game-header,.real-mode-world .hero-panel{border-color:#604673}
+.world-mode-switch{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;justify-content:flex-end}
+.world-mode-switch button{min-height:44px;padding:8px 18px;border:1px solid #66526e;border-radius:6px;background:#15111c;color:#cbbbd1;cursor:pointer;touch-action:manipulation}
+.world-mode-switch button.active{background:#4b315b;color:#fff;border-color:#b18acc}
+.world-mode-switch span{font-size:12px;color:#a698ae}
+.real-monster-stage .monster-sprite-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:11}
+.real-monster-stage .monster-curse-dim{position:absolute;inset:0;z-index:9;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,#140d20,#030107)}
+.real-monster-stage .monster-screen-impact{position:absolute;inset:0;pointer-events:none;z-index:10;opacity:0}
+.real-vfx-loading{position:absolute;left:8px;bottom:4px;z-index:25;max-width:90%;font-size:10px;color:#bdaac7;pointer-events:none}
+.real-monster-statuses{position:absolute;left:8px;right:8px;bottom:6px;z-index:24;display:flex;gap:4px;flex-wrap:wrap;justify-content:center;pointer-events:none}
+.real-monster-statuses span{font-size:10px;color:#ddcbe5;background:#211328db;border:1px solid #674b71;border-radius:3px;padding:2px 5px}
+.battle-monster.monster-ghost-flipped{transform:scaleX(-1)}
+.real-unlock-backdrop{position:fixed;inset:0;z-index:2500;background:#08060de8;display:grid;place-items:center;padding:18px}
+.real-unlock-dialog{max-width:480px;background:linear-gradient(145deg,#26182e,#100d15);border:1px solid #8b669e;padding:30px;border-radius:12px;box-shadow:0 20px 90px #000;color:#e8ddea}
+.real-unlock-dialog small{font-size:10px;letter-spacing:3px;color:#b58bc8}.real-unlock-dialog h2{font-size:27px;margin:12px 0 18px}.real-unlock-dialog p{line-height:1.9;font-size:14px;color:#c2b3c9}
+.real-unlock-dialog button{min-height:44px;padding:10px 18px;border:1px solid #916aa6;background:#573465;color:#fff;border-radius:5px;cursor:pointer;margin:16px 8px 0 0}.real-unlock-dialog button+button{background:transparent}
+@media(prefers-reduced-motion:reduce){.real-monster-stage .fighter-frame{animation:none!important;transition:none!important}}
+
+.real-monster-stage .monster-charge-dim{position:absolute;inset:0;z-index:9;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,#091b16,#010705)}
+.real-monster-stage .monster-maw-dim{position:absolute;inset:0;z-index:9;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 30% 50%,#18201988,#020504 78%)}
+
+.real-mode-world .hero-panel{background:linear-gradient(135deg,#201527,#101017)}
+.real-mode-world .map-card{border-color:#554161;background-color:#16121d}
+
+.real-map-loading{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:24px;background:#09070ff7;color:#e8ddea}
+.real-map-loading section{width:min(460px,100%);text-align:center;padding:30px 20px;border:1px solid #664d79;border-radius:12px;background:linear-gradient(145deg,#24172e,#100d16)}
+.real-map-loading small{font-size:10px;letter-spacing:2px;color:#bd95d3}.real-map-loading h2{font-size:22px;margin:20px 0}.real-map-loading p{font-size:14px;line-height:1.8;color:#c2b3c9}
+.real-map-loading progress{display:block;width:100%;height:10px;margin:24px 0 10px;accent-color:#b07ada}.real-map-loading span{font-size:12px;color:#cfb8df}.real-map-loading button{min-height:44px;margin:24px 6px 0;padding:10px 20px;border:1px solid #916aa6;background:#573465;color:#fff;border-radius:5px;cursor:pointer}

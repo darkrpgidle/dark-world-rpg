@@ -21,7 +21,7 @@ export function createMageShieldState(): MageShieldState {
 
 export function tryActivateMageShield(
   combat: MageCombat,
-  input: { currentHealth: number; maxHealth: number; ascended: boolean },
+  input: { currentHealth: number; maxHealth: number; ascended: boolean; shieldBonusPercent?:number },
 ): { combat: MageCombat; activated: boolean; effectiveMaxHealth: number; initialShieldValue: number } {
   if (!Number.isFinite(input.maxHealth) || input.maxHealth <= 0
     || !Number.isFinite(input.currentHealth) || input.currentHealth < 0) {
@@ -38,7 +38,8 @@ export function tryActivateMageShield(
 
   const initialShieldValue = effectiveMaxHealth
     * (mageSkillRankValue(MAGE_ACTIVE_RULES.魔力護盾.maxHealthShieldPercent, rank) / 100)
-    * (1 + magePassiveStats(combat.build).initialShieldBonusPercent / 100);
+    * (1 + magePassiveStats(combat.build).initialShieldBonusPercent / 100)
+    * (1 + Math.max(0,input.shieldBonusPercent??0)/100);
   if (!Number.isFinite(initialShieldValue)) throw new RangeError("Initial mage shield overflow");
   const shield: MageShieldState = {
     value: combat.shield.value + initialShieldValue, initialValue: combat.shield.initialValue + initialShieldValue,
@@ -65,7 +66,7 @@ export function consumeMageShieldActiveCast(
 
 export function recordMageIncomingAttack(
   combat: MageCombat, damageSegments: readonly number[],
-  passiveShield?: { maxHealth: number; roll: () => number },
+  passiveShield?: { maxHealth: number; roll: () => number; shieldBonusPercent?:number },
 ): {
   combat: MageCombat; absorbedDamage: number; remainingDamage: number;
   shieldBroke: boolean; ultimateEnergyGranted: number; passiveShieldActivated: boolean;
@@ -100,7 +101,8 @@ export function recordMageIncomingAttack(
     if (!Number.isFinite(roll) || roll < 0 || roll >= 1) throw new RangeError("Passive mage shield roll must be in [0, 1)");
     const stats = magePassiveStats(combat.build);
     if (roll * 100 < stats.incomingShieldChancePercent) {
-      const shieldValue = passiveShield.maxHealth * stats.incomingShieldMaxHealthPercent / 100 * (1 + stats.initialShieldBonusPercent / 100);
+      const shieldValue = passiveShield.maxHealth * stats.incomingShieldMaxHealthPercent / 100 * (1 + stats.initialShieldBonusPercent / 100)
+    * (1 + Math.max(0,passiveShield.shieldBonusPercent??0)/100);
       if (!Number.isFinite(shieldValue)) throw new RangeError("Passive mage shield overflow");
       shield = { ...shield, value: shield.value + shieldValue, initialValue: shield.initialValue + shieldValue };
       passiveShieldActivated = true;

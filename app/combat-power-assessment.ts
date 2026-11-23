@@ -10,6 +10,7 @@ import { SKY_RAIN_DURATION_MS } from "./sky-queen-rain-timing";
 import { ASTRAL_TIMING } from "./astral-annihilation-frames";
 
 export type AssessmentStats = {
+  gemBasicDamage?:number;gemDotDamage?:number;gemShieldBonus?:number;gemThorns?:number;
   hp: number; attack: number; defense: number; speed: number; hit: number; dodge: number;
   crit: number; critDamage: number; lifesteal: number; bossDamage: number;
   damageReduction: number; bossReduction: number; skillDamage: number;

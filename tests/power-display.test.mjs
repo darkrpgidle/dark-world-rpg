@@ -27,7 +27,7 @@ test('all score surfaces use common formatting but raw sorting, map comparison a
  assert.match(page,/label: "綜合戰力", value: formatAssessedPower\(assessedCombatPower\)/);
  assert.match(page,/formatAssessedPower\(recommendedPower\[0\]\)/);
  assert.match(page,/formatAssessedPower\(recommendedPower\[1\]\)/);
- assert.match(page,/formatAssessedPower\(powerDifferenceForItem\(currentItem\)\)/);
+ assert.match(page,/formatAssessedPower\(currentItemPowerDifference\)/);
  assert.match(page,/formatAssessedPower\(r.power\)/);
  assert.match(page,/formatAssessedPower\(selectedRank.power\)/);
  assert.match(page,/formatAssessedPower\(combatPower\)/);

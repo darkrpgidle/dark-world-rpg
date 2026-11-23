@@ -74,8 +74,8 @@ test('entering and leaving a boss while a tower kill is pending clears the actua
  values.towerDeathPendingRef.current=true;values.ultimateAnimationLockRef.current=42;
  values.ultimatePlaybackGuardRef.current=new CombatPlaybackGuard();values.ultimatePlaybackGuardRef.current.begin(42,1000);
  values.skyRainKeyRef.current=null;
- new Function(...names,"emptyElementSigilVisual","emptyManaShieldVisual","emptyOverloadVisual",compile(reset))
-   (...names.map(name=>values[name]),emptyElementSigilVisual,emptyManaShieldVisual,emptyOverloadVisual)();
+ new Function(...names,"emptyElementSigilVisual","emptyManaShieldVisual","emptyOverloadVisual","notifyRealMonster",compile(reset))
+   (...names.map(name=>values[name]),emptyElementSigilVisual,emptyManaShieldVisual,emptyOverloadVisual,()=>{})();
  assert.equal(values.towerDeathPendingRef.current,false);
  assert.equal(values.pendingEnemyDefeatRef.current,null);
  assert.equal(values.ultimateAnimationLockRef.current,null);

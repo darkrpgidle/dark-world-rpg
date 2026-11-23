@@ -1,6 +1,6 @@
 import { balanceConfig } from "./balance-config";
 
-export type GemTier = "beginner" | "intermediate" | "advanced";
+export type GemTier = "beginner" | "intermediate" | "advanced" | "lv4" | "lv5" | "lv6" | "lv7" | "lv8" | "lv9" | "lv10";
 export type GemId =
   | "redIron"
   | "azureGuard"
@@ -11,9 +11,9 @@ export type GemId =
   | "sunburst"
   | "blooddrop"
   | "wisdom"
-  | "greed";
+  | "greed" | "thorns" | "corrosion" | "rift" | "battlewill" | "arcana" | "bastion";
 
-export type GemStack = { gemId: GemId; tier: GemTier; quantity: number };
+export type GemStack = { gemId: GemId; tier: GemTier; quantity: number; locked?: boolean };
 export type SocketedGem = { gemId: GemId; tier: GemTier };
 export type EquipmentSockets = { socketCount: 0 | 1 | 2; gems: Array<SocketedGem | null> };
 
@@ -28,6 +28,13 @@ const ICONS: Record<GemId, string> = {
   blooddrop: "/gems/blooddrop.webp",
   wisdom: "/gems/wisdom.webp",
   greed: "/gems/greed.webp",
+  thorns: "/gems/thorns.svg",
+  corrosion: "/gems/corrosion.svg",
+  rift: "/gems/rift.svg",
+  battlewill: "/gems/battlewill.svg",
+  arcana: "/gems/arcana.svg",
+  bastion: "/gems/bastion.svg",
+
 };
 
 const NAMES: Record<GemId, string> = {
@@ -41,10 +48,17 @@ const NAMES: Record<GemId, string> = {
   blooddrop: "血滴石",
   wisdom: "智慧石",
   greed: "貪婪石",
+  thorns: "荊棘石",
+  corrosion: "蝕魂石",
+  rift: "裂空石",
+  battlewill: "戰意石",
+  arcana: "秘法石",
+  bastion: "壁壘石",
+
 };
 
 export const GEM_IDS = Object.keys(ICONS) as GemId[];
-export const GEM_TIERS: GemTier[] = ["beginner", "intermediate", "advanced"];
+export const GEM_TIERS: GemTier[] = ["beginner", "intermediate", "advanced", "lv4", "lv5", "lv6", "lv7", "lv8", "lv9", "lv10"];
 
 export function getGemDefinition(gemId: GemId, tier: GemTier) {
   const cfg = balanceConfig.gems.values[gemId];
@@ -52,7 +66,8 @@ export function getGemDefinition(gemId: GemId, tier: GemTier) {
     id: gemId,
     name: NAMES[gemId],
     tier,
-    tierLabel: balanceConfig.gems.tiers[tier].label,
+    tierLabel: `Lv.${gemLevel(tier)}`,
+    level: gemLevel(tier),
     icon: ICONS[gemId],
     stat: cfg.stat,
     value: cfg[tier],
@@ -85,15 +100,17 @@ export function normalizeGemInventory(value: unknown): GemStack[] {
     if (!raw || typeof raw !== "object") return result;
     const gemId = (raw as GemStack).gemId;
     const tier = (raw as GemStack).tier;
-    const quantity = Math.max(0, Math.floor(Number((raw as GemStack).quantity ?? 0)));
-    if (!GEM_IDS.includes(gemId) || !GEM_TIERS.includes(tier) || !quantity) return result;
-    return addGemStack(result, { gemId, tier }, quantity);
+    const quantity = Number((raw as GemStack).quantity ?? 0);
+    if (!GEM_IDS.includes(gemId) || !GEM_TIERS.includes(tier) || !Number.isSafeInteger(quantity) || quantity <= 0) return result;
+    const next = addGemStack(result, { gemId, tier }, quantity);
+    if ((raw as GemStack).locked) next.find(g => g.gemId === gemId && g.tier === tier)!.locked = true;
+    return next;
   }, []);
 }
 
 export function rollGemDrop(mapIndex: number, random = Math.random): SocketedGem | null {
   const map = Math.max(1, Math.min(9, mapIndex));
-  const eligible = (["advanced", "intermediate", "beginner"] as GemTier[])
+  const eligible = (["advanced", "intermediate", "beginner"] as const)
     .filter((tier) => map >= balanceConfig.gems.tiers[tier].mapFrom);
   const roll = random();
   let cursor = 0;
@@ -152,80 +169,58 @@ export function socketGem(current: EquipmentSockets, socketIndex: number, gem: S
   return { ...normalized, gems };
 }
 
-export function fuseGem(
-  inventory: GemStack[],
-  gemId: GemId,
-  tier: Exclude<GemTier, "advanced">,
-  random = Math.random,
-) {
-  const required = balanceConfig.gems.fusion.materialCount;
-  const current = inventory.find((stack) => stack.gemId === gemId && stack.tier === tier);
-  if (!current || current.quantity < required) return null;
-  const nextTier: GemTier = tier === "beginner" ? "intermediate" : "advanced";
-  const successRate = tier === "beginner"
-    ? balanceConfig.gems.fusion.beginnerToIntermediateSuccess
-    : balanceConfig.gems.fusion.intermediateToAdvancedSuccess;
-  const success = random() < successRate;
-  const consumed = success ? required : required - 1;
-  const afterConsume = consumeGemStack(inventory, { gemId, tier }, consumed)!;
-  return {
-    inventory: success ? addGemStack(afterConsume, { gemId, tier: nextTier }) : afterConsume,
-    success,
-    resultTier: success ? nextTier : tier,
-  };
+export function gemLevel(tier: GemTier) { return GEM_TIERS.indexOf(tier) + 1; }
+export function fusionRate(tier: GemTier) { return balanceConfig.gems.successRates[gemLevel(tier) - 1] ?? 0; }
+export function gemLabel(gem: SocketedGem) {
+  const d = getGemDefinition(gem.gemId, gem.tier);
+  return `${d.stat.replace(/%$/, "")} +${d.value}${["命中", "閃避"].includes(d.stat) ? "" : "%"}`;
 }
-
-export function fuseGemSelection(
-  inventory: GemStack[],
-  materials: SocketedGem[],
-  random = Math.random,
-) {
-  const required = balanceConfig.gems.fusion.materialCount;
-  if (materials.length !== required) return null;
-  const tier = materials[0]?.tier;
-  if (!tier || tier === "advanced" || materials.some((gem) => gem.tier !== tier)) return null;
-
-  const requiredCounts = new Map<string, number>();
-  for (const gem of materials) {
-    const key = gemStackKey(gem);
-    requiredCounts.set(key, (requiredCounts.get(key) ?? 0) + 1);
+export function fuseGem(inventory: GemStack[], gemId: GemId, tier: GemTier, random = Math.random) {
+  const level = gemLevel(tier);
+  const current = inventory.find(g => g.gemId === gemId && g.tier === tier);
+  if (!current || current.locked || current.quantity < 2 || level < 1 || level >= 10) return null;
+  const success = random() < fusionRate(tier);
+  const after = consumeGemStack(inventory, {gemId, tier}, success ? 2 : 1)!;
+  const nextTier = GEM_TIERS[level];
+  return {inventory: success ? addGemStack(after, {gemId, tier: nextTier}) : after,
+    success, resultTier: success ? nextTier : tier};
+}
+export function fuseGemSelection(inventory: GemStack[], materials: SocketedGem[], random = Math.random) {
+  if (materials.length !== 2 || materials.some(g => g.gemId !== materials[0].gemId || g.tier !== materials[0].tier)) return null;
+  const gem = materials[0], fused = fuseGem(inventory, gem.gemId, gem.tier, random);
+  if (!fused) return null;
+  return {...fused, result: fused.success ? {...gem, tier: fused.resultTier} : null,
+    preserved: fused.success ? null : {...gem}, successRate: fusionRate(gem.tier)};
+}
+export function fuseGemBatch(inventory: GemStack[], options: {gemId?: GemId; targetLevel: number; reserve: number; maxMaterials: number; sourceTier?:GemTier}, random = Math.random) {
+  if (!Number.isInteger(options.targetLevel) || options.targetLevel < 2 || options.targetLevel > 10 ||
+      !Number.isSafeInteger(options.reserve) || options.reserve < 0 || !Number.isSafeInteger(options.maxMaterials) || options.maxMaterials < 2 || options.maxMaterials > 10000) return null;
+  let next = normalizeGemInventory(inventory), successes = 0, failures = 0, consumed = 0, attempts = 0;
+  for (let level = 1; level < options.targetLevel; level++) {
+    if(options.sourceTier && GEM_TIERS[level-1]!==options.sourceTier)continue;
+    for (const gemId of GEM_IDS) {
+      if (options.gemId && options.gemId !== gemId) continue;
+      const tier = GEM_TIERS[level - 1];
+      while (consumed + 2 <= options.maxMaterials) {
+        const stack = next.find(g => g.gemId === gemId && g.tier === tier);
+        if (!stack || stack.locked || stack.quantity - options.reserve < 2) break;
+        const fused = fuseGem(next, gemId, tier, random)!;
+        next = fused.inventory; attempts++;
+        if (fused.success) { successes++; consumed += 2; } else { failures++; consumed++; }
+      }
+    }
   }
-  for (const [key, quantity] of requiredCounts) {
-    const stack = inventory.find((gem) => gemStackKey(gem) === key);
-    if (!stack || stack.quantity < quantity) return null;
+  return {inventory: next, successes, failures, consumed, attempts};
+}
+export function gemInventoryDelta(current: GemStack[], before: GemStack[], after: GemStack[]) {
+  let next = normalizeGemInventory(current);
+  for (const id of GEM_IDS) for (const tier of GEM_TIERS) {
+    const count = (list: GemStack[]) => list.find(g => g.gemId === id && g.tier === tier)?.quantity ?? 0;
+    const delta = count(after) - count(before);
+    if (delta > 0) next = addGemStack(next, {gemId:id,tier}, delta);
+    if (delta < 0) { const reduced = consumeGemStack(next,{gemId:id,tier},-delta); if (!reduced) throw new Error("gem_inventory_conflict"); next = reduced; }
   }
-
-  const nextTier: GemTier = tier === "beginner" ? "intermediate" : "advanced";
-  const successRate = tier === "beginner"
-    ? balanceConfig.gems.fusion.beginnerToIntermediateSuccess
-    : balanceConfig.gems.fusion.intermediateToAdvancedSuccess;
-  const success = random() < successRate;
-  let next = inventory.map((stack) => ({ ...stack }));
-  for (const gem of materials) next = consumeGemStack(next, gem, 1)!;
-
-  if (!success) {
-    const preserved = materials[Math.min(materials.length - 1, Math.floor(random() * materials.length))];
-    return {
-      inventory: addGemStack(next, preserved),
-      success: false,
-      result: null,
-      preserved,
-      successRate,
-    };
-  }
-
-  const sameGem = materials.every((gem) => gem.gemId === materials[0].gemId);
-  const resultSource = sameGem
-    ? materials[0]
-    : materials[Math.min(materials.length - 1, Math.floor(random() * materials.length))];
-  const result: SocketedGem = { gemId: resultSource.gemId, tier: nextTier };
-  return {
-    inventory: addGemStack(next, result),
-    success: true,
-    result,
-    preserved: null,
-    successRate,
-  };
+  return next;
 }
 
 export function getSocketStatBonus(sockets: EquipmentSockets) {

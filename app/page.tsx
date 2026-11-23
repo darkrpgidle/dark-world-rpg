@@ -1,5 +1,14 @@
 "use client";
+import {emptyRealMode,normalizeRealMode,realModeScale,type RealModeProgress} from './real-mode-progress';
+import {advanceRealMonster,createRealMonster,realAbilityFor,realMonsterModifiers,realMonsterSnapshot,type RealMonster} from './real-monster-combat';
+import {RealMonsterVfx} from './real-monster-vfx';
+import {useRealMapAssets} from './use-real-map-assets';
+import {RealMapLoading} from './real-map-loading';
+import {useCombatState} from './use-combat-state';
 import {formatAssessedPower} from "./power-display";
+import {GemPanel} from "./gem-panel";
+import {gemInventoryDelta} from "./gem-system";
+import type {GemAction} from "./gem-save-policy";
 import {saveJsonWithTimeout} from "./save-request";
 import { firstChapterPower, firstChapterHealth, secondChapterPower, secondChapterHealth } from "./balance";
 import { armorThreshold, armorMitigation, monsterArmorRating, additiveDamageMultiplier } from "./combat-math";
@@ -11,7 +20,7 @@ import {affixOptions as sharedAffixOptions,rollAffixes as sharedRollAffixes,equi
 
 import { useGmInbox, GmInboxMessages } from "./gm-mail-ui";
 
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Backpack,
   ChevronRight,
@@ -119,7 +128,6 @@ import { MAX_REBIRTHS, REBIRTH_REWARD_PER_TURN, clampRebirthCount } from "./rebi
 import {
   addGemStack,
   createEquipmentSockets,
-  fuseGemSelection,
   GEM_TIERS,
   gemStackKey,
   getGemDefinition,
@@ -128,7 +136,6 @@ import {
   normalizeGemInventory,
   rollDrillingStoneDrop,
   rollGemDrop,
-  socketGem,
   type EquipmentSockets,
   type GemStack,
   type SocketedGem,
@@ -221,8 +228,8 @@ import { calculateCharacterStats, calculateAssessedCombatPower, normalizeSceneIt
 type Stage = "welcome" | "create" | "game";
 const MAIL_CAPACITY = 50;
 const PERSONAL_BOSS_RESET_VERSION = "2026-09-05";
-const SAVE_DEBOUNCE_MS = 1_400;
-const SAVE_MAX_INTERVAL_MS = 20_000;
+const SAVE_DEBOUNCE_MS = 5_000;
+const SAVE_MAX_INTERVAL_MS = 30_000;
 const LOGIN_INSTANCE_STORAGE_KEY = "dark-world-login-instance-v1";
 const LOGIN_ID_HEADER = "x-dark-world-login-id";
 const SET_ELEMENTAL_DAMAGE_PCT = 15;
@@ -694,7 +701,7 @@ function newcomerExperienceFactor(level: number) {
 }
 
 function mapExperienceGain(
-  map: (typeof maps)[number],
+  map: {exp:readonly number[]},
   tier: "normal" | "elite" | "guardian" | "boss",
   level: number,
 ) {
@@ -706,7 +713,7 @@ function mapExperienceGain(
   );
 }
 
-function recommendedPowerAtFloor(map: (typeof maps)[number], floor: number) {
+function recommendedPowerAtFloor(map: {id:number;bossPower:number;power:readonly number[];phasePower:readonly number[]}, floor: number) {
   if (map.id === 1) return firstChapterPower(floor);
   if (map.id === 2) return secondChapterPower(floor);
   if (floor >= MAP_FLOORS) return map.bossPower;
@@ -759,7 +766,9 @@ function effectiveMonsterMaximumHealth(
   recommendedPower: number,
   tier: "normal" | "elite" | "guardian" | "boss",
   monsterName?: string,
-) {
+  realModeChapter=0,realModeFloor=1,
+):number {
+  if(realModeChapter){const scale=realModeScale(realModeChapter,realModeFloor,tier);return Math.round(effectiveMonsterMaximumHealth(9,balanceConfig.maps[8].bossPower,'boss','時墟主宰')*scale.health);}
   if (mapId === 1) return firstChapterHealth(recommendedPower, tier, monsterName);
   if (mapId === 2) return secondChapterHealth(recommendedPower, tier, monsterName);
   return Math.max(
@@ -956,108 +965,13 @@ function equipmentBaseStats(item: Item, enhanceLevel = item.enhance): EquipmentS
   return sharedEquipmentBaseStats(item, enhanceLevel);
 }
 
-function equipmentCombatRating(item: Item) {
-  const combat = {
-    hp: 0,
-    attack: 0,
-    defense: 0,
-    speed: 0,
-    hit: 0,
-    dodge: 0,
-    crit: 0,
-    critDamage: 0,
-    lifesteal: 0,
-    damageReduction: 0,
-    skillDamage: 0,
-    bossDamage: 0,
-    bossReduction: 0,
-    hpPct: 0,
-    attackPct: 0,
-    defensePct: 0,
-  };
-
-  const addStat = (name: EquipmentStatName, value: number, isPercent = false) => {
-    if (name === "生命") {
-      if (isPercent) combat.hpPct += value;
-      else combat.hp += value;
-    }
-    if (name === "生命%") combat.hpPct += value;
-    if (name === "攻擊") {
-      if (isPercent) combat.attackPct += value;
-      else combat.attack += value;
-    }
-    if (name === "攻擊%") combat.attackPct += value;
-    if (name === "防禦") {
-      if (isPercent) combat.defensePct += value;
-      else combat.defense += value;
-    }
-    if (name === "防禦%") combat.defensePct += value;
-    if (name === "攻速") combat.speed += value;
-    if (name === "命中") combat.hit += value;
-    if (name === "閃避") combat.dodge += value;
-    if (name === "暴擊") combat.crit += value;
-    if (name === "暴擊傷害") combat.critDamage += value;
-    if (name === "吸血") combat.lifesteal += value;
-    if (name === "傷害減免") combat.damageReduction += value;
-    if (name === "技能傷害") combat.skillDamage += value;
-    if (name === "首領傷害") combat.bossDamage += value;
-    if (name === "首領減傷") combat.bossReduction += value;
-  };
-
-  for (const stat of equipmentBaseStats(item)) addStat(stat.name, stat.value, stat.percent);
-  for (const [index, affix] of item.affixes.entries()) {
-    const name = affixName(affix);
-    const value = Number(affix.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
-    addStat(name, index === 0 ? amplifyEquipmentStat(item, name, value, "core") : value, affix.includes("%"));
-  }
-  const epithets = equippedEpithetBonuses([item]);
-  combat.hpPct += epithets.hpPct ?? 0;
-  combat.attackPct += epithets.attackPct ?? 0;
-  combat.defensePct += epithets.defensePct ?? 0;
-  combat.speed += epithets.speed ?? 0;
-  combat.hit += epithets.hit ?? 0;
-  combat.crit += epithets.crit ?? 0;
-  combat.critDamage += epithets.critDamage ?? 0;
-  combat.lifesteal += epithets.lifesteal ?? 0;
-  combat.skillDamage += epithets.skillDamage ?? 0;
-  for (const [name, value] of Object.entries(getSocketStatBonus(item.sockets ?? { socketCount: 0, gems: [] }))) {
-    addStat(name as EquipmentStatName, value, name.endsWith("%"));
-  }
-
-  combat.hp = Math.round(combat.hp * (1 + combat.hpPct / 100));
-  combat.attack = Math.round(combat.attack * (1 + combat.attackPct / 100));
-  combat.defense = Math.round(combat.defense * (1 + combat.defensePct / 100));
-
-  // 評級只代表戰鬥價值；經驗、金幣、資源與元寶掉率刻意不納入。
-  const damageScore =
-    combat.attack * 4 +
-    combat.speed * 4 +
-    combat.hit * 5 +
-    combat.crit * 8 +
-    combat.critDamage * 5 +
-    combat.skillDamage * 7 +
-    combat.bossDamage * 7;
-  const enduranceScore =
-    combat.hp * 0.25 +
-    combat.defense * 3 +
-    combat.dodge * 8 +
-    combat.lifesteal * 10 +
-    combat.damageReduction * 10 +
-    combat.bossReduction * 9;
-  return Math.max(1, Math.round(damageScore + enduranceScore));
-}
-
-function equipmentDisplayRating(item: Item) {
-  return equipmentCombatRating(item);
-}
-
 function itemSetAccent(item: Item) {
   return maps.find((map) => map.set === item.set)?.tone ?? "transparent";
 }
 
 function gemEffectLabel(definition: ReturnType<typeof getGemDefinition>) {
   const stat = definition.stat.replace(/%$/, "");
-  const percentageStats = ["吸血", "經驗", "金幣"];
+  const percentageStats = ["吸血", "經驗", "金幣", "攻速", "暴擊", "暴擊傷害", "技能傷害", "普攻傷害", "持續傷害", "反傷", "護盾量"];
   const isPercentage = definition.stat.endsWith("%") || percentageStats.includes(stat);
   return `${stat} +${definition.value}${isPercentage ? "%" : ""}`;
 }
@@ -1450,7 +1364,15 @@ function GearTooltip({
       <h4>
         {item.set && <span className="set-name-prefix">【{item.set}】</span>} <EquipmentName item={item} /> {item.enhance > 0 && `+${item.enhance}`}
       </h4>
-      <b>裝備評級 {equipmentDisplayRating(item).toLocaleString()}</b>
+      {powerDifference !== undefined && (
+        <div className="gear-compare">
+          {compared && <span>取代目前穿著：{compared.name}</span>}
+          <strong className={powerDifference >= 0 ? "gain" : "loss"}>
+            {equippedItem?.id === item.id ? "卸下後" : "穿上後"}綜合戰力{" "}
+            {powerDifference >= 0 ? "+" : ""}{formatAssessedPower(powerDifference)}
+          </strong>
+        </div>
+      )}
       <div className="gear-base-stats">
         <strong>基礎屬性</strong>
         {equipmentBaseStats(item).map((stat) => (
@@ -1492,15 +1414,6 @@ function GearTooltip({
             <p>效果：{catalogDefinition.effectDescription}</p>
           </div>
         </>
-      )}
-      {compared && (
-        <div className="gear-compare">
-          <span>目前穿著：{compared.name}</span>
-          <strong className={(powerDifference ?? 0) >= 0 ? "gain" : "loss"}>
-            {(powerDifference ?? 0) >= 0 ? "▲" : "▼"} 實際戰力{" "}
-            {formatAssessedPower(Math.abs(powerDifference ?? 0))}
-          </strong>
-        </div>
       )}
     </div>
   );
@@ -1739,15 +1652,28 @@ function Game({
   const [reforgeStones, setReforgeStones] = useState(2);
   const [drillingStones, setDrillingStones] = useState(0);
   const [gemInventory, setGemInventory] = useState<GemStack[]>([]);
-  const [mapId, setMapId] = useState(1);
-  const [unlockedMapId, setUnlockedMapId] = useState(1);
-  const [mapBestFloors, setMapBestFloors] = useState<Record<number, number>>({
+  const [normalMapId, setNormalMapId] = useState(1);
+  const [normalUnlockedMapId, setNormalUnlockedMapId] = useState(1);
+  const [normalMapBestFloors, setNormalMapBestFloors] = useState<Record<number, number>>({
     1: 1,
   });
   const [battleOn, setBattleOn] = useState(true);
-  const [wave, setWave] = useState(1);
+  const [normalWave, setNormalWave] = useState(1);
+  const [realProgress,setRealProgress]=useState<RealModeProgress>(()=>emptyRealMode());
+  const [pendingMapEntry,setPendingMapEntry]=useState<{kind:'world'|'map';chapter:number;origin:string}|null>(null);
+  const realMode=realProgress.mode==='real';
+  const mapId=realMode?realProgress.mapId:normalMapId,wave=realMode?realProgress.wave:normalWave;
+  const unlockedMapId=realMode?realProgress.unlockedMapId:normalUnlockedMapId;
+  const mapBestFloors=realMode?realProgress.bestFloors:normalMapBestFloors;
+  const setMapId=useCallback((next:React.SetStateAction<number>)=>{if(realMode)setRealProgress(p=>({...p,mapId:typeof next==='function'?next(p.mapId):next}));else setNormalMapId(next);},[realMode]);
+  const setWave=useCallback((next:React.SetStateAction<number>)=>{if(realMode)setRealProgress(p=>({...p,wave:typeof next==='function'?next(p.wave):next}));else setNormalWave(next);},[realMode]);
+  const setUnlockedMapId=useCallback((next:React.SetStateAction<number>)=>{if(realMode)setRealProgress(p=>({...p,unlockedMapId:typeof next==='function'?next(p.unlockedMapId):next}));else setNormalUnlockedMapId(next);},[realMode]);
+  const setMapBestFloors=useCallback((next:React.SetStateAction<Record<number,number>>)=>{if(realMode)setRealProgress(p=>({...p,bestFloors:typeof next==='function'?next(p.bestFloors):next}));else setNormalMapBestFloors(next);},[realMode]);
+  const realMonsterRef=useRef<RealMonster|null>(null),realPlayerHpRef=useRef(100);
+  const [realCombatFloats,setRealCombatFloats]=useState<CombatFloatEvent[]>([]);
+  const notifyRealMonster=(type:string,detail:Record<string,unknown>)=>window.dispatchEvent(new CustomEvent(type,{detail}));
   const [enemyName, setEnemyName] = useState<string>(() => maps[0].monsters[0]);
-  const [enemyHp, setEnemyHp] = useState(100);
+  const [enemyHp, setEnemyHp,readEnemyHp] = useCombatState(100,realMode);
   const towerCadenceRef=useRef<CombatCadence|null>(null);
   const bossCadenceRef=useRef<CombatCadence|null>(null);
   const [presentedEnemyHealth,setPresentedEnemyHealth]=useState<{token: string | object | null;percent:number;viewKey:string}>({token:null,percent:100,viewKey:"boot"});
@@ -1758,8 +1684,8 @@ function Game({
     update();document.addEventListener("visibilitychange",update);
     return()=>document.removeEventListener("visibilitychange",update);
   },[]);
-  const [playerHp, setPlayerHp] = useState(100);
-  const [battlePulse, setBattlePulse] = useState(0);
+  const [playerHp, setPlayerHp,readPlayerHp] = useCombatState(100,realMode);
+  const [battlePulse, setBattlePulse] = useCombatState(0,realMode);
   const [enemyDefeated, setEnemyDefeated] = useState(false);
   const [, setRound] = useState(1);
   const [skillEffect, setSkillEffect] = useState<{
@@ -2634,11 +2560,14 @@ function Game({
   const [reforgeOpen, setReforgeOpen] = useState(false);
   const [gemWorkshopOpen, setGemWorkshopOpen] = useState(false);
   const [selectedGemKey, setSelectedGemKey] = useState<string | null>(null);
-  const [gemFusionSlots, setGemFusionSlots] = useState<Array<SocketedGem | null>>([null, null, null]);
-  const [gemPageMode, setGemPageMode] = useState<"寶石庫" | "寶石合成" | "裝備鑲嵌">("寶石合成");
-  const [gemTierFilter, setGemTierFilter] = useState<"全部" | "beginner" | "intermediate" | "advanced">("全部");
-  const [gemStatFilter, setGemStatFilter] = useState<"全部" | "戰鬥" | "生存" | "收益">("全部");
-  const [gemFusionResult, setGemFusionResult] = useState<{ success: boolean; gem: SocketedGem } | null>(null);
+  const [gemPowder,setGemPowder]=useState(0);
+  const [gemRevision,setGemRevision]=useState(0);
+  const [gemActionBusy,setGemActionBusy]=useState(false);
+  const [gemPending,setGemPending]=useState(false);
+  const gemActionBusyRef=useRef(false);
+  const lastSavedGemInventoryRef=useRef<GemStack[]>([]);
+  const gemPendingRef=useRef<{action:GemAction;before:GemStack[]}|null>(null);
+
   const [bulkSalvageOpen, setBulkSalvageOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [bulkQualities, setBulkQualities] = useState<string[]>(["普通", "良好"]);
@@ -2670,6 +2599,13 @@ function Game({
   const [saveStatus, setSaveStatus] = useState("載入存檔");
   const [saveUpdatedAt, setSaveUpdatedAt] = useState<string | null>(null);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
+  const gemContextEpochRef=useRef(0);
+  const gemSessionRef=useRef({saveReady:false,sessionSuperseded:false,loginId,playerId});
+  useEffect(()=>{gemContextEpochRef.current++;gemSessionRef.current={saveReady,sessionSuperseded,loginId,playerId};},[saveReady,sessionSuperseded,loginId,playerId]);
+  const requestedRealChapter=saveReady&&!sessionSuperseded?(pendingMapEntry?.chapter??(realMode?mapId:null)):null;
+  const realMapAssets=useRealMapAssets(requestedRealChapter,playerClass);
+  const realMapLoading=Boolean(pendingMapEntry)||(realMode&&!realMapAssets.assets);
+
   const [sessionEndedReason, setSessionEndedReason] = useState<"replaced" | "suspended" | "expired" | "conflict" | "maintenance">("replaced");
   const [saveRetryTick, setSaveRetryTick] = useState(0);
   const equipmentBusyRef = useRef(false);
@@ -2734,6 +2670,8 @@ function Game({
     arcaneEchoReady: false,
   });
   const resetCombatPerks = () => {
+    realMonsterRef.current=null;setRealCombatFloats([]);
+    notifyRealMonster('dark-world-monster-target',{id:null});
     pendingEnemyDefeatRef.current=null;
     towerCadenceRef.current=null;bossCadenceRef.current=null;
     towerDeathPendingRef.current=false;
@@ -2890,7 +2828,10 @@ function Game({
       text: "角色以無裝備狀態進入灰燼墓園",
     },
   ]);
-  const currentMap = maps.find((m) => m.id === mapId)!;
+  const currentMap = useMemo(()=>{const base=maps.find(m=>m.id===mapId)!;if(!realMode)return base;const strength=realModeScale(mapId,1,'normal');return {...base,name:`真實・${base.name}`,level:100,
+    exp:maps[8].exp.map(v=>Math.round(v*strength.reward)) as [number,number],
+    recommendedAssessedPower:maps[8].recommendedAssessedPower.map(v=>Math.round(v*strength.power)) as [number,number]};},[mapId,realMode]);
+  const offlineMap=maps[normalMapId-1];
   const requiredExperience = experienceRequired(level);
   const experienceProgress =
     level >= 100 ? 100 : Math.min(100, (exp / requiredExperience) * 100);
@@ -2987,14 +2928,15 @@ function Game({
     })
     .sort((a, b) => {
       if (bagSort === "品質") return qualityOrder.indexOf(b.quality) - qualityOrder.indexOf(a.quality);
-      if (bagSort === "強化") return b.enhance - a.enhance || powerDifferenceForItem(b) - powerDifferenceForItem(a) || equipmentDisplayRating(b) - equipmentDisplayRating(a);
+      if (bagSort === "強化") return b.enhance - a.enhance || powerDifferenceForItem(b) - powerDifferenceForItem(a);
       if (bagSort === "最新") return items.indexOf(b) - items.indexOf(a);
-      return powerDifferenceForItem(b) - powerDifferenceForItem(a) || equipmentDisplayRating(b) - equipmentDisplayRating(a);
+      return powerDifferenceForItem(b) - powerDifferenceForItem(a);
     });
   // 批次分解後強制以實際背包內容重建列表，避免手機瀏覽器保留舊的卡片節點。
   const bagRenderKey = visibleBagItems.length
     ? visibleBagItems.map((item, index) => `${item.id}:${index}`).join("|")
     : "empty";
+  const currentItemPowerDifference = currentItem ? powerDifferenceForItem(currentItem) : 0;
   const hasBlessing = useCallback((id: string) =>
     blessings.some((blessing) => blessing.id === id), [blessings]);
   const blessingUpgraded = useCallback((id: string) =>
@@ -3057,10 +2999,11 @@ function Game({
         ? "elite"
         : "normal";
   const currentEnemyBaseName = baseMonsterName(enemyName);
-  const currentRecommendedPower = recommendedPowerAtFloor(currentMap, wave);
+  const currentRecommendedPower = realMode?Math.round(balanceConfig.maps[8].bossPower*realModeScale(mapId,wave,currentCombatTier).power):recommendedPowerAtFloor(currentMap, wave);
   const currentSuppression = realmSuppression(combatPower, currentRecommendedPower);
   const evasionRules = balanceConfig.combat.evasionModel;
-  const currentMonsterRatings = monsterRatingsForMap(mapId);
+  const ordinaryRatings=monsterRatingsForMap(realMode?9:mapId);
+  const currentMonsterRatings = realMode?{accuracy:Math.round(ordinaryRatings.accuracy*(1.05+(mapId-1)*balanceConfig.realMode.accuracyGrowth)),evasion:Math.round(ordinaryRatings.evasion*(1.02+(mapId-1)*balanceConfig.realMode.evasionGrowth))}:ordinaryRatings;
   const monsterAccuracyRating = currentMonsterRatings.accuracy;
   const playerEvasionRating =
     Math.max(0, characterStats.dodge) * evasionRules.statToRating;
@@ -3070,8 +3013,9 @@ function Game({
     currentRecommendedPower,
     currentCombatTier,
     currentEnemyBaseName,
+    realMode?mapId:0,wave,
   );
-  const enemyPresentationToken=activeBossBattle ?? `${runStartedAt}:${mapId}:${wave}`;
+  const enemyPresentationToken=activeBossBattle ?? `${realMode?"real":"normal"}:${runStartedAt}:${mapId}:${wave}`;
   const settledEnemyPercent=activeBossBattle?bossEnemyHp:enemyHp;
   const presentedEnemyPercent=presentedEnemyHealth.token===enemyPresentationToken
     ? presentedEnemyHealth.percent:settledEnemyPercent;
@@ -3209,28 +3153,7 @@ function Game({
   const selectedGem = selectedGemKey
     ? gemInventory.find((stack) => gemStackKey(stack) === selectedGemKey) ?? null
     : null;
-  const gemFusionMaterials = gemFusionSlots.filter((gem): gem is SocketedGem => Boolean(gem));
-  const gemFusionTier = gemFusionMaterials[0]?.tier;
-  const gemFusionSuccessRate = gemFusionTier === "beginner"
-    ? balanceConfig.gems.fusion.beginnerToIntermediateSuccess
-    : gemFusionTier === "intermediate"
-      ? balanceConfig.gems.fusion.intermediateToAdvancedSuccess
-      : 0;
-  const gemFusionKeepsType = gemFusionMaterials.length === 3 &&
-    gemFusionMaterials.every((gem) => gem.gemId === gemFusionMaterials[0].gemId);
-  const filteredGemInventory = [...gemInventory]
-    .filter((stack) => gemTierFilter === "全部" || stack.tier === gemTierFilter)
-    .filter((stack) => {
-      if (gemStatFilter === "全部") return true;
-      const stat = getGemDefinition(stack.gemId, stack.tier).stat.replace(/%$/, "");
-      if (gemStatFilter === "戰鬥") return ["攻擊", "攻速", "命中", "暴擊"].includes(stat);
-      if (gemStatFilter === "生存") return ["生命", "防禦", "閃避", "吸血"].includes(stat);
-      return ["經驗", "金幣"].includes(stat);
-    })
-    .sort((a, b) => GEM_TIERS.indexOf(b.tier) - GEM_TIERS.indexOf(a.tier) || a.gemId.localeCompare(b.gemId));
-  const fusionPreviewGem = gemFusionKeepsType && gemFusionTier
-    ? getGemDefinition(gemFusionMaterials[0].gemId, gemFusionTier === "beginner" ? "intermediate" : "advanced")
-    : null;
+
   const bulkCandidates = items.filter(
     (item) =>
       bulkQualities.includes(item.quality) &&
@@ -3336,7 +3259,7 @@ function Game({
             setEnhanceStones(save.enhanceStones ?? 6);
             setReforgeStones(save.reforgeStones ?? 2);
             setDrillingStones(Math.max(0, Math.floor(Number(save.drillingStones ?? 0))));
-            setGemInventory(normalizeGemInventory(save.gemInventory));
+            setGemInventory(normalizeGemInventory(save.gemInventory));lastSavedGemInventoryRef.current=normalizeGemInventory(save.gemInventory);setGemPowder(save.gemPowder??0);setGemRevision(save._gemRevision??0);
             setAdminRevision(Number(save.adminRevision ?? 0));
             setRebirthCount(clampRebirthCount(save.rebirthCount));
             const savedLegacyRebirthCount = Math.max(0, Math.min(20, Number(save.legacyRebirthCount ?? 0)));
@@ -3369,9 +3292,9 @@ function Game({
                 save.mapId ? save.wave ?? 1 : ((legacyWave - 1) % 10) + 1,
               ),
             );
-            setWave(savedWave);
-            setMapId(savedMapId);
-            setUnlockedMapId(
+            setNormalWave(savedWave);
+            setNormalMapId(savedMapId);
+            setNormalUnlockedMapId(
               Math.max(
                 savedMapId,
                 Math.min(
@@ -3381,14 +3304,19 @@ function Game({
                 ),
               ),
             );
-            setMapBestFloors(
+            setNormalMapBestFloors(
               save.mapBestFloors ?? { [savedMapId]: savedWave },
             );
+            const restoredReal=normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated);
+            setRealProgress(restoredReal);
+            const activeSavedMap=restoredReal.mode==='real'?restoredReal.mapId:savedMapId;
+            const activeSavedFloor=restoredReal.mode==='real'?restoredReal.wave:savedWave;
+            setEnemyName(maps[activeSavedMap-1].monsters[activeSavedFloor%5===0?4:0]);
             const savedPlayerHp = Number(save.playerHp ?? 100);
             if (savedPlayerHp <= 0) {
               // A save captured on the lethal frame resumes as a clean retry,
               // never as an active battle with a dead character.
-              setWave(1);
+              if(restoredReal.mode==='real')setRealProgress(p=>({...p,wave:1}));else setNormalWave(1);
               setEnemyHp(100);
               setPlayerHp(100);
               setBlessings([]);
@@ -3571,7 +3499,7 @@ function Game({
   }, [loginId, pauseSupersededSession, playerId, sessionSuperseded]);
 
   useEffect(() => {
-    if (!saveReady || !playerId || sessionSuperseded || adminOpen || skillActionBusy || offlineClaimPending || equipmentBusy || equipmentPendingRef.current) return;
+    if (!saveReady || !playerId || sessionSuperseded || adminOpen || skillActionBusy || offlineClaimPending || equipmentBusy || equipmentPendingRef.current || gemPendingRef.current) return;
     if (saveInFlightRef.current) {
       saveQueuedRef.current = true;
       return;
@@ -3587,7 +3515,7 @@ function Game({
       prioritySaveRef.current ? 0 : Math.min(SAVE_DEBOUNCE_MS, maxWait),
     );
     const timer = setTimeout(() => {
-      if (offlineClaimPendingRef.current || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+      if (offlineClaimPendingRef.current || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current || gemPendingRef.current) return;
       // Do not persist an intermediate zero-HP target before its kill/loot
       // and next wave have committed; a reload cannot restore that callback.
       if(!activeBossBattle && enemyHp<=0 && towerDeathPendingRef.current)return;
@@ -3629,11 +3557,12 @@ function Game({
         enhanceStones,
         reforgeStones,
         drillingStones,
-        gemInventory,
-        wave,
-        mapId,
-        unlockedMapId,
-        mapBestFloors,
+        gemInventory,gemPowder,_gemRevision:gemRevision,
+        wave:normalWave,
+        mapId:normalMapId,
+        unlockedMapId:normalUnlockedMapId,
+        mapBestFloors:normalMapBestFloors,
+        realMode:realProgress,
         enemyHp,
         playerHp,
         items: items.map(normalizeSceneItem),
@@ -3733,6 +3662,7 @@ function Game({
           }
           setSaveUpdatedAt((current) => result.updatedAt ?? current);
           setSaveStatus("雲端已同步");
+          lastSavedGemInventoryRef.current=payload.gemInventory;
           if (typeof result.idleClock?.storedSeconds === "number")
             reconcileStoredTime(result.idleClock.storedSeconds, idleEpoch, result.updatedAt);
           saveRequestIdRef.current = null;
@@ -3777,11 +3707,12 @@ function Game({
     enhanceStones,
     reforgeStones,
     drillingStones,
-    gemInventory,
+    gemInventory,gemPowder,gemRevision,
     wave,
     mapId,
     unlockedMapId,
     mapBestFloors,
+    normalWave,normalMapId,normalUnlockedMapId,normalMapBestFloors,realProgress,
     enemyHp,
     playerHp,
     items,
@@ -3857,7 +3788,7 @@ function Game({
         .then((result) => {
           const save = result?.save;
           const revision = Number(save?.adminRevision ?? 0);
-          if (!save || revision <= adminRevision || equipmentBusyRef.current || equipmentPendingRef.current) return;
+          if (!save || revision <= adminRevision || equipmentBusyRef.current || equipmentPendingRef.current || gemPendingRef.current) return;
           setGold(save.gold ?? 0);
           setYuanbao(save.yuanbao ?? 0);
           setEnhanceStones(save.enhanceStones ?? 0);
@@ -4005,7 +3936,7 @@ function Game({
     const cosmeticPrices: Partial<Record<typeof item, number>> = balanceConfig.economy.yuanbaoCosmetics;
     const cosmeticPrice = cosmeticPrices[item];
     if (item === "reforge" || cosmeticPrice !== undefined) {
-      if (shopPurchaseInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+      if (shopPurchaseInFlightRef.current || gemActionBusyRef.current || gemPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
       if (!saveReady || !playerId || sessionSuperseded) return toast.error("請先完成存檔載入");
       const price = item === "reforge" ? balanceConfig.economy.yuanbaoReforgeBundle.price : (cosmeticPrice ?? 0);
       if (yuanbao < price) return toast.error("元寶不足", { description: `需要 ${price} 元寶` });
@@ -4078,7 +4009,7 @@ function Game({
     }
     if (yuanbao < 10) return toast.error("元寶不足", { description: "需要 10 元寶" });
     setYuanbao((value) => value - 10);
-    const targetMap = Math.max(1, unlockedMapId);
+    const targetMap = Math.max(1, normalUnlockedMapId);
     const reward = createGambleReward(targetMap, Math.random(), Date.now());
     if (reward.type === "reforge") {
       setReforgeStones((value) => value + reward.amount);
@@ -4311,6 +4242,7 @@ function Game({
       defeatedWave: number,
     ) => {
       if (tier === "elite") setBattleDrops([]);
+      const lootMapId=realMode?9:mapId;
       const treasure = hasBlessing("treasure");
       const treasureUpgraded = blessingUpgraded("treasure");
       const treasureBonus = treasure ? (treasureUpgraded ? 0.3 : 0.2) : 0;
@@ -4320,17 +4252,17 @@ function Game({
           : tier === "elite"
             ? 0.7 + treasureBonus + characterStats.equipmentDrop / 100
             : 0.4 + treasureBonus + characterStats.equipmentDrop / 100;
-      if (Math.random() > dropChance) return;
+      if (Math.random() > Math.min(1,dropChance+(realMode?.10:0))) return;
       const catalogSource: CatalogDropSource =
         tier === "boss" ? "boss" : tier === "guardian" ? "guardian" : tier;
       const catalogItem = rollCatalogDrop(
-        mapId,
+        lootMapId,
         catalogSource,
         playerClass,
         defeatedWave,
       );
       let item = catalogItem ?? createDrop(
-        mapId,
+        lootMapId,
         tier === "guardian" || tier === "boss" ? "首領" : "戰鬥",
         defeatedWave,
       );
@@ -4370,7 +4302,7 @@ function Game({
         `${tier === "boss" ? "地圖首領" : tier === "guardian" ? "守關者" : tier === "elite" ? "精英" : "怪物"}掉落【${item.quality}】${item.name}`,
       );
     },
-    [addLoot, blessingUpgraded, characterStats.equipmentDrop, characterStats.highQualityDrop, hasBlessing, mapId, playerClass, pushLog],
+    [addLoot, blessingUpgraded, characterStats.equipmentDrop, characterStats.highQualityDrop, hasBlessing, mapId, realMode, playerClass, pushLog],
   );
 
   const offerBlessings = useCallback(() => {
@@ -4522,7 +4454,7 @@ function Game({
         }),
       }).catch(() => undefined);
     }
-    if (outcome === "complete" && mapId === 9 && floor === MAP_FLOORS)
+    if (outcome === "complete" && !realMode && mapId === 9 && floor === MAP_FLOORS)
       setFinalBossDefeated(true);
     setHighestFloor((value) => Math.max(value, floor));
     setMapBestFloors((old) => ({
@@ -4530,8 +4462,9 @@ function Game({
       [mapId]: Math.max(old[mapId] ?? 0, floor),
     }));
     if (outcome === "complete") {
-      setCompletedRuns((value) => value + 1);
-      setUnlockedMapId((value) => Math.max(value, Math.min(9, mapId + 1)));
+      if(realMode)setRealProgress(p=>({...p,completedRuns:p.completedRuns+1}));else setCompletedRuns((value) => value + 1);
+      setUnlockedMapId((value) => Math.max(value, Math.min(realMode?4:9, mapId + 1)));
+      if(realMode)requestPrioritySave();
     }
     setRunSummary({
       outcome,
@@ -4554,9 +4487,9 @@ function Game({
     );
   });
 
-  const canRebirth = level >= 100 && (mapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
+  const canRebirth = level >= 100 && (normalMapBestFloors[9] ?? 0) >= MAP_FLOORS && rebirthCount < MAX_REBIRTHS;
   const runSkillAction = async (action: SkillSaveAction): Promise<boolean> => {
-    if (!saveReady || sessionSuperseded || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return false;
+    if (!saveReady || sessionSuperseded || gemActionBusyRef.current || gemPendingRef.current || skillActionInFlightRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return false;
     skillActionInFlightRef.current = true;
     setSkillActionBusy(true);
     const key = JSON.stringify(action);
@@ -4615,10 +4548,11 @@ function Game({
     setRebirthPoints((value) => value + REBIRTH_REWARD_PER_TURN.talentPoints);
     setLevel(1);
     setExp(0);
-    setMapId(1);
-    setUnlockedMapId(1);
-    setMapBestFloors({ 1: 1 });
-    setWave(1);
+    setNormalMapId(1);
+    setNormalUnlockedMapId(1);
+    setNormalMapBestFloors({ 1: 1 });
+    setNormalWave(1);
+    setRealProgress(p=>({...emptyRealMode(p.unlocked),acknowledged:p.acknowledged}));
     setEnemyName(maps[0].monsters[0]);
     setEnemyHp(100);
     setPlayerHp(100);
@@ -4658,8 +4592,21 @@ function Game({
     toast.success("輪迴配點已重置", { description: `退回 ${investedPoints} 點，可重新自由分配。` });
   };
 
-  const enterMap = (targetMapId: number) => {
-    if (targetMapId > unlockedMapId) return;
+  const commitWorldMode=(next:'normal'|'real')=>{
+    if(!saveReady||sessionSuperseded||equipmentBusy||skillActionBusy||offlineClaimPending)return;
+    if(activeBossBattle){toast.info('請先結束首領挑戰');return;}
+    if(towerDeathPendingRef.current){toast.info('戰鬥正在結算，請稍候');return;}
+    if(next==='real'&&!realProgress.unlocked&&!(finalBossDefeated&&(normalMapBestFloors[9]??0)>=30))return;
+    if(next===(realMode?'real':'normal'))return;
+    resetCombatPerks();setRealProgress(p=>({...p,unlocked:p.unlocked||finalBossDefeated&&(normalMapBestFloors[9]??0)>=30,acknowledged:next==='real'||p.acknowledged,mode:next}));
+    const targetMap=next==='real'?realProgress.mapId:normalMapId,targetFloor=next==='real'?realProgress.wave:normalWave;
+    setEnemyName(maps[targetMap-1].monsters[targetFloor%5===0?4:0]);setEnemyHp(100);setPlayerHp(100);setBloodShieldReady(true);setBattlePulse(0);setRound(1);setBlessings([]);setBattleDrops([]);
+    setRunKills(0);setRunElites(0);setRunGuardians(0);setRunGold(0);setRunEnhance(0);setRunReforge(0);setRunGear(0);setRunStartedAt(Date.now());setRunSummary(null);setRestartCountdown(10);setBattleOn(!offlineReportOpen&&!blessingOpen);
+    setCausePrompt(next==='real'?'踏入真實世界，怪物沉睡的力量已甦醒':'已返回普通世界');pushLog('系統',next==='real'?'切換真實模式':'切換普通模式');requestPrioritySave();
+  };
+  const commitEnterMap = (targetMapId: number) => {
+    if(!saveReady||sessionSuperseded||activeBossBattle||towerDeathPendingRef.current)return;
+    if (targetMapId > unlockedMapId || realMode&&targetMapId>4) return;
     const target = maps[targetMapId - 1];
     towerDeathPendingRef.current = false;
     resetCombatPerks();
@@ -4689,9 +4636,41 @@ function Game({
     pushLog("系統", `前往${target.name}，從第 1 層開始定點掛機`);
   };
 
+  const mapEntryOrigin=`${loginId}:${saveReloadTick}:${runStartedAt}:${realMode?'real':'normal'}:${mapId}`;
+  const switchWorldMode=(next:'normal'|'real')=>{
+    if(!saveReady||sessionSuperseded||equipmentBusy||skillActionBusy||offlineClaimPending||activeBossBattle||towerDeathPendingRef.current)return;
+    if(next===(realMode?'real':'normal'))return;
+    if(next==='normal'){setPendingMapEntry(null);commitWorldMode(next);return;}
+    if(!realProgress.unlocked&&!(finalBossDefeated&&(normalMapBestFloors[9]??0)>=30))return;
+    setPendingMapEntry({kind:'world',chapter:realProgress.mapId,origin:mapEntryOrigin});
+  };
+  const enterMap=(targetMapId:number)=>{
+    if(!saveReady||sessionSuperseded||activeBossBattle||towerDeathPendingRef.current||pendingMapEntry)return;
+    if(targetMapId<1||targetMapId>unlockedMapId||realMode&&targetMapId>4)return;
+    if(!realMode){commitEnterMap(targetMapId);return;}
+    setPendingMapEntry({kind:'map',chapter:targetMapId,origin:mapEntryOrigin});
+  };
+  const finishRealMapEntry=useEffectEvent(()=>{
+    if(!pendingMapEntry)return;
+    if(!saveReady||sessionSuperseded||pendingMapEntry.origin!==mapEntryOrigin){setPendingMapEntry(null);return;}
+    if(!realMapAssets.assets)return;
+    const request=pendingMapEntry;setPendingMapEntry(null);
+    if(request.kind==='world')commitWorldMode('real');else commitEnterMap(request.chapter);
+  });
+  useEffect(()=>{finishRealMapEntry();},[pendingMapEntry,realMapAssets.assets,saveReady,sessionSuperseded,mapEntryOrigin]);
+
   const restartRun = useEffectEvent(beginNewRun);
   // HP changes on every hit; read its current value without resetting attack clocks.
-  const readTowerHealth = useEffectEvent(() => playerHp);
+  const readTowerHealth = useEffectEvent(readPlayerHp);
+  const readTowerEnemyHealth=useEffectEvent(readEnemyHp);
+  const readTowerEncounter=useEffectEvent((key:string)=>saveReady&&!sessionSuperseded&&!activeBossBattle&&!runSummary&&key===`${realMode?'real':'normal'}:${runStartedAt}:${mapId}:${wave}`);
+  const readRealFloatsVisible=useEffectEvent(()=>tab==='主控'&&documentVisible&&!sessionSuperseded);
+  useEffect(()=>{if(tab!=='主控'||!documentVisible)setRealCombatFloats([]);},[tab,documentVisible]);
+  useEffect(()=>{if(!realMode||activeBossBattle||sessionSuperseded||!battleOn||runSummary||enemyHp<=0)notifyRealMonster('dark-world-monster-target',{id:null});},[realMode,activeBossBattle,sessionSuperseded,battleOn,runSummary,enemyHp]);
+
+  const readRealCombatAllowed=useEffectEvent(()=>saveReady&&!sessionSuperseded&&realMode&&!activeBossBattle&&battleOn&&!runSummary&&!realMapLoading);
+  useEffect(()=>{if(saveReady&&finalBossDefeated&&(normalMapBestFloors[9]??0)>=30&&!realProgress.unlocked)setRealProgress(p=>({...p,unlocked:true}));},[saveReady,finalBossDefeated,normalMapBestFloors,realProgress.unlocked]);
+
 
   useEffect(() => {
     if (!runSummary) return;
@@ -4703,19 +4682,19 @@ function Game({
   }, [runSummary, restartCountdown]);
 
   useEffect(() => {
-    if (!saveReady || sessionSuperseded || !battleOn || activeBossBattle || runSummary) return;
+    if (!saveReady || sessionSuperseded || !battleOn || activeBossBattle || runSummary || realMapLoading) return;
     const cutoverRoute = beginSkillBattleCutover({
-      battleId: `tower:${runStartedAt}:${mapId}`,
+      battleId: `tower:${realMode?"real":"normal"}:${runStartedAt}:${mapId}`,
       encounter: "tower",
       enableRework: true,
       reworkReady: true,
     });
     let actionSequence = 0;
-    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, `tower:${runStartedAt}:${mapId}`,
-      `${runStartedAt}:${mapId}:${wave}`, skillReworkBuild, playerClass, level, skillAscensions);
+    liveCombatRef.current = syncLiveCombat(liveCombatRef.current, `tower:${realMode?"real":"normal"}:${runStartedAt}:${mapId}`,
+      `${realMode?"real":"normal"}:${runStartedAt}:${mapId}:${wave}`, skillReworkBuild, playerClass, level, skillAscensions);
     const tickMs = COMBAT_TICK_MS;
     const monsterAttackSpeed = monsterProfile(currentEnemyBaseName).speed * 100;
-    const cadence=retainCombatCadence(towerCadenceRef.current,`${runStartedAt}:${mapId}:${wave}`);
+    const cadence=retainCombatCadence(towerCadenceRef.current,`${realMode?"real":"normal"}:${runStartedAt}:${mapId}:${wave}`);
     towerCadenceRef.current=cadence;
     let skillCooldown = 0;
     let defenseBreakRemaining = 0;
@@ -4735,7 +4714,7 @@ function Game({
     if (markedRemaining > 0 && hasSkillMythic("致命標記")) {
       showCombatStatus({ name: "致命標記 ×2", target: "enemy", remaining: markedRemaining + 1, unit: "攻擊", tone: "gold" });
     }
-    const targetKey = `${runStartedAt}:${mapId}:${wave}`;
+    const targetKey = `${realMode?"real":"normal"}:${runStartedAt}:${mapId}:${wave}`;
     const resolveTowerKill = (executionFinisher: boolean, markExplosionWasActive: boolean, tier: "normal" | "elite" | "guardian" | "boss") => {
       if (!towerVictoryGuardRef.current.claim(targetKey)) return executionFinisher ? 0 : 100;
       if (hasPerk("special-bloodfang")) combatPerksRef.current.killBuffRemaining = 5;
@@ -4758,9 +4737,9 @@ function Game({
       const enemy = baseMonsterName(enemyName);
       const goldRules = balanceConfig.economy.gold;
       const goldTier = currentWaveBoss ? "boss" : currentWaveGuardian ? "guardian" : currentWaveElite ? "elite" : "normal";
-      const goldBase = goldRules.monsterDropBaseByMap[mapId - 1] ?? goldRules.monsterDropBaseByMap[0];
+      const goldBase = goldRules.monsterDropBaseByMap[(realMode?9:mapId) - 1] ?? goldRules.monsterDropBaseByMap[0];
       const goldGain = Math.round(
-        goldBase * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
+        goldBase * (realMode?realModeScale(mapId,wave,tier).reward:1) * (1 + Math.max(0, wave - 1) * goldRules.floorGrowth) *
         goldRules.tierMultiplier[goldTier] *
         (hasBlessing("stat-gold") ? 1.2 : 1) *
         (1 + (characterStats.goldBonus / 100) * goldRules.goldAffixEffectiveness),
@@ -4842,7 +4821,7 @@ function Game({
       pushLog("成長", `獲得 ${experienceGain.toLocaleString()} 經驗`);
       if (wave >= MAP_FLOORS) {
         setMapBestFloors((old) => ({ ...old, [mapId]: MAP_FLOORS }));
-        setTimeout(() => finishRun("complete", MAP_FLOORS), 250);
+        setTimeout(() => {if(!realMode||readTowerEncounter(targetKey))finishRun("complete", MAP_FLOORS);}, 250);
         return 100;
       }
       const nextWave = wave + 1;
@@ -4861,11 +4840,14 @@ function Game({
         setEnemyName(baseMonsterName(nextEnemy));
         if (executionFinisher) setEnemyHp(100);
         towerDeathPendingRef.current = false;
-        if (currentWaveGuardian) setTimeout(offerBlessings, 450);
+        if (currentWaveGuardian) setTimeout(()=>{
+          const nextKey=`${realMode?'real':'normal'}:${runStartedAt}:${mapId}:${nextWave}`;
+          if(!realMode||readTowerEncounter(nextKey)&&readTowerHealth()>0)offerBlessings();
+        },450);
       };
       if (executionFinisher) {
         towerDeathPendingRef.current = true;
-        window.setTimeout(advanceToNextEnemy, 1_050);
+        window.setTimeout(()=>{if(!realMode||readTowerEncounter(targetKey))advanceToNextEnemy();}, 1_050);
         return 0;
       }
       advanceToNextEnemy();
@@ -4878,17 +4860,83 @@ function Game({
       }};
       return 0;
     };
+    if(realMode){
+      const ability=realAbilityFor(mapId,currentEnemyBaseName);
+      if(ability&&realMonsterRef.current?.identity!==targetKey){
+        notifyRealMonster('dark-world-monster-target',{id:null});
+        realMonsterRef.current=createRealMonster(targetKey,ability,currentCombatTier,wave);setRealCombatFloats([]);
+      }
+    }
+    const settleRealMonsterHit=(request:import('./real-monster-combat').RealHit,eventId:string)=>{
+      const runtime=realMonsterRef.current;
+      if(!runtime||runtime.identity!==targetKey||towerDeathPendingRef.current||!readRealCombatAllowed())return {landed:false,damage:0};
+      const health=realPlayerHpRef.current,mods=realMonsterModifiers(runtime);
+      const values=towerCombatValues({combatPower,recommendedPower:currentRecommendedPower,mapId,localFloor:wave,tier:currentCombatTier,attacks:1,skillTriggered:false,setTier:0,monsterName:currentEnemyBaseName,playerAttack:characterStats.attack,
+        playerDefense:characterStats.defense*mods.defense*(1-(request.defenseIgnore??0)),bossReduction:characterStats.bossReduction,lowHealthReduction:characterStats.lowHealthReduction,lowHealth:health<=35,realModeChapter:mapId});
+      let damage=Math.max(0,Math.round(values.monsterDamage*request.scale*(hasBlessing('stat-hp')?.84:1)*(hasBlessing('stat-defense')?.87:1)*(1-Math.min(balanceConfig.progression.damageReductionCap,characterStats.damageReduction+(hasPerk('special-ashguard')&&health<40?8:0))/100)));
+      let dodged=false,blocked=false;
+      if(!request.dot&&hasBlessing('blood')&&bloodShieldReady&&!runtime.bloodShieldUsed){runtime.bloodShieldUsed=true;damage=Math.max(1,Math.round(damage*(blessingUpgraded('blood')?.10:.20)));setBloodShieldReady(false);}
+      if(!request.dot&&liveCombatRef.current){
+        const result=resolveLiveEnemyAttack(liveCombatRef.current,{healthPercent:health,maxHealth:characterStats.hp,damage,gemThorns:characterStats.gemThorns,gemShieldBonus:characterStats.gemShieldBonus,baseDodgeChance:effectiveDodge,defense:characterStats.defense*mods.defense,equippedItems:equippedGearRef.current});
+        damage=result.damage;dodged=result.dodged;blocked=result.blocked;
+        updateManaShield(liveCombatRef.current,result.manaShield);updatePhantomStepVisual(liveCombatRef.current,Date.now(),result.phantomStep);
+        if(result.unyielding){updateUnyieldingVisual(result.unyielding,Date.now());}
+        if(result.reflectedDamage>0){setEnemyHp(previous=>{
+          if(towerDeathPendingRef.current||towerVictoryGuardRef.current.has(targetKey))return previous;
+          const hit=settleCombatHealth(previous,currentEnemyMaximumHealth,result.reflectedDamage);showCounterDamage(hit.actualDamage,'荊棘反傷');
+          return hit.defeated?queueTowerKill(false,false,currentCombatTier):hit.remainingPercent;
+        });}
+        if(result.counterDamagePercent>0||(result.equipmentDamage??0)>0){
+          const amount=characterStats.attack*mods.attack*result.counterDamagePercent/100+(result.equipmentDamage??0);
+          setEnemyHp(previous=>{
+            if(towerDeathPendingRef.current||towerVictoryGuardRef.current.has(targetKey))return previous;
+            const settled=settleCombatHealth(previous,currentEnemyMaximumHealth,amount);showCounterDamage(settled.actualDamage,result.equipmentDamage?'過載爆炸':'反擊');
+            return settled.defeated?queueTowerKill(false,false,currentCombatTier):settled.remainingPercent;
+          });
+        }
+      }else if(!request.dot&&Math.random()*100<effectiveDodge){damage=0;dodged=true;}
+      if(dodged&&hasPerk('special-shadowwalker')){combatPerksRef.current.dodgeSpeedAttacks=3;showCombatStatus({name:'疾影 +12%攻速',target:'player',remaining:3,unit:'次',tone:'green'});}
+      const settlement=settleCombatHealth(health,characterStats.hp,damage);
+      realPlayerHpRef.current=settlement.remainingPercent;setPlayerHp(settlement.remainingPercent);
+      const text=blocked?'格擋！':dodged?'閃避！':undefined;
+      const event:CombatFloatEvent={id:eventId,target:'player',channel:text?'status':request.dot?'dot':'primary',damage:text?undefined:settlement.actualDamage,text,label:request.label,delayMs:0,tone:request.ability==='bleed'?'bleed':request.ability==='ironWhip'?'burn':'normal'};
+      if(readRealFloatsVisible()&&(text||settlement.actualDamage>0))setRealCombatFloats(old=>old.some(e=>e.id===eventId)?old:[...old,event].slice(-48));
+      if(settlement.actualDamage>0&&hasPerk('special-revenge-thorn'))combatPerksRef.current.revengeStacks=Math.min(3,combatPerksRef.current.revengeStacks+1);
+      if(settlement.defeated&&!towerDeathPendingRef.current){towerDeathPendingRef.current=true;setBattleOn(false);setCausePrompt('生命歸零 → 戰鬥已停止');window.setTimeout(()=>{if(readTowerEncounter(targetKey)&&readTowerHealth()<=0)finishRun('death',wave);},0);}
+      return {landed:!dodged&&!blocked,damage:settlement.actualDamage};
+    };
     const timer = setInterval(
       () => {
-        const playerHp = readTowerHealth();
-        if (ultimateAnimationLockRef.current !== null) return;
+        let playerHp = readTowerHealth();
+        if (!realMode && ultimateAnimationLockRef.current !== null) return;
         if (towerDeathPendingRef.current) return;
         if (towerVictoryGuardRef.current.has(targetKey)) return;
+        if(realMode&&realMonsterRef.current){
+          const runtime=realMonsterRef.current;realPlayerHpRef.current=playerHp;
+          const control=liveEnemyControl(liveCombatRef.current,Date.now());
+          advanceRealMonster(runtime,tickMs,control.frozen,{
+            hit:settleRealMonsterHit,alive:()=>readRealCombatAllowed()&&realPlayerHpRef.current>0&&readTowerEnemyHealth()>0&&!towerDeathPendingRef.current&&!towerVictoryGuardRef.current.has(targetKey),notify:notifyRealMonster,
+            heal:fraction=>{
+              const native=towerCombatValues({combatPower,recommendedPower:currentRecommendedPower,mapId,localFloor:wave,tier:currentCombatTier,attacks:1,skillTriggered:false,setTier:0,playerAttack:0,playerDefense:0,monsterName:currentEnemyBaseName,realModeChapter:mapId}).monsterAttack;
+              // Effect Events must run on the combat tick, never inside a
+              // React state updater (which React may replay during render).
+              const visible=readRealFloatsVisible(),id=`${runtime.identity}:heal:${runtime.serial}:${runtime.clock}`;
+              setEnemyHp(previous=>{
+                if(previous<=0||realMonsterRef.current?.identity!==runtime.identity||towerDeathPendingRef.current)return previous;
+                const next=Math.min(100,previous+Math.round(native*fraction)/currentEnemyMaximumHealth*100),healed=(next-previous)*currentEnemyMaximumHealth/100;
+                if(healed>=1&&visible)setRealCombatFloats(old=>old.some(e=>e.id===id)?old:[...old,{id,target:'enemy',channel:'status',text:`恢復 ${Math.round(healed)}`,tone:'element'}].slice(-48) as CombatFloatEvent[]);
+                return next;
+              });
+            },
+          });
+          if(realPlayerHpRef.current<=0||towerDeathPendingRef.current)return;
+          playerHp=realPlayerHpRef.current;
+        }
         const dotTicks = liveCombatRef.current ? advanceLiveCombatEvents(liveCombatRef.current, Date.now()) : [];
         const tickDamage = dotTicks.reduce((sum, event) => sum + event.damage, 0);
         if (tickDamage > 0) {
           const tickTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
-          const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName);
+          const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tickTier, currentEnemyBaseName,realMode?mapId:0,wave);
           setEnemyHp((health) => {
             if(towerDeathPendingRef.current)return 0;
             if (towerVictoryGuardRef.current.has(targetKey)) return 100;
@@ -4907,14 +4955,14 @@ function Game({
           }
           setBloodRoarVisualActive(false);
         }
-        cadence.player += tickMs;
+        cadence.player += tickMs * realMonsterModifiers(realMode?realMonsterRef.current:null).speed;
         const enemyControl = liveEnemyControl(liveCombatRef.current, Date.now());
         cadence.enemy = enemyControl.frozen ? 0 : cadence.enemy + tickMs * enemyControl.speedMultiplier;
         const activeCombatAttackSpeed = combatAttackSpeed * (
           combatPerksRef.current.dodgeSpeedAttacks > 0 ? 1.12 : 1
         );
         const playerInterval = 100000 / Math.max(1, activeCombatAttackSpeed);
-        const monsterInterval = 100000 / monsterAttackSpeed;
+        const monsterInterval = 100000 / (monsterAttackSpeed*realMonsterModifiers(realMode?realMonsterRef.current:null).enemySpeed);
         const playerActs = cadence.player >= playerInterval;
         let monsterActs = !enemyControl.frozen && cadence.enemy >= monsterInterval;
         if (!playerActs && !monsterActs) return;
@@ -4924,7 +4972,7 @@ function Game({
           nextBurnAt = Date.now() + 1000;
           const burnLevel = skills.find((skill) => skill.name === "霜火新星")?.level ?? 1;
           const burnTier = currentWaveGuardian ? "guardian" : currentWaveBoss ? "boss" : currentWaveElite ? "elite" : "normal";
-          const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName);
+          const maximumHealth = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, burnTier, currentEnemyBaseName,realMode?mapId:0,wave);
           setEnemyHp((health) => {
             if(towerDeathPendingRef.current)return 0;
             if (towerVictoryGuardRef.current.has(targetKey)) return towerDeathPendingRef.current ? 0 : 100;
@@ -4938,7 +4986,7 @@ function Game({
         const dynamicLifesteal = characterStats.lifesteal +
           (hasPerk("special-blood-prayer") && playerHp < 30 ? 3 : 0);
         const offensiveAttack = Math.round(
-          characterStats.attack *
+          characterStats.attack * realMonsterModifiers(realMode?realMonsterRef.current:null).attack *
           (hasPerk("special-warhelm") && playerHp > 80 ? 1.1 : 1),
         );
         setBattlePulse((p) => {
@@ -4956,7 +5004,8 @@ function Game({
                 : "normal";
           if (!playerActs) {
             const monsterOnlyValues = towerCombatValues({
-              secondChapterTuning: mapId === 2,
+              secondChapterTuning: !realMode && mapId === 2,
+              realModeChapter:realMode?mapId:0,
               combatPower,
               recommendedPower: currentRecommendedPower,
               mapId,
@@ -4975,7 +5024,7 @@ function Game({
               lowHealth: playerHp <= 35,
               roll: Math.random(),
               monsterName: currentEnemyBaseName,
-              playerDefense: characterStats.defense,
+              playerDefense: characterStats.defense * realMonsterModifiers(realMode?realMonsterRef.current:null).defense,
               playerAttack: offensiveAttack,
               defenseIgnore: hasPerk("special-blackfang") ? 8 : 0,
               playerDamageMultiplier: 1,
@@ -5029,7 +5078,8 @@ function Game({
                 queueSkillVisual({ name: "魔力護盾・爆炸", key: next });
                 showCombatStatus({ name: "過載爆炸", target: "player", remaining: 1, unit: "次", tone: "gold" });
               }
-              if (hasBlessing("blood") && bloodShieldReady) {
+              if (hasBlessing("blood") && bloodShieldReady && !(realMode&&realMonsterRef.current?.bloodShieldUsed)) {
+                if(realMode&&realMonsterRef.current)realMonsterRef.current.bloodShieldUsed=true;
                 const reduction = blessingUpgraded("blood") ? 0.9 : 0.8;
                 monsterDamage = Math.max(1, Math.round(monsterDamage * (1 - reduction)));
                 setBloodShieldReady(false);
@@ -5038,8 +5088,8 @@ function Game({
               if (liveCombatRef.current) {
                 const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
                   healthPercent: playerHealth, maxHealth: characterStats.hp,
-                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
-                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
+                  damage: monsterDamage,gemThorns:characterStats.gemThorns,gemShieldBonus:characterStats.gemShieldBonus, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense * realMonsterModifiers(realMode?realMonsterRef.current:null).defense, equippedItems: equippedGearRef.current,
                 });
                 updateManaShield(liveCombatRef.current, liveDefense.manaShield);
                 updatePhantomStepVisual(liveCombatRef.current, next, liveDefense.phantomStep);
@@ -5048,9 +5098,21 @@ function Game({
                   setUnyieldingCounterFeedback(liveDefense.unyielding.countered ? next : null);
                 }
                 monsterDamage = liveDefense.damage;
+                if (liveDefense.reflectedDamage > 0) {
+                  const maximum=effectiveMonsterMaximumHealth(mapId,currentRecommendedPower,tier,currentEnemyBaseName,realMode?mapId:0,wave);
+                  let reflectedRemaining:number|null=null;
+                  setEnemyHp(health=>{
+                    if(reflectedRemaining!==null)return reflectedRemaining;
+                    if(!readTowerEncounter(targetKey)||towerDeathPendingRef.current||towerVictoryGuardRef.current.has(targetKey))return health;
+                    const hit=settleCombatHealth(health,maximum,liveDefense.reflectedDamage);
+                    reflectedRemaining=hit.remainingPercent;showCounterDamage(hit.actualDamage,"荊棘反傷");
+                    if(hit.defeated)queueTowerKill(false,false,tier);
+                    return reflectedRemaining;
+                  });
+                }
                 if (liveDefense.counterDamagePercent > 0 || (liveDefense.equipmentDamage ?? 0) > 0) {
-                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
-                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  const counter = characterStats.attack * realMonsterModifiers(realMode?realMonsterRef.current:null).attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName,realMode?mapId:0,wave);
                   setEnemyHp((health) => {
                     if(towerDeathPendingRef.current)return 0;
                     if (towerVictoryGuardRef.current.has(targetKey)) return 100;
@@ -5080,7 +5142,7 @@ function Game({
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
                   setCausePrompt("生命歸零 → 戰鬥已停止");
-                  window.setTimeout(() => finishRun("death", wave), 0);
+                  window.setTimeout(() => {if(!realMode||readTowerEncounter(targetKey)&&readTowerHealth()<=0)finishRun("death", wave);}, 0);
                 }
                 return 0;
               }
@@ -5128,9 +5190,9 @@ function Game({
             playerAttackCount % SET_RESONANCE_ATTACKS === 0;
           const liveCombat = liveCombatRef.current;
           const liveAction = playerActs && liveCombat ? resolveLiveCombatAttack(liveCombat, {
-            now: Date.now(), healthPercent: playerHp, attack: characterStats.attack,
+            now: Date.now(), healthPercent: playerHp, attack: characterStats.attack * realMonsterModifiers(realMode?realMonsterRef.current:null).attack,
             hitChance: effectiveHit, criticalChance: characterStats.crit,
-            criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
+            criticalDamage: characterStats.critDamage, gemBasicDamage:characterStats.gemBasicDamage,gemDotDamage:characterStats.gemDotDamage, equippedItems: equippedGearRef.current,
           }) : null;
           if (liveAction?.currentHealthCostPercent) setPlayerHp(health => Math.max(
             healthPercentFromDamage(1, characterStats.hp), health * (1 - liveAction.currentHealthCostPercent / 100)));
@@ -5138,7 +5200,7 @@ function Game({
           if (liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
             skill.category === "ultimate" && skill.name === liveAction.name)) {
             beginUltimateAnimation(next);
-            if ((liveAction.name === "蒼穹箭雨" || liveAction.name === "星界寂滅") && monsterActs) cadence.enemy += monsterInterval;
+            if (!realMode && (liveAction.name === "蒼穹箭雨" || liveAction.name === "星界寂滅") && monsterActs) cadence.enemy += monsterInterval;
           }
           if (liveAction && liveCombat) {
             updateLiveBloodRoar(liveCombat, liveAction, next);
@@ -5367,7 +5429,8 @@ function Game({
             : 1;
           const hitRoll = Math.random() * 100;
           const combatValues = towerCombatValues({
-            secondChapterTuning: mapId === 2,
+            secondChapterTuning: !realMode && mapId === 2,
+              realModeChapter:realMode?mapId:0,
             combatPower,
             recommendedPower: currentRecommendedPower,
             mapId,
@@ -5397,14 +5460,14 @@ function Game({
             lowHealth: playerHp <= 35,
             roll: liveAction ? 0 : hitRoll / 100,
             monsterName: currentEnemyBaseName,
-            playerDefense: characterStats.defense,
+            playerDefense: characterStats.defense * realMonsterModifiers(realMode?realMonsterRef.current:null).defense,
             playerAttack: offensiveAttack,
             defenseIgnore: triggeredDefenseIgnore,
             playerHit: characterStats.hit,
             monsterEvasionRating:
-              monsterRatingsForMap(mapId).evasion,
+              currentMonsterRatings.evasion,
             playerDamageMultiplier:
-              attackPerkMultiplier *
+              realMonsterModifiers(realMode?realMonsterRef.current:null).incomingEnemy * attackPerkMultiplier *
               (fissureWasActive ? 1.3 : 1) *
               (enemyAttackCount === 1 && hasEquippedEpithet(equippedGearRef.current, "chase") ? 1.1 : 1) *
               (critical && enemyAttackCount <= 3 && hasEquippedEpithet(equippedGearRef.current, "charge")
@@ -5541,6 +5604,8 @@ function Game({
               currentRecommendedPower,
               tier,
               currentEnemyBaseName,
+              realMode ? mapId : 0,
+              wave,
             );
             const currentHealth = healthFromPercent(h, enemyMaximumHealth);
             const actionLedger = createSkillDamageLedger(cutoverRoute.battleId, targetKey,
@@ -5755,7 +5820,7 @@ function Game({
             }
             if (healthSettlement.defeated) return queueTowerKill(triggered?.name === "處決", markExplosionWasActive, tier,
               liveAction?.name==="疾風連射"?next:undefined);
-            if (!monsterActs || liveAction?.name === "蒼穹箭雨" || liveAction?.name === "星界寂滅") return healthSettlement.remainingPercent;
+            if (!monsterActs || !realMode && (liveAction?.name === "蒼穹箭雨" || liveAction?.name === "星界寂滅")) return healthSettlement.remainingPercent;
             setPlayerHp((playerHealth) => {
               const shieldWasActive = magicShieldCooldown > 0;
               if (magicShieldCooldown > 0) magicShieldCooldown -= 1;
@@ -5805,7 +5870,8 @@ function Game({
                 queueSkillVisual({ name: "魔力護盾・爆炸", key: next });
                 showCombatStatus({ name: "過載爆炸", target: "player", remaining: 1, unit: "次", tone: "gold" });
               }
-              if (hasBlessing("blood") && bloodShieldReady) {
+              if (hasBlessing("blood") && bloodShieldReady && !(realMode&&realMonsterRef.current?.bloodShieldUsed)) {
+                if(realMode&&realMonsterRef.current)realMonsterRef.current.bloodShieldUsed=true;
                 const reduction = blessingUpgraded("blood") ? 0.9 : 0.8;
                 monsterDamage = Math.max(
                   1,
@@ -5819,8 +5885,8 @@ function Game({
               if (liveCombatRef.current) {
                 const liveDefense = resolveLiveEnemyAttack(liveCombatRef.current, {
                   healthPercent: playerHealth, maxHealth: characterStats.hp,
-                  damage: monsterDamage, baseDodgeChance: effectiveDodge,
-                   defense: characterStats.defense, equippedItems: equippedGearRef.current,
+                  damage: monsterDamage,gemThorns:characterStats.gemThorns,gemShieldBonus:characterStats.gemShieldBonus, baseDodgeChance: effectiveDodge,
+                   defense: characterStats.defense * realMonsterModifiers(realMode?realMonsterRef.current:null).defense, equippedItems: equippedGearRef.current,
                 });
                 updateManaShield(liveCombatRef.current, liveDefense.manaShield);
                 updatePhantomStepVisual(liveCombatRef.current, next, liveDefense.phantomStep);
@@ -5829,9 +5895,21 @@ function Game({
                   setUnyieldingCounterFeedback(liveDefense.unyielding.countered ? next : null);
                 }
                 monsterDamage = liveDefense.damage;
+                if (liveDefense.reflectedDamage > 0) {
+                  const maximum=effectiveMonsterMaximumHealth(mapId,currentRecommendedPower,tier,currentEnemyBaseName,realMode?mapId:0,wave);
+                  let reflectedRemaining:number|null=null;
+                  setEnemyHp(health=>{
+                    if(reflectedRemaining!==null)return reflectedRemaining;
+                    if(!readTowerEncounter(targetKey)||towerDeathPendingRef.current||towerVictoryGuardRef.current.has(targetKey))return health;
+                    const hit=settleCombatHealth(health,maximum,liveDefense.reflectedDamage);
+                    reflectedRemaining=hit.remainingPercent;showCounterDamage(hit.actualDamage,"荊棘反傷");
+                    if(hit.defeated)queueTowerKill(false,false,tier);
+                    return reflectedRemaining;
+                  });
+                }
                 if (liveDefense.counterDamagePercent > 0 || (liveDefense.equipmentDamage ?? 0) > 0) {
-                  const counter = characterStats.attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
-                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName);
+                  const counter = characterStats.attack * realMonsterModifiers(realMode?realMonsterRef.current:null).attack * liveDefense.counterDamagePercent / 100 + (liveDefense.equipmentDamage ?? 0);
+                  const maximum = effectiveMonsterMaximumHealth(mapId, currentRecommendedPower, tier, currentEnemyBaseName,realMode?mapId:0,wave);
                   setEnemyHp((health) => {
                     if(towerDeathPendingRef.current)return 0;
                     if (towerVictoryGuardRef.current.has(targetKey)) return 100;
@@ -5865,7 +5943,7 @@ function Game({
                   towerDeathPendingRef.current = true;
                   setBattleOn(false);
                   setCausePrompt("生命歸零 → 戰鬥已停止");
-                  window.setTimeout(() => finishRun("death", wave), 0);
+                  window.setTimeout(() => {if(!realMode||readTowerEncounter(targetKey)&&readTowerHealth()<=0)finishRun("death", wave);}, 0);
                 }
                 return 0;
               }
@@ -5921,9 +5999,11 @@ function Game({
     battleOn,
     runSummary,
     currentMap,
+    realMode,realMapLoading,currentMonsterRatings.accuracy,currentMonsterRatings.evasion,
     combatPower,
     baseCharacterStats.attack,
     characterStats.attack,
+    characterStats.defense,characterStats.hp,characterStats.critDamage,
     characterStats.hit,
     characterStats.crit,
     characterStats.dodge,
@@ -5932,7 +6012,7 @@ function Game({
     characterStats.goldBonus,
     characterStats.bossDamage,
     characterStats.damageReduction,
-    characterStats.skillDamage,
+    characterStats.skillDamage,characterStats.gemBasicDamage,characterStats.gemDotDamage,characterStats.gemShieldBonus,characterStats.gemThorns,
     characterStats.comboChance,
     characterStats.bossReduction,
     characterStats.eliteDamage,
@@ -5975,7 +6055,7 @@ function Game({
   };
 
   const claimOfflineReport = async () => {
-    if (offlineClaimPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+    if (offlineClaimPendingRef.current || gemActionBusyRef.current || gemPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
     offlineClaimPendingRef.current = true;
     setOfflineClaimPending(true);
     let claimSeconds = storedSeconds;
@@ -6042,7 +6122,7 @@ function Game({
     );
     const gainedStones = Math.floor(hours * 6 * offlineSetMultiplier);
     const averageMonsterExp = Math.round(
-      (currentMap.exp[0] + currentMap.exp[1]) / 2,
+      (offlineMap.exp[0] + offlineMap.exp[1]) / 2,
     );
     const gainedExp = Math.round(
       simulatedKills *
@@ -6056,12 +6136,12 @@ function Game({
       () => Math.random() < 0.15,
     ).length;
     const offlineFinds = Array.from({ length: equipmentCount }, (_, index) =>
-      createDrop(mapId, "掛機", Date.now() + index),
+      createDrop(normalMapId, "掛機", Date.now() + index),
     );
     let offlineGems: GemStack[] = [];
     let offlineDrillingStones = 0;
     for (let index = 0; index < simulatedKills; index += 1) {
-      const gem = rollGemDrop(mapId);
+      const gem = rollGemDrop(normalMapId);
       if (gem) offlineGems = addGemStack(offlineGems, gem);
       if (rollDrillingStoneDrop()) offlineDrillingStones += 1;
     }
@@ -6176,8 +6256,10 @@ function Game({
   };
 
   const submitEquipmentAction = async (kind:"reforge"|"drill",targetIndex?:number) => {
-    if(!currentItem || !saveReady || equipmentBusyRef.current || skillActionInFlightRef.current || shopPurchaseInFlightRef.current || offlineClaimPendingRef.current || sessionSuperseded)return;
-    if(saveInFlightRef.current){requestPrioritySave();return toast.info("進度正在同步，請稍後再試");}
+    if(!currentItem || !saveReady || gemActionBusyRef.current || gemPendingRef.current || equipmentBusyRef.current || skillActionInFlightRef.current || shopPurchaseInFlightRef.current || offlineClaimPendingRef.current || sessionSuperseded)return;
+    // The current snapshot must finish first, but another priority snapshot
+    // would only keep the next equipment attempt blocked again.
+    if(saveInFlightRef.current)return toast.info("進度正在同步，請稍後再試");
     const pending=equipmentPendingRef.current;
     if(pending&&(pending.kind!==kind||pending.itemId!==currentItem.id||pending.targetIndex!==targetIndex))return toast.info("請先重試上一筆裝備操作，或重新登入確認結果");
     const action=pending??{id:crypto.randomUUID(),kind,itemId:currentItem.id,...(targetIndex===undefined?{}:{targetIndex})};
@@ -6193,7 +6275,9 @@ function Game({
       if(kind==="reforge"){setGold(v=>Math.max(0,v-result.receipt.gold));setReforgeStones(v=>Math.max(0,v-result.receipt.stones));}else setDrillingStones(v=>Math.max(0,v-result.receipt.stones));
       setAdminRevision(result.adminRevision);setSaveUpdatedAt(result.updatedAt);equipmentPendingRef.current=null;
       pushLog("裝備",`${currentItem.name}完成${kind==="drill"?"打孔":targetIndex===undefined?"一般洗鍊":"定向洗鍊"}`);
-      toast.success(kind==="drill"?"裝備新增 1 個孔位":"洗鍊完成",{description:kind==="reforge"?`${currentItem.quality}裝備只會產生${currentItem.quality}數值區間・可繼續洗鍊`:"已消耗 1 顆打孔石"});requestPrioritySave();
+      // The equipment endpoint already saved the roll and charged resources
+      // atomically. Let other local progress use the normal autosave cadence.
+      toast.success(kind==="drill"?"裝備新增 1 個孔位":"洗鍊完成",{description:kind==="reforge"?`${currentItem.quality}裝備只會產生${currentItem.quality}數值區間・可繼續洗鍊`:"已消耗 1 顆打孔石"});
     }catch{setSaveStatus("等待裝備操作確認");toast.error("連線中斷，請重試相同裝備操作",{description:"重試沿用同一筆操作，不會重複扣費；也可重新登入確認結果。"});}
     finally{equipmentBusyRef.current=false;setEquipmentBusy(false);}
   };
@@ -6203,95 +6287,54 @@ function Game({
   };
   const drillCurrentItem = () => { void submitEquipmentAction("drill"); };
 
-  const socketSelectedGem = (socketIndex: number) => {
-    if (!currentItem || !selectedGem) return toast.info("請先選擇一顆寶石");
-    const gem: SocketedGem = { gemId: selectedGem.gemId, tier: selectedGem.tier };
-    const currentSockets = normalizeEquipmentSockets(currentItem.sockets);
-    if (currentSockets.gems.some((existing) => existing?.gemId === gem.gemId)) {
-      return toast.info("同一件裝備不可重複鑲嵌同種類寶石");
-    }
-    const nextSockets = socketGem(currentSockets, socketIndex, gem);
-    if (!nextSockets) return toast.error("這個孔位無法鑲嵌");
-    const nextInventory = normalizeGemInventory(gemInventory).map((stack) => ({ ...stack }));
-    const source = nextInventory.find((stack) => stack.gemId === gem.gemId && stack.tier === gem.tier);
-    if (!source || source.quantity <= 0) return toast.error("寶石數量不足");
-    source.quantity -= 1;
-    setGemInventory(nextInventory.filter((stack) => stack.quantity > 0));
-    setItems((old) => old.map((item) => item.id === currentItem.id ? { ...item, sockets: nextSockets } : item));
-    if (source.quantity <= 0) setSelectedGemKey(null);
-    const definition = getGemDefinition(gem.gemId, gem.tier);
-    pushLog("裝備", `${currentItem.name}鑲嵌${definition.tierLabel}${definition.name}`);
-    toast.success("鑲嵌完成", { description: `${gemEffectLabel(definition)}，鑲嵌後不可拆卸` });
-  };
-
-  const addGemToFusionCircle = (stack: GemStack) => {
-    if (stack.tier === "advanced") return toast.info("高階寶石已達最高階");
-    const placed = gemFusionSlots.filter(
-      (gem) => gem?.gemId === stack.gemId && gem.tier === stack.tier,
-    ).length;
-    if (placed >= stack.quantity) return toast.info("這種寶石已全部放入魔法陣");
-    const occupiedTier = gemFusionSlots.find(Boolean)?.tier;
-    if (occupiedTier && occupiedTier !== stack.tier)
-      return toast.info("魔法陣只能放入相同階級的寶石");
-    const emptyIndex = gemFusionSlots.findIndex((gem) => !gem);
-    if (emptyIndex < 0) return toast.info("三個魔法陣槽位已放滿");
-    setGemFusionResult(null);
-    setGemFusionSlots((slots) => slots.map((gem, index) =>
-      index === emptyIndex ? { gemId: stack.gemId, tier: stack.tier } : gem,
-    ));
-  };
-
-  const autoFillGemCircle = (mode: "same" | "mixed") => {
-    const candidates = [...gemInventory]
-      .filter((stack) => stack.tier !== "advanced")
-      .sort((a, b) => GEM_TIERS.indexOf(a.tier) - GEM_TIERS.indexOf(b.tier));
-    if (mode === "same") {
-      const stack = candidates.find((candidate) => candidate.quantity >= 3);
-      if (!stack) return toast.info("目前沒有可自動放入的三顆同名寶石");
-      setGemFusionSlots(Array.from({ length: 3 }, () => ({ gemId: stack.gemId, tier: stack.tier })));
-      setGemFusionResult(null);
-      return;
-    }
-    for (const tier of ["beginner", "intermediate"] as const) {
-      const pool = candidates.filter((candidate) => candidate.tier === tier);
-      const materials: SocketedGem[] = [];
-      for (const stack of pool) {
-        for (let index = 0; index < stack.quantity && materials.length < 3; index += 1) {
-          materials.push({ gemId: stack.gemId, tier: stack.tier });
+  const runGemAction = async (input:Omit<GemAction,'id'>) => {
+    if(gemActionBusyRef.current||equipmentBusyRef.current||equipmentPendingRef.current||skillActionInFlightRef.current||shopPurchaseInFlightRef.current||offlineClaimPendingRef.current||!saveReady||sessionSuperseded)throw new Error("目前有其他操作進行中，請稍後再試。");
+    const existing=gemPendingRef.current;
+    if(existing&&JSON.stringify({...existing.action,id:undefined})!==JSON.stringify({...input,id:undefined}))throw new Error("請先確認上一筆寶石操作。");
+    gemActionBusyRef.current=true;setGemActionBusy(true);
+    const epoch=gemContextEpochRef.current;
+    const sameSession=()=>{const latest=gemSessionRef.current;return epoch===gemContextEpochRef.current&&latest.saveReady&&!latest.sessionSuperseded&&latest.playerId===playerId&&latest.loginId===loginId;};
+    try{
+      if(!existing){
+        // Save earned drops and new equipment first. The normal snapshot remains
+        // allowed during this drain; other resource actions are reserved above.
+        requestPrioritySave();
+        await new Promise(resolve=>window.setTimeout(resolve,0));
+        const deadline=Date.now()+20000;
+        while(prioritySaveRef.current||saveInFlightRef.current||saveRequestIdRef.current){
+          if(!sameSession()||Date.now()>=deadline)throw new Error("進度同步尚未完成，請稍後再試。");
+          await new Promise(resolve=>window.setTimeout(resolve,50));
         }
       }
-      if (materials.length === 3) {
-        setGemFusionSlots(materials);
-        setGemFusionResult(null);
-        return;
-      }
-    }
-    toast.info("目前沒有可自動放入的三顆同階寶石");
+      if(!sameSession())throw new Error("登入狀態已變更，請重新載入。");
+      const pending=existing??{action:{...input,id:crypto.randomUUID()},before:normalizeGemInventory(lastSavedGemInventoryRef.current)};
+      gemPendingRef.current=pending;setGemPending(true);equipmentBusyRef.current=true;setEquipmentBusy(true);
+      const {response,result}=await saveJsonWithTimeout('/api/save',{method:'POST',headers:loginHeaders(loginId,true),body:JSON.stringify({playerId,action:'gem',gemAction:pending.action})});
+      if(!sameSession()){gemPendingRef.current=null;setGemPending(false);return;}
+      if(response.status===401||result?.error==='maintenance'){gemPendingRef.current=null;setGemPending(false);pauseSupersededSession(result?.error==='maintenance'?'maintenance':result?.error==='session_replaced'?'replaced':'expired');return;}
+      if(response.status>=500||response.status===429)throw new Error("寶石結果尚待確認，請重試上一筆操作。");
+      if(!response.ok||!result.ok){gemPendingRef.current=null;setGemPending(false);throw new Error("操作未完成，請確認材料、孔位及鎖定設定。");}
+      // Drops earned during the request remain in the browser; apply only the
+      // authoritative transaction delta, never replace the whole live roster.
+      setGemInventory(current=>gemInventoryDelta(current,pending.before,normalizeGemInventory(result.gemInventory)));
+      setItems(current=>current.map(item=>{const saved=result.items?.find((i:Item)=>i.id===item.id);return saved?{...item,sockets:saved.sockets}:item;}));
+      setGemPowder(result.gemPowder);setGemRevision(result.gemRevision);setSaveUpdatedAt(result.updatedAt);
+      lastSavedGemInventoryRef.current=normalizeGemInventory(result.gemInventory);
+      gemPendingRef.current=null;setGemPending(false);
+      const summary=result.summary;const message=`成功 ${summary.successes} 次・失敗 ${summary.failures} 次・消耗 ${summary.consumed} 顆`;
+      setSaveStatus("雲端已同步");toast.success("寶石操作完成",{description:message});pushLog("寶石",message);return message;
+    }catch(error){
+      if(gemPendingRef.current){setSaveStatus("等待寶石操作確認");toast.error("寶石操作結果待確認",{description:"請重試上一筆操作；相同操作不會重複扣材料。"});}
+      throw error;
+    }finally{gemActionBusyRef.current=false;setGemActionBusy(false);equipmentBusyRef.current=false;setEquipmentBusy(false);}
   };
-
-  const fuseMagicCircle = () => {
-    const materials = gemFusionSlots.filter((gem): gem is SocketedGem => Boolean(gem));
-    if (materials.length !== 3) return toast.info("請先在魔法陣放入 3 顆同階寶石");
-    const result = fuseGemSelection(gemInventory, materials);
-    if (!result) return toast.error("寶石數量或階級不符合合成條件");
-    setGemInventory(result.inventory);
-    setGemFusionSlots([null, null, null]);
-    if (result.success && result.result) {
-      const outcome = getGemDefinition(result.result.gemId, result.result.tier);
-      setGemFusionResult({ success: true, gem: result.result });
-      pushLog("合成", `魔法陣合成成功，獲得${outcome.tierLabel}${outcome.name}`);
-      toast.success("魔法陣合成成功", { description: `${outcome.tierLabel}${outcome.name} ×1` });
-    } else {
-      const preserved = result.preserved
-        ? getGemDefinition(result.preserved.gemId, result.preserved.tier)
-        : null;
-      if (result.preserved) setGemFusionResult({ success: false, gem: result.preserved });
-      pushLog("合成", `魔法陣合成失敗，保留${preserved?.tierLabel ?? "原階"}${preserved?.name ?? "寶石"} ×1`);
-      toast.error("魔法陣合成失敗", { description: `消耗 2 顆，保留${preserved?.name ?? "原階寶石"} ×1` });
-    }
+  const socketSelectedGem = (socketIndex:number) => {
+    if(!currentItem||!selectedGem)return toast.info("請先選擇裝備與寶石");
+    void runGemAction({kind:'socket',itemId:currentItem.id,socketIndex,gemId:selectedGem.gemId,tier:selectedGem.tier}).catch(error=>toast.error(error.message));
   };
 
   const sellCurrentItem = () => {
+    if(gemActionBusyRef.current||gemPendingRef.current)return toast.info("請先完成寶石操作");
     if (!currentItem) return;
     const usedByLoadout = Object.values(loadouts).some((ids) =>
       ids.includes(currentItem.id),
@@ -6317,6 +6360,7 @@ function Game({
   };
 
   const salvageSelectedQualities = () => {
+    if(gemActionBusyRef.current||gemPendingRef.current)return toast.info("請先完成寶石操作");
     if (!bulkCandidates.length) {
       setBulkSalvageOpen(false);
       return toast.info("沒有符合條件且未穿戴的裝備");
@@ -6389,7 +6433,7 @@ function Game({
       return toast.error("今日挑戰次數已用完");
     if (bossMode === "world" && worldAttempts <= 0)
       return toast.error("世界首領攻擊次數已用完");
-    if (bossMode === "personal" && (mapBestFloors[selectedBoss.mapId] ?? 0) < selectedBoss.baseFloor)
+    if (bossMode === "personal" && (normalMapBestFloors[selectedBoss.mapId] ?? 0) < selectedBoss.baseFloor)
       return toast.error(`需要通過第 ${selectedBoss.baseFloor} 層才能挑戰`);
     bossMarkedRemainingRef.current = 0;
     bossMarkExplosionPendingRef.current = false;
@@ -6737,7 +6781,7 @@ function Game({
           hitChance: hitChanceFromRatings(characterStats.hit,
             20 + activeBossBattle.level * balanceConfig.combat.evasionModel.bossEvasionPerLevel),
           criticalChance: characterStats.crit,
-          criticalDamage: characterStats.critDamage, equippedItems: equippedGearRef.current,
+          criticalDamage: characterStats.critDamage, gemBasicDamage:characterStats.gemBasicDamage,gemDotDamage:characterStats.gemDotDamage, equippedItems: equippedGearRef.current,
         }) : null;
         if (liveEnemyControl(liveCombat, Date.now()).frozen) { bossActs = false; cadence.enemy = 0; }
         if (liveAction?.name && SKILL_REWORK_CATALOG[playerClass].some((skill) =>
@@ -7015,7 +7059,7 @@ function Game({
         let unyieldingBlocked = false;
         if (bossActs && liveCombatRef.current && !bossHealthSettlement.defeated) {
           const defense = resolveLiveEnemyAttack(liveCombatRef.current, {
-            healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,
+            healthPercent: bossPlayerHpRef.current, maxHealth: characterStats.hp, damage: bossDamage,gemThorns:characterStats.gemThorns,gemShieldBonus:characterStats.gemShieldBonus,
              defense: characterStats.defense, equippedItems: equippedGearRef.current,
           });
           updateManaShield(liveCombatRef.current, defense.manaShield);
@@ -7026,6 +7070,10 @@ function Game({
           }
           unyieldingBlocked = Boolean(defense.unyielding?.blocked);
           bossDamage = defense.damage;
+          if (defense.reflectedDamage > 0) {
+            const hit=settleBossHit(defense.reflectedDamage,"attack");showCounterDamage(hit.actualDamage,"荊棘反傷");
+            if(activeBossBattle.mode==="world"&&hit.actualDamage>0){setWorldDamage(v=>v+hit.actualDamage);setWorldRoundDamage(v=>v+hit.actualDamage);}
+          }
           if (defense.counterDamagePercent > 0 || (defense.equipmentDamage ?? 0) > 0) {
             const counter = Math.round(characterStats.attack * defense.counterDamagePercent / 100 + (defense.equipmentDamage ?? 0));
             const counterSettlement = settleBossHit(counter, "attack");
@@ -7219,7 +7267,7 @@ function Game({
     characterStats.bossDamage,
     characterStats.damageReduction,
     characterStats.dodge,
-    characterStats.skillDamage,
+    characterStats.skillDamage,characterStats.gemBasicDamage,characterStats.gemDotDamage,characterStats.gemShieldBonus,characterStats.gemThorns,
     characterStats.comboChance,
     characterStats.bossReduction,
     characterStats.lowHealthDamage,
@@ -7277,7 +7325,9 @@ function Game({
   ];
 
   return (
-    <main className="game-shell">
+    <main className={`game-shell ${realMode?"real-mode-world":""}`}>
+      {saveReady&&!sessionSuperseded&&realMapLoading&&requestedRealChapter!==null&&<RealMapLoading chapter={requestedRealChapter} progress={realMapAssets.progress} error={realMapAssets.error} onRetry={realMapAssets.retry} onCancel={()=>{if(pendingMapEntry)setPendingMapEntry(null);else switchWorldMode('normal');}}/>}
+      {saveReady&&realProgress.unlocked&&!realProgress.acknowledged&&<div className="real-unlock-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="real-unlock-title" className="real-unlock-dialog"><small>THE TRUE WORLD AWAKENS</small><h2 id="real-unlock-title">九域已盡，長夜未終</h2><p>你已走過九域長夜。如今封印鬆動，怪物沉睡的力量即將甦醒。更兇險的敵人、真正的技能與更豐厚的戰果，正在真實世界等候你。</p><button onClick={()=>switchWorldMode('real')}>踏入真實世界</button><button onClick={()=>{setRealProgress(p=>({...p,acknowledged:true}));requestPrioritySave();}}>稍後再戰</button></section></div>}
       <Toaster theme="dark" position="top-center" richColors />
       {sessionSuperseded && (
         <div className="sync-lock-banner" role="alert">
@@ -7409,7 +7459,7 @@ function Game({
       <Dialog
         open={offlineReportOpen}
         onOpenChange={(open) => {
-          if (offlineClaimPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
+          if (offlineClaimPendingRef.current || gemActionBusyRef.current || gemPendingRef.current || equipmentBusyRef.current || equipmentPendingRef.current) return;
           setOfflineReportOpen(open);
           if (!open && !offlineClaimPending) setBattleOn(true);
         }}
@@ -7418,7 +7468,7 @@ function Game({
           <DialogHeader>
             <DialogTitle>離線期間戰果已結算</DialogTitle>
             <DialogDescription>
-              伺服器已整理這次離線期間的戰果，確認後即可領取。
+              伺服器已整理這次離線期間的戰果，確認後即可領取。真實模式目前沿用普通世界的離線收益。
             </DialogDescription>
           </DialogHeader>
           <div className="offline-hero">
@@ -7427,7 +7477,7 @@ function Game({
             </span>
             <div>
               <small>
-                {currentMap.name} · 離線 {hours} 小時 {mins} 分
+                {offlineMap.name} · 離線 {hours} 小時 {mins} 分
               </small>
               <h3>
                 擊敗{" "}
@@ -7449,7 +7499,7 @@ function Game({
               <Sparkles /> 約{" "}
               {Math.round(
                 Math.floor(storedSeconds / 12) *
-                  ((currentMap.exp[0] + currentMap.exp[1]) / 2) *
+                  ((offlineMap.exp[0] + offlineMap.exp[1]) / 2) *
                   EXPERIENCE_MULTIPLIER *
                   newcomerExperienceFactor(level) *
                   offlineSetMultiplier,
@@ -7673,7 +7723,7 @@ function Game({
           <DialogHeader>
           <DialogTitle>裝備鑲嵌</DialogTitle>
             <DialogDescription>
-              打孔與鑲嵌會立即寫入雲端存檔；已鑲嵌的寶石不可拆卸。
+              打孔與鑲嵌會立即寫入雲端存檔；已鑲嵌寶石可在寶石頁原位升級或轉移。
             </DialogDescription>
           </DialogHeader>
           <div className="gem-workshop-body">
@@ -7984,11 +8034,12 @@ function Game({
                     </span>
                   </div>
                   <div
-                    className={`battle-stage ${astralVisual ? "astral-active" : ""} ${skyRainVisual ? "sky-queen-active" : ""} ${overloadVisual.enabled && (overloadVisual.phase !== "idle" || overloadVisual.charge > 0) ? "overload-active" : ""} ${activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "elite-stage" : ""} ${setTier > 0 ? "set-awakened" : ""} ${rangerImpactPulse ? "ranger-impact" : ""} ${executionImpactPulse ? "execution-impact" : ""} ${abyssImpactPulse ? "abyss-impact" : ""} ${voidVisuals.length ? "void-active" : ""} ${meteorVisuals.length ? "meteor-active" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-impact" : ""} ${skillEffect && !["星界寂滅", "虛空崩解", "奧術超載", "隕星術", "霜火新星", "元素蝕印", "裂地斬", "處決", "泰坦斷界斬", "穿雲箭", "追風箭", "獵殺標記", "疾風連射", "風行領域", "破星狙擊", "蒼穹箭雨"].includes(normalizeCombatEffectName(skillEffect.name)) ? `impact-${impactTier(skillEffect.name)}` : ""}`}
+                    className={`battle-stage ${realMode&&!activeBossBattle?"phase2-stage real-monster-stage":""} ${astralVisual ? "astral-active" : ""} ${skyRainVisual ? "sky-queen-active" : ""} ${overloadVisual.enabled && (overloadVisual.phase !== "idle" || overloadVisual.charge > 0) ? "overload-active" : ""} ${activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? "elite-stage" : ""} ${setTier > 0 ? "set-awakened" : ""} ${rangerImpactPulse ? "ranger-impact" : ""} ${executionImpactPulse ? "execution-impact" : ""} ${abyssImpactPulse ? "abyss-impact" : ""} ${voidVisuals.length ? "void-active" : ""} ${meteorVisuals.length ? "meteor-active" : ""} ${skillEffect && normalizeCombatEffectName(skillEffect.name) === "奧術回響" ? "arcane-echo-impact" : ""} ${skillEffect && !["星界寂滅", "虛空崩解", "奧術超載", "隕星術", "霜火新星", "元素蝕印", "裂地斬", "處決", "泰坦斷界斬", "穿雲箭", "追風箭", "獵殺標記", "疾風連射", "風行領域", "破星狙擊", "蒼穹箭雨"].includes(normalizeCombatEffectName(skillEffect.name)) ? `impact-${impactTier(skillEffect.name)}` : ""}`}
                     style={
                       { "--map-tone": currentMap.tone } as React.CSSProperties
                     }
                   >
+                    {realMode&&!activeBossBattle&&!realMapLoading&&realMapAssets.assets&&<RealMonsterVfx chapter={mapId} sprites={realMapAssets.assets!}/>}
                     {activeBossBattle?.mode === "world" && activeBossBattle.name === "深淵王" && (
                       <div className={`world-boss-countdown ${worldBossSecondsLeft <= 5 && !bossOutcome ? "danger" : ""}`}>
                         <Clock3 />
@@ -8079,7 +8130,7 @@ function Game({
                           const monsterImage = monsterImages[currentMonsterName]
                             ?? monsterImages[baseMonsterName(currentMonsterName)];
                           return monsterImage ? (
-                            <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-monster" src={monsterImage} alt={currentMonsterName} />
+                            <NextImage unoptimized width={1024} height={1536} loading="eager" className={`battle-monster ${baseMonsterName(currentMonsterName)==="遊魂"?"monster-ghost-flipped":""}`} src={monsterImage} alt={currentMonsterName} />
                           ) : (
                             <span className="monster-placeholder">
                               {activeBossBattle || currentWaveBoss || currentWaveElite || currentWaveGuardian ? <Crown /> : <Skull />}
@@ -8238,7 +8289,7 @@ function Game({
                         onComplete={finishTitanEchoVisual}
                       />
                     ))}
-                    {!titanUltimateVisual && <WebGLBerserkerStanceVfx {...berserkerStanceVisual} targetKey={activeBossBattle?.name ?? `${runStartedAt}:${mapId}:${wave}`} active={berserkerStanceVisual.active && Boolean(battleOn || activeBossBattle)} />}
+                    {!titanUltimateVisual && <WebGLBerserkerStanceVfx {...berserkerStanceVisual} targetKey={activeBossBattle?.name ?? `${realMode?"real":"normal"}:${runStartedAt}:${mapId}:${wave}`} active={berserkerStanceVisual.active && Boolean(battleOn || activeBossBattle)} />}
                     {skillVisualEffects.map((effect) => (
                       effect.name === "鮮血怒吼"
                         ? <WebGLBloodRoarVfx key={`blood-roar-${effect.key}`} ascended={skillAscensions.choices.includes("鮮血怒吼")} />
@@ -8289,7 +8340,7 @@ function Game({
                       enabled={!sessionSuperseded}
                       inputs={{ groups: battleHitGroups, elementals: setElementalHits, dots: dotDamageGroups,
                         player: playerHitFeedback, enemy: enemyHitFeedback, miss: missFeedback,
-                        counter: unyieldingCounterFeedback, boss: Boolean(activeBossBattle) }}
+                        counter: unyieldingCounterFeedback, boss: Boolean(activeBossBattle),custom:realCombatFloats }}
                     />
                     {resourceDrop && !activeBossBattle && (
                       <div key={resourceDrop.key} className="resource-float">
@@ -8657,16 +8708,19 @@ function Game({
           {tab === "地圖" && (
             <div className="page-section">
               <PageTitle
-                title="九域長夜遠征"
+                title={realMode?"真實世界遠征":"九域長夜遠征"}
                 sub="每張地圖皆有 30 層；10、20 層取得祝福，擊敗 30 層首領後永久解鎖下一區域。"
               >
                 <span className="bag-capacity">
-                  {currentMap.name} {wave} / 30 · 已解鎖 {unlockedMapId} / 9 ·
-                  完成 {completedRuns} 輪
+                  {currentMap.name} {wave} / 30 · 已解鎖 {unlockedMapId} / {realMode?4:9} ·
+                  完成 {realMode?realProgress.completedRuns:completedRuns} 輪
                 </span>
               </PageTitle>
+              {(realProgress.unlocked||finalBossDefeated&&(normalMapBestFloors[9]??0)>=30)&&<div className="world-mode-switch" role="group" aria-label="世界模式">
+                <button className={!realMode?'active':''} onClick={()=>switchWorldMode('normal')}>普通世界</button><button className={realMode?'active':''} onClick={()=>switchWorldMode('real')}>真實世界</button>
+                <span>{realMode?'前四章已甦醒・怪物技能啟動':'完成九章後，真實世界開啟'}</span></div>}
               <div className="map-grid">
-                {maps.map((map) => {
+                {(realMode?maps.slice(0,4):maps).map((map) => {
                   const locked = map.id > unlockedMapId;
                   const localProgress = Math.min(
                     MAP_FLOORS,
@@ -8675,7 +8729,7 @@ function Game({
                   const reachedFloors = mapId === map.id
                     ? Math.max(localProgress, Math.min(wave, MAP_FLOORS))
                     : localProgress;
-                  const recommendedPower = map.recommendedAssessedPower;
+                  const recommendedPower = realMode?map.recommendedAssessedPower.map((_,i)=>Math.round(maps[8].recommendedAssessedPower[i]*realModeScale(map.id,i?30:1,i?"boss":"normal").power)):map.recommendedAssessedPower;
                   const powerState = locked
                     ? { label: "尚未解鎖", tone: "locked" }
                     : assessedCombatPower < recommendedPower[0]
@@ -8708,8 +8762,8 @@ function Game({
                       <div className="map-card-content">
                         <div className="map-card-heading">
                           <div>
-                            <small className="map-region-label">REGION 0{map.id} · 建議等級 Lv.{map.level}</small>
-                            <h3>{map.name}</h3>
+                            <small className="map-region-label">REGION 0{map.id} · {realMode?"覺醒領域":`建議等級 Lv.${map.level}`}</small>
+                            <h3>{realMode?"真實・":""}{map.name}</h3>
                           </div>
                           <b className={`power-state ${powerState.tone}`}>
                             {powerState.label}
@@ -8741,8 +8795,8 @@ function Game({
                         </div>
                         <span className="sr-only">5/15/25F 精英 · 10/20F 守關 · 30F 首領</span>
                         <div className="map-card-rewards">
-                          <span>EXP {map.exp[0]}～{map.exp[1]}</span>
-                          <span>套裝・{map.set}</span>
+                          <span>{realMode?`第九章經驗 ×${realModeScale(map.id,1,"normal").reward}`:`EXP ${map.exp[0]}～${map.exp[1]}`}</span>
+                          <span>{realMode?"時墟裝備池":`套裝・${map.set}`}</span>
                           <span>場景普通裝備 · 品質上限：傳奇</span>
                         </div>
                       </div>
@@ -8905,6 +8959,7 @@ function Game({
                             item.slot === it.slot && equipped.includes(item.id),
                         );
                         const unseen = unseenItemIds.includes(it.id);
+                        const powerDifference = powerDifferenceForItem(it);
                         return (
                           <Popover key={`${it.id}-${i}`}>
                             <PopoverTrigger asChild>
@@ -8924,15 +8979,15 @@ function Game({
                                     "--item-delay": `${140 + Math.min(order, 8) * 35}ms`,
                                   } as React.CSSProperties
                                 }
-                                aria-label={`${it.name}，裝備評級 ${equipmentDisplayRating(it)}`}
+                                aria-label={`${it.name}，${equipped.includes(it.id) ? "卸下後" : "穿上後"}綜合戰力 ${powerDifference >= 0 ? "+" : ""}${formatAssessedPower(powerDifference)}`}
                               >
                                 <EquipmentIcon item={it} className="bag-equipment-art" />
                                 {it.set && <i className="set-badge">✦</i>}
                                 <small>+{it.enhance}</small>
                                 {it.locked && <span className="lock-mark">鎖</span>}
                                 {unseen && <i>NEW</i>}
-                                <span className={`bag-power-delta ${powerDifferenceForItem(it) >= 0 ? "gain" : "loss"}`}>
-                                  {powerDifferenceForItem(it) >= 0 ? "▲" : "▼"}
+                                <span className={`bag-power-delta ${powerDifference >= 0 ? "gain" : "loss"}`}>
+                                  {powerDifference >= 0 ? "▲+" : "▼"}{formatAssessedPower(powerDifference)}
                                 </span>
                               </button>
                             </PopoverTrigger>
@@ -8944,7 +8999,7 @@ function Game({
                               <GearTooltip
                                 item={it}
                                 equippedItem={worn}
-                                powerDifference={powerDifferenceForItem(it)}
+                                powerDifference={powerDifference}
                               />
                             </PopoverContent>
                           </Popover>
@@ -8980,15 +9035,12 @@ function Game({
                       <h3>
                          {currentItem.set && <span className="set-name-prefix">【{currentItem.set}】</span>} <EquipmentName item={currentItem} /> <em>+{currentItem.enhance}</em>
                       </h3>
-                      <b>
-                        裝備評級 {equipmentDisplayRating(currentItem).toLocaleString()}
-                      </b>
                       <p
-                        className={`power-impact ${powerDifferenceForItem(currentItem) >= 0 ? "gain" : "loss"}`}
+                        className={`power-impact ${currentItemPowerDifference >= 0 ? "gain" : "loss"}`}
                       >
                         {equipped.includes(currentItem.id) ? "卸下後" : "穿上後"}
-                        實際戰力 {powerDifferenceForItem(currentItem) >= 0 ? "+" : ""}
-                        {formatAssessedPower(powerDifferenceForItem(currentItem))}
+                        綜合戰力 {currentItemPowerDifference >= 0 ? "+" : ""}
+                        {formatAssessedPower(currentItemPowerDifference)}
                       </p>
                       {currentItem.set && (
                         <p className="set-label">{currentItem.set} 套裝</p>
@@ -9157,125 +9209,13 @@ function Game({
             </div>
           )}
 
-          {tab === "寶石" && (
-            <div className="page-section gem-page">
-              <PageTitle
-                title="寶石系統"
-                sub="整理寶石、升階合成，或為裝備打孔與鑲嵌。"
-              >
-                <span className="gem-page-summary">
-                  <Gem /> 寶石 {gemInventory.reduce((sum, stack) => sum + stack.quantity, 0)} · 打孔石 {drillingStones}
-                </span>
-              </PageTitle>
-              <div className="gem-mode-tabs" role="tablist" aria-label="寶石功能">
-                {(["寶石庫", "寶石合成", "裝備鑲嵌"] as const).map((mode) => (
-                  <button key={mode} className={gemPageMode === mode ? "active" : ""} onClick={() => setGemPageMode(mode)}>{mode}</button>
-                ))}
-              </div>
-              {gemPageMode === "裝備鑲嵌" ? (
-                <Panel className="gem-socket-entry">
-                  <Gem />
-                  <div><h3>裝備鑲嵌</h3><p>選擇裝備後可打孔、查看孔位並鑲入寶石；已鑲嵌寶石不可拆卸。</p></div>
-                  <button className="btn btn-primary" onClick={() => { setGemWorkshopOpen(true); setGemPageMode("裝備鑲嵌"); }}>選擇裝備與寶石</button>
-                </Panel>
-              ) : <div className={`gem-page-layout ${gemPageMode === "寶石庫" ? "vault-only" : ""}`}>
-                {gemPageMode === "寶石合成" && (
-                <Panel className="gem-circle-panel">
-                  <div className="section-head">
-                    <h3>三芒升階法陣</h3>
-                    <span>{gemFusionMaterials.length} / 3</span>
-                  </div>
-                  <div className="gem-auto-actions">
-                    <button className="btn btn-ghost" onClick={() => autoFillGemCircle("same")}>自動放入同名 ×3</button>
-                    <button className="btn btn-ghost" onClick={() => autoFillGemCircle("mixed")}>自動混合 ×3</button>
-                  </div>
-                  <div className={`gem-magic-circle ${gemFusionMaterials.length === 3 ? "ready" : ""}`}>
-                    <div className="gem-circle-backdrop" aria-hidden="true"><div className="magic-ring" /></div>
-                    {gemFusionSlots.map((gem, index) => {
-                      const definition = gem ? getGemDefinition(gem.gemId, gem.tier) : null;
-                      return (
-                        <button
-                          key={index}
-                          className={`magic-slot slot-${index + 1} ${gem ? "filled" : ""}`}
-                          onClick={() => { setGemFusionResult(null); setGemFusionSlots((slots) => slots.map((value, slotIndex) => slotIndex === index ? null : value)); }}
-                          aria-label={definition ? `移除${definition.tierLabel}${definition.name}` : `空的寶石槽位 ${index + 1}`}
-                        >
-                          {definition ? (
-                            <>
-                              <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
-                              <small>{definition.tierLabel}</small>
-                              <b>{definition.name}</b>
-                            </>
-                          ) : (
-                            <><Gem /><small>點選寶石放入</small></>
-                          )}
-                        </button>
-                      );
-                    })}
-                    <div className="magic-core">
-                      {gemFusionResult ? <NextImage unoptimized width={256} height={256} loading="eager" src={getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).icon} alt="合成結果" /> : fusionPreviewGem ? <NextImage unoptimized width={256} height={256} loading="eager" src={fusionPreviewGem.icon} alt="預計產物" /> : <Sparkles />}
-                      <b>{gemFusionResult ? (gemFusionResult.success ? "成功" : "失敗") : gemFusionMaterials.length === 3 ? `${Math.round(gemFusionSuccessRate * 100)}%` : "待機"}</b>
-                      <small>{gemFusionResult ? getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).name : gemFusionMaterials.length === 3 ? "成功率" : "升階法陣"}</small>
-                    </div>
-                  </div>
-                  <div className="fusion-preview">
-                    <b>
-                      {gemFusionResult
-                        ? `${gemFusionResult.success ? "獲得" : "保留"}${getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).tierLabel}${getGemDefinition(gemFusionResult.gem.gemId, gemFusionResult.gem.tier).name}`
-                        : gemFusionMaterials.length < 3
-                        ? "放入 3 顆同階寶石"
-                        : gemFusionKeepsType
-                          ? `固定升級為${getGemDefinition(gemFusionMaterials[0].gemId, gemFusionTier === "beginner" ? "intermediate" : "advanced").name}`
-                          : "隨機選擇一種材料寶石升階"}
-                    </b>
-                    <small>失敗會消耗 2 顆，隨機保留 1 顆原階材料。</small>
-                  </div>
-                  <div className="gem-circle-actions gem-sticky-actions">
-                    <button className="btn btn-primary" disabled={gemFusionMaterials.length !== 3} onClick={fuseMagicCircle}>
-                      <Sparkles /> 啟動魔法陣 {gemFusionMaterials.length === 3 ? `· ${Math.round(gemFusionSuccessRate * 100)}%` : ""}
-                    </button>
-                    <button className="btn btn-ghost" disabled={!gemFusionMaterials.length} onClick={() => { setGemFusionResult(null); setGemFusionSlots([null, null, null]); }}>
-                      清空槽位
-                    </button>
-                  </div>
-                </Panel>
-                )}
-                <Panel className="gem-vault-panel">
-                  <div className="section-head">
-                    <h3>寶石庫</h3>
-                    <span>{gemPageMode === "寶石合成" ? "點擊即可放入" : `共 ${gemInventory.reduce((sum, stack) => sum + stack.quantity, 0)} 顆`}</span>
-                  </div>
-                  <div className="gem-filter-row">
-                    <select value={gemTierFilter} onChange={(event) => setGemTierFilter(event.target.value as typeof gemTierFilter)} aria-label="寶石階級">
-                      <option value="全部">全部階級</option><option value="beginner">初階</option><option value="intermediate">中階</option><option value="advanced">高階</option>
-                    </select>
-                    <select value={gemStatFilter} onChange={(event) => setGemStatFilter(event.target.value as typeof gemStatFilter)} aria-label="寶石屬性">
-                      <option value="全部">全部屬性</option><option value="戰鬥">戰鬥</option><option value="生存">生存</option><option value="收益">收益</option>
-                    </select>
-                  </div>
-                  {filteredGemInventory.length ? (
-                    <div className="gem-vault-grid">
-                      {filteredGemInventory.map((stack) => {
-                          const definition = getGemDefinition(stack.gemId, stack.tier);
-                          const selectedCount = gemFusionMaterials.filter((gem) => gemStackKey(gem) === gemStackKey(stack)).length;
-                          const disabled = gemPageMode !== "寶石合成" || stack.tier === "advanced" || Boolean(gemFusionTier && gemFusionTier !== stack.tier) || selectedCount >= stack.quantity || gemFusionMaterials.length >= 3;
-                          return (
-                            <button key={gemStackKey(stack)} className={`${stack.tier === "advanced" ? "max-tier" : ""} ${gemPageMode === "寶石庫" ? "vault-readonly" : ""}`} disabled={disabled} onClick={() => addGemToFusionCircle(stack)}>
-                              <NextImage unoptimized width={256} height={256} loading="eager" src={definition.icon} alt="" />
-                              <span><b>{definition.tierLabel} · {definition.name}</b><small>{gemEffectLabel(definition)} · 持有 {stack.quantity}</small></span>
-                              <em>{stack.tier === "advanced" ? "已達最高階" : gemPageMode === "寶石庫" ? "可鑲嵌" : selectedCount ? `已放 ${selectedCount}` : "放入"}</em>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <div className="empty-bag"><Gem /><p>{gemInventory.length ? "沒有符合篩選的寶石" : "尚未獲得寶石"}</p></div>
-                  )}
-                  {gemPageMode === "寶石合成" && <details className="gem-rules-details"><summary>合成規則</summary><p>三顆同階寶石可升階。同名固定升級原寶石，混合則隨機選擇其中一種；失敗消耗兩顆並保留一顆。</p></details>}
-                </Panel>
-              </div>}
-            </div>
-          )}
+          {tab === "寶石" && <GemPanel inventory={gemInventory} powder={gemPowder} gear={items} equippedIds={equipped}
+            busy={gemActionBusy||equipmentBusy||skillActionBusy||offlineClaimPending||shopPurchaseBusy} pending={gemPending}
+            onAction={runGemAction}
+            onRetry={()=>{const pending=gemPendingRef.current;if(pending){const {id,...action}=pending.action;void runGemAction(action).catch(error=>toast.error(error.message));}}}
+            onLock={key=>{if(gemActionBusyRef.current||gemPendingRef.current)return;setGemInventory(old=>old.map(g=>gemStackKey(g)===key?{...g,locked:!g.locked}:g));}}
+            onDrill={itemId=>{if(itemId){const index=items.findIndex(item=>item.id===itemId);if(index>=0)setSelectedItem(index);}setGemWorkshopOpen(true);}}
+          />}
 
           {tab === "技能" && (
             <div className="page-section">
@@ -9321,7 +9261,7 @@ function Game({
                 <div className="boss-layout">
                   <div className="boss-list">
                     {personalBosses.map((b) => {
-                      const locked = (mapBestFloors[b.mapId] ?? 0) < b.baseFloor;
+                      const locked = (normalMapBestFloors[b.mapId] ?? 0) < b.baseFloor;
                       return (
                         <button
                           key={b.id}
@@ -9353,7 +9293,7 @@ function Game({
                     image={monsterImages[selectedBoss.name]}
                     attempts={`${bossTickets} / 10`}
                     report={battleReport}
-                    disabled={(mapBestFloors[selectedBoss.mapId] ?? 0) < selectedBoss.baseFloor || bossTickets <= 0}
+                    disabled={(normalMapBestFloors[selectedBoss.mapId] ?? 0) < selectedBoss.baseFloor || bossTickets <= 0}
                     onFight={() => fightBoss()}
                   />
                 </div>
@@ -9472,8 +9412,8 @@ function Game({
               selectedTitle={selectedTitle}
               selectedTitleBonus={selectedTitleBonus}
               selectedAppearance={selectedAppearance}
-              ashCleared={(mapBestFloors[1] ?? 0) >= MAP_FLOORS}
-              abyssCleared={(mapBestFloors[9] ?? 0) >= MAP_FLOORS || finalBossDefeated}
+              ashCleared={(normalMapBestFloors[1] ?? 0) >= MAP_FLOORS}
+              abyssCleared={(normalMapBestFloors[9] ?? 0) >= MAP_FLOORS || finalBossDefeated}
               ownedTitles={ownedTitles}
               ownedAppearances={ownedAppearances}
               onSelectTitle={setSelectedTitle}
