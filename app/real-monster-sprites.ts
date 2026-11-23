@@ -67,7 +67,7 @@ export async function prepareRealMonsterSheets(sheets,onProgress,signal){
  // Register the sheen to the original portrait's own metal facets. Generated
  // lighting modulates these pixels; it cannot paint a second displaced beetle.
  async function prepareIronShell(img,meta,portrait){
-  const w=384,h=576,c=document.createElement('canvas');c.width=w*3;c.height=h*2;
+  const w=192,h=288,c=document.createElement('canvas');c.width=w*3;c.height=h*2;
   const original=document.createElement('canvas');original.width=w;original.height=h;const ox=original.getContext('2d',{willReadFrequently:true});ox.drawImage(portrait,0,0,w,h);const source=ox.getImageData(0,0,w,h).data;
   const atlas=document.createElement('canvas');atlas.width=img.naturalWidth;atlas.height=img.naturalHeight;const ax=atlas.getContext('2d',{willReadFrequently:true});ax.drawImage(img,0,0);const light=ax.getImageData(0,0,atlas.width,atlas.height).data,fw=atlas.width/3,fh=atlas.height/2;
   const regions=[[[.51,.20],[.66,.24],[.78,.32],[.83,.43],[.77,.50],[.60,.56],[.46,.60],[.29,.57],[.19,.47],[.23,.34],[.38,.26]],[[.28,.49],[.54,.49],[.57,.60],[.43,.65],[.27,.60]],[[.02,.45],[.19,.43],[.28,.52],[.25,.65],[.12,.77],[.03,.69]],[[.65,.44],[.89,.44],[.99,.58],[.91,.72],[.67,.85],[.56,.77],[.64,.63],[.59,.55]]];
