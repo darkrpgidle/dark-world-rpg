@@ -3307,7 +3307,7 @@ function Game({
             setNormalMapBestFloors(
               save.mapBestFloors ?? { [savedMapId]: savedWave },
             );
-            const restoredReal=normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated);
+            const restoredReal=normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated,save.rebirthCount);
             setRealProgress(restoredReal);
             const activeSavedMap=restoredReal.mode==='real'?restoredReal.mapId:savedMapId;
             const activeSavedFloor=restoredReal.mode==='real'?restoredReal.wave:savedWave;
@@ -4552,7 +4552,7 @@ function Game({
     setNormalUnlockedMapId(1);
     setNormalMapBestFloors({ 1: 1 });
     setNormalWave(1);
-    setRealProgress(p=>({...emptyRealMode(p.unlocked),acknowledged:p.acknowledged}));
+    setRealProgress(p=>({...emptyRealMode(true),acknowledged:p.acknowledged}));
     setEnemyName(maps[0].monsters[0]);
     setEnemyHp(100);
     setPlayerHp(100);

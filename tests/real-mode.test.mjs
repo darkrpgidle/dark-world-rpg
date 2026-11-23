@@ -40,6 +40,19 @@ test('progress has safe legacy defaults, earned access, separate positions and s
  for(const mutation of [{wave:31},{bestFloors:{5:1}},{mapId:'2'},{mode:'other'},{acknowledged:1}])assert.equal(invalidSaveField({realMode:{...r,...mutation}}),'realMode');
 });
 
+test('rebirth permanently unlocks legacy saves and server validates the migration',()=>{
+ const legacy={rebirthCount:1,mapBestFloors:{1:1},finalBossDefeated:false};
+ const restored=progress.normalizeRealMode(undefined,legacy.mapBestFloors,false,legacy.rebirthCount);
+ assert.equal(restored.unlocked,true);
+ assert.equal(progress.normalizeRealMode(undefined,{},false,0).unlocked,false);
+ assert.equal(progress.normalizeRealMode(undefined,{},false,'1').unlocked,false);
+ assert.equal(progress.validateRealModeTransition({...legacy,realMode:{...restored,acknowledged:true,mode:'real'}},legacy).mode,'real');
+ assert.equal(progress.validateRealModeTransition({...legacy,realMode:progress.emptyRealMode()},legacy).unlocked,true);
+ assert.equal(progress.validateRealModeTransition({},legacy).unlocked,true);
+ assert.equal(progress.validateRealModeTransition({}, {rebirthCount:0,mapBestFloors:{9:30}},true).unlocked,true);
+ assert.throws(()=>progress.validateRealModeTransition({realMode:{...restored,acknowledged:true,mode:'real'}},{rebirthCount:0}));
+});
+
 function run(ability,{landed=()=>true,until=5000,killAt=Infinity,frozen=()=>false,tier='normal',floor=1}={}){
  const state=combat.createRealMonster('test',ability,tier,floor),hits=[],events=[],heals=[];let alive=true;
  const c={alive:()=>alive,hit:(r,id)=>{const hit=landed(r);hits.push({...r,id,at:state.clock,landed:hit});if(hits.length>=killAt)alive=false;return {landed:hit,damage:hit?10:0}},heal:f=>heals.push(f),notify:(type,detail)=>events.push({type,detail})};

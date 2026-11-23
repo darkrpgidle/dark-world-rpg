@@ -14,7 +14,7 @@ export function finalizePendingRebirth(save:Save,now=Date.now()):Save{
  const revision=save.adminRevision??0;
  if(typeof revision!=='number'||!Number.isSafeInteger(revision)||revision<0||revision>=Number.MAX_SAFE_INTEGER)return save;
  const next:Save={...save,rebirthCount:count+1,rebirthPoints:points+REBIRTH_REWARD_PER_TURN.talentPoints,
-  realMode:{...emptyRealMode(normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated).unlocked),acknowledged:normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated).acknowledged},
+  realMode:{...emptyRealMode(true),acknowledged:normalizeRealMode(save.realMode,save.mapBestFloors,save.finalBossDefeated,save.rebirthCount).acknowledged},
   level:1,exp:0,xpSchemaVersion:2,mapId:1,unlockedMapId:1,wave:1,highestFloor:1,mapBestFloors:{1:1},
   items:[],mails:[],loadouts:{1:[],2:[]},unseenItemIds:[],completedRuns:0,storedSeconds:0,idleSeconds:0,
   enemyHp:100,playerHp:100,battleOn:true,dailyKills:0,dailyRewardClaimed:false,finalBossDefeated:false,
