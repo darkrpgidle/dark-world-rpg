@@ -132,8 +132,20 @@ export async function prepareRealMonsterSheets(sheets,onProgress,signal){
 
  let done=0;const total=Object.keys(M).length;
  onProgress({done,total});
- for(const [key,meta]of Object.entries(M)){
-  await yieldWork();const img=await decode(sheets.images[key]);
+ const entries=Object.entries(M),prefetched=new Map();
+ // Start a small window of image decodes while the current atlas is processed.
+ // Settled results prevent an early rejection from becoming unhandled.
+ function prefetch(index){
+  if(index>=entries.length)return;
+  const key=entries[index][0];
+  prefetched.set(index,decode(sheets.images[key]).then(image=>({image}),error=>({error})));
+ }
+ for(let i=0;i<Math.min(4,entries.length);i++)prefetch(i);
+ try{for(let index=0;index<entries.length;index++){
+  const [key,meta]=entries[index];await yieldWork();
+  const result=await prefetched.get(index);prefetched.delete(index);
+  if(result.error)throw result.error;
+  const img=result.image;prefetch(index+4);
   const portrait=key==='ironShell'?await decode('/monsters/鐵殼蟲.webp'):null;
   const prepared=await prepare(img,meta,key,portrait);images.set(key,prepared);
   // All texture work, including first-hit jaw/eye extraction, finishes here.
@@ -148,6 +160,6 @@ export async function prepareRealMonsterSheets(sheets,onProgress,signal){
    isolatedFrames.set(info,isolatedFrames.get(prepared));isolatedFrames.delete(prepared);images.set(key,info);prepared.width=prepared.height=1;
   }
   img.src='';if(portrait)portrait.src='';onProgress({done:++done,total});
- }
+ }}finally{for(const pending of prefetched.values())pending.then(result=>{if(result.image)result.image.src='';});}
  check();return {manifest:M,images,isolatedFrames,cavalryFrame,mawTexture,houndTextures};
 }

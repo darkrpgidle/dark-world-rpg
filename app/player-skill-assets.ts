@@ -32,7 +32,9 @@ export const playerSkillAssets=createChapterAssetCache<Map<string,HTMLImageEleme
  if(!Number.isInteger(key)||key<0||key>2)throw Error('Invalid character class');
  const paths=[...new Set(PLAYER_SKILL_ASSETS[['戰士','遊俠','法師'][key]]??[])],images=new Map<string,HTMLImageElement>();
  let done=0;progress({done,total:paths.length});
- for(const path of paths){
+ let next=0;
+ async function loadNext(){while(next<paths.length){
+  const path=paths[next++];
   if(signal.aborted)throw new DOMException('Aborted','AbortError');
   const image=new Image();image.src=path;
   let abort:(()=>void)|undefined;
@@ -40,6 +42,7 @@ export const playerSkillAssets=createChapterAssetCache<Map<string,HTMLImageEleme
   finally{if(abort)signal.removeEventListener('abort',abort);}
   if(signal.aborted)throw new DOMException('Aborted','AbortError');
   images.set(path,image);progress({done:++done,total:paths.length});
- }
+ }}
+ await Promise.all(Array.from({length:Math.min(4,paths.length)},loadNext));
  return images;
 });
