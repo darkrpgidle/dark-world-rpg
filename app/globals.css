@@ -6764,3 +6764,13 @@ body {
 .map-floor-milestone.guardian.cleared{color:#a8d5c7}.map-floor-milestone.guardian.cleared .map-floor-symbol{border-color:#6e9b8c;background:#1c3029}
 .map-floor-milestone.boss.cleared{color:#f0aaa0}.map-floor-milestone.boss.cleared .map-floor-symbol{border-color:#b76d5c;background:#38201d}
 @media(max-width:760px){.map-floor-icons{margin:7px 0}.map-floor-icons-line{top:10px}.map-floor-symbol{width:21px;height:21px}.map-floor-symbol svg{width:12px;height:12px}.map-floor-milestone small{font-size:9px}}
+
+/* Choose the boss once, then switch its form in the detail panel. */
+.boss-list{gap:4px}
+.boss-list button{border:1px solid transparent;border-radius:4px;min-height:62px}
+.boss-list button.active{border-color:#785d36}
+.boss-form-switch{display:flex;gap:4px;margin:0 0 10px;padding:4px;border:1px solid #514634;border-radius:4px;background:#101413}
+.boss-form-switch button{flex:1;min-height:36px;border:1px solid transparent;border-radius:3px;background:transparent;color:#aab0a7;font-size:12px;font-weight:700;cursor:pointer}
+.boss-form-switch button.active{border-color:#a8824c;background:linear-gradient(135deg,#423321,#231d15);color:#f2d090}
+.boss-form-switch button.active.true-form{border-color:#ad6a56;background:linear-gradient(135deg,#4b2924,#211715);color:#f3c0a6}
+.boss-form-switch button:focus-visible{outline:2px solid #e6bd73;outline-offset:1px}
