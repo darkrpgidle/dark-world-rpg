@@ -6751,3 +6751,16 @@ body {
 .rebirth-dialog .dialog-actions{margin:0;padding-top:2px}.rebirth-dialog .dialog-actions .btn{min-height:40px}
 @media(max-width:600px){.rebirth-dialog{gap:12px!important;padding:16px!important}.rebirth-heading [data-slot="dialog-title"]{font-size:20px}.rebirth-impact>div{padding:8px 9px}.rebirth-talent-grid{gap:6px}.rebirth-dialog .talent-card{padding:9px 8px}.rebirth-dialog .dialog-actions .btn{flex:1}}
 @media(max-width:360px){.rebirth-talent-grid{grid-template-columns:1fr}.rebirth-dialog .dialog-actions{flex-wrap:wrap}}
+
+/* Expedition milestones: icon types with a continuous floor progress line. */
+.map-floor-icons{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));align-items:start;margin:8px 0 10px;min-width:0}
+.map-floor-icons-line{position:absolute;top:11px;left:8.333%;right:8.333%;height:2px;background:#48504a}
+.map-floor-icons-line span{display:block;height:100%;background:linear-gradient(90deg,#8b7145,#d9b66e);box-shadow:0 0 6px #d9b66e55}
+.map-floor-milestone{position:relative;display:grid;justify-items:center;gap:3px;min-width:0;color:#818981}
+.map-floor-symbol{display:grid;place-items:center;width:23px;height:23px;border:1px solid #515851;border-radius:50%;background:#171c19;box-shadow:0 0 0 2px #121615}
+.map-floor-symbol svg{width:13px;height:13px;stroke-width:1.8}
+.map-floor-milestone small{color:inherit;font:10px/1 ui-monospace,monospace}
+.map-floor-milestone.cleared{color:#e6c681}.map-floor-milestone.cleared .map-floor-symbol{border-color:#ad8953;background:linear-gradient(145deg,#413621,#191b16)}
+.map-floor-milestone.guardian.cleared{color:#a8d5c7}.map-floor-milestone.guardian.cleared .map-floor-symbol{border-color:#6e9b8c;background:#1c3029}
+.map-floor-milestone.boss.cleared{color:#f0aaa0}.map-floor-milestone.boss.cleared .map-floor-symbol{border-color:#b76d5c;background:#38201d}
+@media(max-width:760px){.map-floor-icons{margin:7px 0}.map-floor-icons-line{top:10px}.map-floor-symbol{width:21px;height:21px}.map-floor-symbol svg{width:12px;height:12px}.map-floor-milestone small{font-size:9px}}
