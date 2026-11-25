@@ -6693,3 +6693,33 @@ body {
  .skill-tree-node{min-height:64px}
  .skill-detail-value-row{font-size:11px}
 }
+
+/* Personal boss selection and encounter presentation. */
+.boss-layout{grid-template-columns:minmax(245px,310px) minmax(0,1fr);gap:14px;align-items:start}
+.boss-list{max-height:720px;gap:8px;padding:10px;border-color:#4b4133;border-radius:5px;background:linear-gradient(155deg,#1a1d1b,#0d1110)}
+.boss-list-group{overflow:hidden;border:1px solid #3c3b32;border-radius:4px;background:#0e1211}
+.boss-list-region{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid #403a2e;color:#d4bd8d;font-size:12px;font-weight:700}
+.boss-list-region small{color:#99998c;font-size:10px;font-weight:400;text-align:right}
+.boss-list button{width:100%;min-height:48px;padding:8px 10px;border-bottom:1px solid #292e2b}
+.boss-list button:last-child{border-bottom:0}
+.boss-list button span{gap:2px}
+.boss-list button small{font-size:10px;color:#929a91}
+.boss-list button:disabled{opacity:.52;cursor:not-allowed}
+.boss-list button.active{background:linear-gradient(100deg,#44321b,#171a16);box-shadow:inset 2px 0 #d7aa5d;color:#f1d08a}
+.boss-list button.boss-form-true.active{background:linear-gradient(100deg,#432222,#1b1615);box-shadow:inset 2px 0 #c76d57;color:#f2c1a2}
+.boss-list button:focus-visible{outline:2px solid #e6bd73;outline-offset:-2px}
+.boss-detail{padding:12px;border-color:#514536;border-radius:5px;background:linear-gradient(145deg,#1c201e,#0e1111);box-shadow:inset 0 1px #ddc4941c}
+.boss-visual{position:relative;isolation:isolate;overflow:hidden;min-height:440px;display:flex;flex-direction:column;align-items:center;justify-content:end;padding:18px 20px 22px;border-color:#51443a;background:#101110}
+.boss-visual::before{position:absolute;z-index:-2;inset:-25px;content:"";background-image:linear-gradient(#090b0bb0,#0a0b0de0),var(--boss-image);background-position:center 38%;background-size:cover;filter:blur(12px);transform:scale(1.06)}
+.boss-visual::after{position:absolute;z-index:-1;inset:0;content:"";pointer-events:none;background:radial-gradient(ellipse at 50% 44%,#9b51361c,transparent 57%),linear-gradient(0deg,#0d0f0fee,transparent 40%);box-shadow:inset 0 0 60px #000b}
+.boss-detail-true .boss-visual::after{background:radial-gradient(ellipse at 50% 44%,#a22f2a35,transparent 58%),linear-gradient(0deg,#110d0df2,transparent 40%);box-shadow:inset 0 0 60px #000b}
+.boss-image{width:min(100%,300px);height:340px;max-height:45vh;margin:0 auto 10px;object-fit:contain;filter:drop-shadow(0 8px 18px #000d)}
+.boss-visual h2{margin:5px 0;color:#eee6d9;font-size:clamp(22px,2vw,28px);text-shadow:0 2px 10px #000}
+.boss-visual span{color:#c9aa74;font-size:11px;letter-spacing:.12em}
+.boss-visual p{margin:0;color:#c4b9a7;font-size:12px}
+.boss-info{grid-template-columns:minmax(0,1.6fr) minmax(95px,.65fr) minmax(0,1fr);gap:0;margin:12px 0;background:#101413;border:1px solid #3d3e33;border-radius:4px;overflow:hidden}
+.boss-info>div{min-width:0;gap:4px;padding:11px 13px;border:0;border-right:1px solid #363b33;background:transparent}
+.boss-info>div:last-child{border:0}.boss-info small{color:#a99b80;font-size:11px}.boss-info b{margin:0;color:#e3ddd0;font-size:12px;line-height:1.5}
+.boss-fight{min-height:46px}
+@media(max-width:800px){.boss-layout{grid-template-columns:1fr}.boss-list{max-height:240px}.boss-detail{padding:10px}.boss-visual{min-height:370px}.boss-image{height:280px;max-height:none}.boss-info{grid-template-columns:1fr 1fr}.boss-info>div:first-child{grid-column:1/-1;border-right:0;border-bottom:1px solid #363b33}}
+@media(max-width:420px){.boss-list-region small{font-size:10px}.boss-visual{min-height:330px}.boss-image{height:240px}.boss-info>div{padding:9px 10px}}
