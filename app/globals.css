@@ -6617,3 +6617,29 @@ body {
 }
 .titan-ultimate-slash { z-index: 4; }
 .titan-ultimate-wound { z-index: 5; }
+
+/* Skill workbench: compact overview and clearer actionable states. */
+.skill-overview-content{padding:14px 20px}
+.skill-point-line strong{font-size:32px}
+.skill-point-meter{margin-top:6px}
+.skill-overview-note{margin-top:5px}
+.skill-state-summary>span{padding:8px 12px;border-radius:4px}
+.skill-loadout-sticky{padding:11px 14px}
+.skill-loadout-slot{border-radius:5px}
+.skill-loadout-slot select{min-height:28px;font-weight:700}
+.skill-loadout-rank{color:#e6c27a;font-size:11px;line-height:1.3}
+.skill-loadout-slot .skill-loadout-description{font-size:12px;line-height:1.45}
+.skill-tree-node{border-radius:5px}
+.skill-tree-node-copy small{font-size:11px}
+.skill-tree-node.equipped .skill-tree-node-copy small{color:#e7c881}
+.skill-tree-node.can-upgrade .skill-tree-node-copy small{color:#b9d29c}
+.skill-tree-node.max-rank .skill-tree-node-copy small{color:#e4c784}
+.skill-tree-node:focus-visible,.skill-loadout-slot select:focus-visible{outline:2px solid #f2c873;outline-offset:2px}
+.skill-detail-equip .btn{height:auto;min-height:38px;white-space:normal;line-height:1.4}
+@media(max-width:600px){
+ .skill-overview-content{padding:12px}
+ .skill-overview-stats{gap:12px}
+ .skill-loadout-sticky{position:relative;top:auto}
+ .skill-loadout-slot .skill-loadout-description{font-size:11px}
+ .skill-tree-node-copy small{font-size:11px}
+}
