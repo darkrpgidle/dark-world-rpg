@@ -9301,7 +9301,7 @@ function Game({
             <div className="page-section">
               <PageTitle
                 title="首領戰"
-                sub="世界首領採 60 秒獨立單挑；每日00:00重置3次挑戰；排行依上次中午至本次中午的傷害，每日12:00結算發獎。"
+                sub={bossMode === "personal" ? "挑選首領，挑戰成功後領取獎勵。" : "60 秒挑戰 · 每日 00:00 重置次數 · 12:00 結算排行"}
               />
               <div className="mode-tabs">
                 <button
@@ -9320,28 +9320,24 @@ function Game({
               {bossMode === "personal" ? (
                 <div className="boss-layout">
                   <div className="boss-list">
-                    {personalBosses.map((b) => {
-                      const locked = (mapBestFloors[b.mapId] ?? 0) < b.baseFloor;
+                    {Array.from(new Set(personalBosses.map((boss) => boss.mapId))).map((mapId) => {
+                      const group = personalBosses.filter((boss) => boss.mapId === mapId);
                       return (
-                        <button
-                          key={b.id}
-                          disabled={locked}
-                          className={selectedBoss.id === b.id ? "active" : ""}
-                          onClick={() => {
-                            setSelectedBoss(b);
-                            setBattleReport([]);
-                          }}
-                        >
-                          {locked ? <LockKeyhole /> : <Skull />}
-                          <span>
-                            <b>{b.name}</b>
-                            <small>
-                              {b.map} · 通過 {b.baseFloor} 層
-                              {locked ? " · 尚未解鎖" : ""}
-                            </small>
-                          </span>
-                          <ChevronRight />
-                        </button>
+                        <section className="boss-list-group" key={mapId} aria-label={group[0].map}>
+                          <div className="boss-list-region"><span>{group[0].map}</span><small>通過 {group[0].baseFloor} 層解鎖</small></div>
+                          {group.map((b) => {
+                            const locked = (mapBestFloors[b.mapId] ?? 0) < b.baseFloor;
+                            return (
+                              <button key={b.id} disabled={locked}
+                                className={`${selectedBoss.id === b.id ? "active" : ""} ${b.name.includes("真身") ? "boss-form-true" : ""}`}
+                                onClick={() => { setSelectedBoss(b); setBattleReport([]); }}>
+                                {locked ? <LockKeyhole /> : <Skull />}
+                                <span><b>{b.name}</b><small>{locked ? "尚未解鎖" : "可挑戰"}</small></span>
+                                <ChevronRight />
+                              </button>
+                            );
+                          })}
+                        </section>
                       );
                     })}
                   </div>
@@ -9354,6 +9350,7 @@ function Game({
                     attempts={`${bossTickets} / 10`}
                     report={battleReport}
                     disabled={(mapBestFloors[selectedBoss.mapId] ?? 0) < selectedBoss.baseFloor || bossTickets <= 0}
+                    disabledReason={bossTickets <= 0 ? "今日挑戰次數已用完" : "尚未解鎖"}
                     onFight={() => fightBoss()}
                   />
                 </div>
@@ -9549,6 +9546,7 @@ function BossDetail({
   attempts,
   report,
   disabled,
+  disabledReason,
   onFight,
 }: {
   name: string;
@@ -9559,11 +9557,12 @@ function BossDetail({
   attempts: string;
   report: string[];
   disabled: boolean;
+  disabledReason: string;
   onFight: () => void;
 }) {
   return (
-    <Panel className="boss-detail">
-      <div className="boss-visual">
+    <Panel className={`boss-detail ${name.includes("真身") ? "boss-detail-true" : ""}`}>
+      <div className="boss-visual" style={image ? { "--boss-image": `url("${image}")` } as React.CSSProperties : undefined}>
         {image ? (
           <NextImage unoptimized width={1024} height={1536} loading="eager" className="boss-image" src={image} alt={name} />
         ) : (
@@ -9597,7 +9596,7 @@ function BossDetail({
         onClick={onFight}
       >
         <Swords />
-        {disabled ? `Lv.${level} 解鎖` : "開始挑戰"}
+        {disabled ? disabledReason : "開始挑戰"}
       </button>
       {report.length > 0 && <BattleReport lines={report} />}
     </Panel>
