@@ -6779,3 +6779,11 @@ body {
 .equipment-panel .paperdoll .character-display{position:absolute;inset:0;grid-column:1/-1;grid-row:1/-1;display:block;overflow:hidden;z-index:1;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%)}
 .equipment-panel .paperdoll .character-display .inventory-character{position:absolute;top:-2%;left:0;width:110%;height:auto;max-width:none;object-fit:contain;object-position:top center;-webkit-mask-image:none;mask-image:none}
 .equipment-panel .paperdoll .gear-slot{z-index:3}
+
+/* Ground Split: brief cast cue without moving combat anchors or hit timing. */
+.warrior-ground-cast-cue{position:absolute;inset:0;z-index:3;pointer-events:none;border:1px solid #e7b56a99;background:radial-gradient(ellipse at 50% 84%,#c26a292e,transparent 57%);box-shadow:inset 0 -12px 22px #b55d2c35;opacity:0;animation:warrior-ground-cast-cue 600ms ease-out both}
+@keyframes warrior-ground-cast-cue{0%{opacity:0}20%{opacity:.9}55%{opacity:.55}100%{opacity:0}}
+.skill-burst.戰士{min-width:0;grid-template-columns:18px auto;gap:2px 6px;padding:6px 11px;border:1px solid #b18a54a6;border-radius:4px;background:linear-gradient(110deg,#15130feF,#32251aeF);box-shadow:0 5px 18px #0009,0 0 12px #c47b3326}
+.skill-burst.戰士 svg{width:15px;height:15px;grid-row:1/3;filter:none;color:#e9bb73}
+.skill-burst.戰士 b{font-size:13px;letter-spacing:.06em}.skill-burst.戰士 span{font-size:9px;letter-spacing:.08em}
+@media(prefers-reduced-motion:reduce){.warrior-ground-cast-cue{animation:none;opacity:.3}.skill-burst.戰士{animation:none;transform:translateX(-50%)}}
