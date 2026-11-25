@@ -6776,6 +6776,6 @@ body {
 .boss-form-switch button:focus-visible{outline:2px solid #e6bd73;outline-offset:1px}
 
 /* Inventory portrait fills the equipment frame while the slots remain foremost. */
-.equipment-panel .paperdoll .character-display{position:absolute;inset:0;display:block;overflow:hidden;z-index:1;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%)}
-.equipment-panel .paperdoll .character-display .inventory-character{position:absolute;top:-2%;left:-22.5%;width:145%;height:auto;max-width:none;object-fit:contain;object-position:top center;-webkit-mask-image:none;mask-image:none}
+.equipment-panel .paperdoll .character-display{position:absolute;inset:0;grid-column:1/-1;grid-row:1/-1;display:block;overflow:hidden;z-index:1;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.68) 17%,#000 29%,#000 71%,rgba(0,0,0,.68) 83%,rgba(0,0,0,.3) 100%)}
+.equipment-panel .paperdoll .character-display .inventory-character{position:absolute;top:-2%;left:0;width:110%;height:auto;max-width:none;object-fit:contain;object-position:top center;-webkit-mask-image:none;mask-image:none}
 .equipment-panel .paperdoll .gear-slot{z-index:3}
