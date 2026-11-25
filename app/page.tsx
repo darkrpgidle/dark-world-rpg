@@ -9333,29 +9333,27 @@ function Game({
               {bossMode === "personal" ? (
                 <div className="boss-layout">
                   <div className="boss-list">
-                    {Array.from(new Set(personalBosses.map((boss) => boss.mapId))).map((mapId) => {
-                      const group = personalBosses.filter((boss) => boss.mapId === mapId);
+                    {personalBosses.filter((boss) => boss.id.endsWith("-1")).map((boss) => {
+                      const locked = (mapBestFloors[boss.mapId] ?? 0) < boss.baseFloor;
                       return (
-                        <section className="boss-list-group" key={mapId} aria-label={group[0].map}>
-                          <div className="boss-list-region"><span>{group[0].map}</span><small>通過 {group[0].baseFloor} 層解鎖</small></div>
-                          {group.map((b) => {
-                            const locked = (mapBestFloors[b.mapId] ?? 0) < b.baseFloor;
-                            return (
-                              <button key={b.id} disabled={locked}
-                                className={`${selectedBoss.id === b.id ? "active" : ""} ${b.name.includes("真身") ? "boss-form-true" : ""}`}
-                                onClick={() => { setSelectedBoss(b); setBattleReport([]); }}>
-                                {locked ? <LockKeyhole /> : <Skull />}
-                                <span><b>{b.name}</b><small>{locked ? "尚未解鎖" : "可挑戰"}</small></span>
-                                <ChevronRight />
-                              </button>
-                            );
-                          })}
-                        </section>
+                        <button key={boss.mapId} disabled={locked}
+                          className={selectedBoss.mapId === boss.mapId ? "active" : ""}
+                          aria-pressed={selectedBoss.mapId === boss.mapId}
+                          onClick={() => { setSelectedBoss(boss); setBattleReport([]); }}>
+                          {locked ? <LockKeyhole /> : <Skull />}
+                          <span><b>{boss.name.replace(/・殘影$/, "")}</b><small>{boss.map} · {locked ? `通過 ${boss.baseFloor} 層解鎖` : "可挑戰"}</small></span>
+                          <ChevronRight />
+                        </button>
                       );
                     })}
                   </div>
                   <BossDetail
                     name={selectedBoss.name}
+                    form={selectedBoss.id.endsWith("-2") ? "true" : "shadow"}
+                    onFormChange={(form) => {
+                      const boss = personalBosses.find((candidate) => candidate.mapId === selectedBoss.mapId && candidate.id.endsWith(form === "true" ? "-2" : "-1"));
+                      if (boss) { setSelectedBoss(boss); setBattleReport([]); }
+                    }}
                     level={selectedBoss.level}
                     hp={selectedBoss.hp}
                     reward={selectedBoss.reward}
@@ -9552,6 +9550,8 @@ function PageTitle({
 
 function BossDetail({
   name,
+  form,
+  onFormChange,
   level,
   hp,
   image,
@@ -9563,6 +9563,8 @@ function BossDetail({
   onFight,
 }: {
   name: string;
+  form: "shadow" | "true";
+  onFormChange: (form: "shadow" | "true") => void;
   level: number;
   hp: number;
   image?: string;
@@ -9574,7 +9576,11 @@ function BossDetail({
   onFight: () => void;
 }) {
   return (
-    <Panel className={`boss-detail ${name.includes("真身") ? "boss-detail-true" : ""}`}>
+    <Panel className={`boss-detail ${form === "true" ? "boss-detail-true" : ""}`}>
+      <div className="boss-form-switch" role="group" aria-label="首領形態">
+        <button type="button" className={form === "shadow" ? "active" : ""} aria-pressed={form === "shadow"} onClick={() => onFormChange("shadow")}>殘影</button>
+        <button type="button" className={form === "true" ? "active true-form" : ""} aria-pressed={form === "true"} onClick={() => onFormChange("true")}>真身</button>
+      </div>
       <div className="boss-visual" style={image ? { "--boss-image": `url("${image}")` } as React.CSSProperties : undefined}>
         {image ? (
           <NextImage unoptimized width={1024} height={1536} loading="eager" className="boss-image" src={image} alt={name} />
