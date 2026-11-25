@@ -83,8 +83,6 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
   const ultimateSkill = catalog.find((skill) => skill.category === "ultimate");
   const ultimate = enabledUltimate(build, characterClass, characterLevel);
   const currentSkills = catalog.filter((skill) => skill.kind === kind);
-  const progressionIndex = progressionTiers.findIndex((tier) => characterLevel <= tier.max);
-  const currentProgressionTier = progressionIndex < 0 ? progressionTiers.length - 1 : progressionIndex;
   const selectedSkill = currentSkills.find((skill) => skill.name === selectedSkillName) ?? currentSkills[0];
   const learnedCount = currentSkills.filter((skill) => (build.ranks[skill.name] ?? 0) > 0).length;
   const confirmedAscensions = ascensions.choices.slice(0, ascensions.rebirthCount)
@@ -110,11 +108,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
               </div>
               <p className="skill-overview-note">{budgetExceeded ? `已投入 ${spent} 點・超出一般上限 ${spent - earned} 點` : `已投入 ${spent} 點`} <i /> 角色 Lv{characterLevel}</p>
             </div>
-            <div className="skill-state-summary">
-              <span><b>{learnedActive.length}</b><small>已學戰技</small></span>
-              <span><b>{confirmedAscensions}/{Math.min(ascensions.rebirthCount, 5)}</b><small>已選昇華</small></span>
-              <span><b>{ultimate ? "啟用" : characterLevel >= (ultimateSkill?.unlockLevel ?? 80) ? "待學" : `Lv${ultimateSkill?.unlockLevel ?? 80}`}</b><small>固定終極</small></span>
-            </div>
+
           </div>
         </div>
       </div>
@@ -144,8 +138,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                       </option>
                     ))}
                   </select>
-                  {name && <span className="skill-loadout-rank">Lv{build.ranks[name] ?? 0}/5・出戰中</span>}
-                  {name && <small className="skill-loadout-description">{skillDisplay(characterClass, name)?.description}</small>}
+                  {name && <span className="skill-loadout-rank">Lv{build.ranks[name] ?? 0}/5</span>}
                   </span>
                   <span className="skill-slot-check" aria-hidden="true">{name ? "✦" : "＋"}</span>
                 </label>
@@ -156,7 +149,6 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                   <SkillIcon name={ultimateSkill.name} characterClass={characterClass} variant="loadout" />
                   <span className="skill-loadout-copy">
                     <span className="skill-ultimate-name">{ultimateSkill.name}</span>
-                    <small className="skill-loadout-description">{skillDisplay(characterClass, ultimateSkill.name)?.description}</small>
                     <small>{ultimate ? `Lv${build.ranks[ultimateSkill.name]}/5` : characterLevel >= ultimateSkill.unlockLevel ? "投入技能點啟用" : `Lv${ultimateSkill.unlockLevel} 解鎖`}</small>
                   </span>
                   <span className="skill-slot-check" aria-hidden="true">✦</span>
@@ -255,19 +247,6 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
         <p className="skill-library-caption">
           {kind === "active" ? `${learnedCount} / ${currentSkills.length} 已學・最多配置三招` : `${learnedCount} / ${currentSkills.length} 已學・投入後自動生效`}
         </p>
-        <div className="skill-progression-route" role="list" aria-label={`技能成長路線，目前角色等級 ${characterLevel}`}>
-          {progressionTiers.map((tier, index) => {
-            const complete = characterLevel > tier.max;
-            const current = index === currentProgressionTier;
-            return (
-              <div className={`skill-route-step ${complete ? "complete" : ""} ${current ? "current" : ""}`} role="listitem" key={tier.title}>
-                <span className="skill-route-node" aria-hidden="true">{complete ? "✓" : `0${index + 1}`}</span>
-                <span className="skill-route-copy"><strong>{tier.title}</strong><small>{tier.range}</small></span>
-              </div>
-            );
-          })}
-          <span className="skill-route-level">Lv{characterLevel}</span>
-        </div>
         <div className="skill-library-layout">
           <div className="skill-tree" aria-label={`${kind === "active" ? "主動" : "被動"}技能等級路線`}>
             {progressionTiers.map((tier, tierIndex) => {
@@ -292,7 +271,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                           : available ? "可學習" : "尚未學習";
                       return (
                         <button type="button" key={skill.name}
-                          className={`skill-tree-node ${skill.kind === "active" ? "has-skill-description" : ""} ${locked ? "locked" : ""} ${rank ? "learned" : ""} ${equipped ? "equipped" : ""} ${!locked && rank < 5 && available > 0 ? "can-upgrade" : ""} ${rank >= 5 ? "max-rank" : ""} ${selected ? "selected" : ""}`}
+                          className={`skill-tree-node ${locked ? "locked" : ""} ${rank ? "learned" : ""} ${equipped ? "equipped" : ""} ${!locked && rank < 5 && available > 0 ? "can-upgrade" : ""} ${rank >= 5 ? "max-rank" : ""} ${selected ? "selected" : ""}`}
                           aria-pressed={selected}
                           aria-label={`${skill.name}，${state}，技能等級 ${rank}／5`}
                           onClick={() => {
@@ -306,7 +285,6 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                             <small>{state}</small>
                           </span>
                           <span className="skill-tree-node-level">{rank ? `Lv${rank}/5` : `Lv${skill.unlockLevel}`}</span>
-                          {skill.kind === "active" && <span className="skill-active-description">{skillDisplay(characterClass, skill.name)?.description}</span>}
                           <span className="skill-tree-rank-track" aria-hidden="true">
                             {Array.from({ length: 5 }, (_, index) => <i className={index < rank ? "filled" : ""} key={index} />)}
                           </span>
@@ -372,11 +350,7 @@ function renderSkillDetails(
         <span className="skill-detail-rank">{rank}<small>/5</small></span>
       </div>
 
-      <div className="skill-detail-gates">
-        <span><small>解鎖等級</small><strong>Lv{skill.unlockLevel}</strong></span>
-        <span><small>角色等級</small><strong>Lv{characterLevel}</strong></span>
-        <span><small>技能等級</small><strong>{rank} / 5</strong></span>
-      </div>
+      {locked && <p className="skill-detail-unlock">角色達到 Lv{skill.unlockLevel} 解鎖</p>}
 
       {display && (
         <div className="skill-detail-effects">
