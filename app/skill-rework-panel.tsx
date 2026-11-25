@@ -144,6 +144,7 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                       </option>
                     ))}
                   </select>
+                  {name && <span className="skill-loadout-rank">Lv{build.ranks[name] ?? 0}/5・出戰中</span>}
                   {name && <small className="skill-loadout-description">{skillDisplay(characterClass, name)?.description}</small>}
                   </span>
                   <span className="skill-slot-check" aria-hidden="true">{name ? "✦" : "＋"}</span>
@@ -286,11 +287,12 @@ export function SkillReworkPanel({ characterClass, characterLevel, build, onUpgr
                       const equipped = build.activeSlots.includes(skill.name);
                       const selected = selectedSkill?.name === skill.name;
                       const state = locked ? `Lv${skill.unlockLevel} 解鎖`
-                        : rank ? skill.kind === "passive" ? "自動生效" : equipped ? "出戰中" : "已學習"
-                          : "可投入技能點";
+                        : rank >= 5 ? (equipped ? "出戰中・已滿級" : "已滿級")
+                        : rank ? skill.kind === "passive" ? (available ? "自動生效・可升級" : "自動生效") : equipped ? (available ? "出戰中・可升級" : "出戰中") : (available ? "已學習・可升級" : "已學習")
+                          : available ? "可學習" : "尚未學習";
                       return (
                         <button type="button" key={skill.name}
-                          className={`skill-tree-node ${skill.kind === "active" ? "has-skill-description" : ""} ${locked ? "locked" : ""} ${rank ? "learned" : ""} ${equipped ? "equipped" : ""} ${selected ? "selected" : ""}`}
+                          className={`skill-tree-node ${skill.kind === "active" ? "has-skill-description" : ""} ${locked ? "locked" : ""} ${rank ? "learned" : ""} ${equipped ? "equipped" : ""} ${!locked && rank < 5 && available > 0 ? "can-upgrade" : ""} ${rank >= 5 ? "max-rank" : ""} ${selected ? "selected" : ""}`}
                           aria-pressed={selected}
                           aria-label={`${skill.name}，${state}，技能等級 ${rank}／5`}
                           onClick={() => {
@@ -413,7 +415,7 @@ function renderSkillDetails(
               <button type="button" className="btn btn-ghost" key={index}
                 disabled={busy || name === skill.name || equipped}
                 onClick={() => onEquip(index, skill.name)}>
-                {name === skill.name ? `槽${index + 1} 已配置` : name ? `替換槽${index + 1}` : `配置到槽${index + 1}`}
+                {name === skill.name ? `槽${index + 1} 已配置` : name ? `槽${index + 1}：替換 ${name}` : `配置到槽${index + 1}`}
               </button>
             ))}
           </div>
