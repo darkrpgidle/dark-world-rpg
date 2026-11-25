@@ -8020,6 +8020,9 @@ function Game({
                         <BloodRoarBuffVfx active={bloodRoarVisualActive} />
                         <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-character-backdrop" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt="" aria-hidden="true" />
                         <NextImage unoptimized width={1024} height={1536} loading="eager" className="battle-character" src={characterFullbodyPath(playerClass, rebirthCount, Boolean(skillEffect))} alt={playerClass} />
+                        {playerClass === "戰士" && skillBannerEffect && skillBannerEffect.name === "裂地斬" && (
+                          <span key={skillBannerEffect.key} className="warrior-ground-cast-cue" aria-hidden="true" />
+                        )}
                         {selectedTitle !== "none" && (
                           <span
                             className="equipped-title"
