@@ -8738,12 +8738,13 @@ function Game({
                           <span>{mapId === map.id ? "遠征進度" : "最佳進度"}</span>
                           <b>{reachedFloors}<small> / {MAP_FLOORS}</small></b>
                         </div>
-                        <div className="map-floor-track" role="img" aria-label={`${map.name}進度 ${reachedFloors}／${MAP_FLOORS} 層；精英在 5、15、25 層，守關者在 10、20 層，首領在 30 層`}>
-                          {Array.from({ length: MAP_FLOORS }, (_, index) => {
-                            const floor = index + 1;
-                            const kind = floor === 30 ? "boss" : [10, 20].includes(floor) ? "guardian" : [5, 15, 25].includes(floor) ? "elite" : "";
-                            const name = kind === "boss" ? "首領" : kind === "guardian" ? "守關者" : kind === "elite" ? "精英" : "普通層";
-                            return <i key={`${map.id}-${floor}`} className={`${floor <= reachedFloors ? "cleared" : ""} ${kind}`} title={`第 ${floor} 層・${name}`} />;
+                        <div className="map-floor-icons" role="img" aria-label={`${map.name}進度 ${reachedFloors}／${MAP_FLOORS} 層；精英在 5、15、25 層，守關者在 10、20 層，首領在 30 層`}>
+                          <div className="map-floor-icons-line" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, (reachedFloors - 5) / (MAP_FLOORS - 5) * 100))}%` }} /></div>
+                          {[5, 10, 15, 20, 25, 30].map((floor) => {
+                            const kind = floor === 30 ? "boss" : floor === 10 || floor === 20 ? "guardian" : "elite";
+                            const name = kind === "boss" ? "首領" : kind === "guardian" ? "守關者" : "精英";
+                            const Icon = kind === "boss" ? Skull : kind === "guardian" ? Shield : Swords;
+                            return <span key={floor} className={`map-floor-milestone ${kind} ${floor <= reachedFloors ? "cleared" : ""}`} title={`第 ${floor} 層・${name}`} aria-hidden="true"><span className="map-floor-symbol"><Icon /></span><small>{floor}</small></span>;
                           })}
                         </div>
                         <div className="map-milestone-legend">
