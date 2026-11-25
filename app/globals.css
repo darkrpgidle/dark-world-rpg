@@ -6723,3 +6723,31 @@ body {
 .boss-fight{min-height:46px}
 @media(max-width:800px){.boss-layout{grid-template-columns:1fr}.boss-list{max-height:240px}.boss-detail{padding:10px}.boss-visual{min-height:370px}.boss-image{height:280px;max-height:none}.boss-info{grid-template-columns:1fr 1fr}.boss-info>div:first-child{grid-column:1/-1;border-right:0;border-bottom:1px solid #363b33}}
 @media(max-width:420px){.boss-list-region small{font-size:10px}.boss-visual{min-height:330px}.boss-image{height:240px}.boss-info>div{padding:9px 10px}}
+
+/* Rebirth confirmation: clear consequences, rewards and compact talents. */
+.rebirth-dialog{gap:14px!important;padding:22px!important;border-color:#725c3e!important;border-radius:6px!important;background:radial-gradient(ellipse at 80% 0,#60452a42,transparent 42%),linear-gradient(145deg,#1b1f1d,#0e1211 78%)!important;box-shadow:0 30px 90px #000d,inset 0 1px #e7c99727!important}
+.rebirth-heading{gap:4px!important;padding-right:28px;text-align:left!important}
+.rebirth-kicker{color:#d0aa6b;font-size:10px;font-weight:700;letter-spacing:.13em}
+.rebirth-heading [data-slot="dialog-title"]{color:#f2e8d5;font-size:22px;line-height:1.35}
+.rebirth-heading [data-slot="dialog-description"]{color:#aab1a8;font-size:12px;line-height:1.5}
+.rebirth-impact{display:grid;gap:1px;overflow:hidden;border:1px solid #60473c;border-radius:4px;background:#513b32}
+.rebirth-impact>div{display:grid;grid-template-columns:42px minmax(0,1fr);gap:9px;padding:9px 11px;background:#211a18}
+.rebirth-impact>div+div{background:#171c18}
+.rebirth-impact span{color:#dc9e83;font-size:12px;font-weight:700}.rebirth-impact>div+div span{color:#b5c999}
+.rebirth-impact p{margin:0;color:#d1c9bc;font-size:12px;line-height:1.55}
+.rebirth-section-title,.rebirth-talent-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#ece3d1;font-size:14px;font-weight:700}
+.rebirth-section-title small,.rebirth-talent-actions small{color:#a9aaa0;font-size:11px;font-weight:400}.rebirth-talent-actions strong{color:#f0c875;font-size:15px}
+.rebirth-summary{display:flex;flex-wrap:wrap;gap:7px 16px;margin:9px 0 0;color:#babfb5;font-size:12px;line-height:1.5}
+.rebirth-summary span{white-space:nowrap}.rebirth-summary strong{color:#e9c67e}
+.rebirth-talents{padding-top:13px;border-top:1px solid #65543a66}
+.rebirth-talent-actions .text-btn{font-size:11px}.rebirth-talent-actions .text-btn:disabled{opacity:.5}
+.rebirth-talent-grid{gap:7px;margin:10px 0 0}
+.rebirth-dialog .talent-card{gap:6px;min-width:0;padding:10px 11px;border-color:#41453a;border-radius:4px;background:linear-gradient(135deg,#1b211d,#101413);box-shadow:inset 0 1px #ffffff0a}
+.rebirth-dialog .talent-card:disabled{opacity:1;cursor:default}.rebirth-dialog .talent-card:disabled .talent-card-description{color:#9fa99f}
+.rebirth-dialog .talent-card:focus-visible{outline:2px solid #e7bd6f;outline-offset:2px}
+.talent-card-heading{display:flex;align-items:center;justify-content:space-between;gap:6px}.talent-card-heading strong{color:#e7e2d5;font-size:13px}.talent-card-heading b{color:#e8c579;font-size:12px;white-space:nowrap}.talent-card-heading b small{color:#959c90;font-size:11px}
+.rebirth-dialog .talent-card-description{color:#a9b0a7;font-size:11px;line-height:1.4}
+.talent-card-track{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}.talent-card-track i{height:3px;border-radius:3px;background:#38403a}.talent-card-track i.filled{background:#d1a75f}
+.rebirth-dialog .dialog-actions{margin:0;padding-top:2px}.rebirth-dialog .dialog-actions .btn{min-height:40px}
+@media(max-width:600px){.rebirth-dialog{gap:12px!important;padding:16px!important}.rebirth-heading [data-slot="dialog-title"]{font-size:20px}.rebirth-impact>div{padding:8px 9px}.rebirth-talent-grid{gap:6px}.rebirth-dialog .talent-card{padding:9px 8px}.rebirth-dialog .dialog-actions .btn{flex:1}}
+@media(max-width:360px){.rebirth-talent-grid{grid-template-columns:1fr}.rebirth-dialog .dialog-actions{flex-wrap:wrap}}
