@@ -7309,38 +7309,50 @@ function Game({
       {sessionSuperseded && <div className="sync-lock-overlay" aria-hidden="true" />}
       <Dialog open={rebirthOpen} onOpenChange={setRebirthOpen}>
         <DialogContent className="mail-dialog rebirth-dialog">
-          <DialogHeader>
-            <DialogTitle>開始第 {rebirthCount + 1} 次輪迴</DialogTitle>
-            <DialogDescription>
-              輪迴後會清空等級、地圖、技能、掛機進度、祝福、背包全部裝備與所有信件；金幣、元寶、強化石與洗鍊石會保留。
-            </DialogDescription>
+          <DialogHeader className="rebirth-heading">
+            <span className="rebirth-kicker">輪迴之力 · 第 {rebirthCount + 1} 轉</span>
+            <DialogTitle>踏上新的輪迴</DialogTitle>
+            <DialogDescription>確認輪迴前，請留意以下重置內容。</DialogDescription>
           </DialogHeader>
-          <div className="rebirth-summary">
-            <div>三圍屬性 +<strong>{REBIRTH_REWARD_PER_TURN.coreStats}%</strong>・經驗值 +<strong>{REBIRTH_REWARD_PER_TURN.experience}%</strong>・金幣 +<strong>{REBIRTH_REWARD_PER_TURN.gold}%</strong></div>
-            <div>資源掉落率 +<strong>{REBIRTH_REWARD_PER_TURN.resourceDrop}%</strong>・裝備掉落率 +<strong>{REBIRTH_REWARD_PER_TURN.equipmentDrop}%</strong></div>
-            <div>高品質掉落 +<strong>{REBIRTH_REWARD_PER_TURN.highQualityDrop}%</strong>・輪迴天賦 +<strong>{REBIRTH_REWARD_PER_TURN.talentPoints}</strong> 點</div>
+          <div className="rebirth-impact" aria-label="輪迴後的變化">
+            <div><span>重置</span><p>等級、地圖、技能、掛機進度、祝福、背包全部裝備與所有信件</p></div>
+            <div><span>保留</span><p>金幣、元寶、強化石與洗鍊石</p></div>
           </div>
-          <div className="rebirth-talent-actions">
-            <span>可用天賦點：<strong>{rebirthPoints}</strong></span>
-            <button className="text-btn" disabled={rebirthPoints === 0 && Object.values(rebirthTalents).every((points) => points === 0)} onClick={resetRebirthTalents}>
-              重置配點
-            </button>
-          </div>
-          <div className="rebirth-talent-grid">
-            {rebirthTalentDefs.map((talent) => (
-              <button
-                key={talent.id}
-                className="talent-card"
-                disabled={rebirthPoints <= 0 || rebirthTalents[talent.id] >= talent.max}
-                onClick={() => spendRebirthTalent(talent.id)}
-              >
-                <small>{talent.path}</small>
-                <strong>{talent.label}</strong>
-                <span>{talent.description}</span>
-                <b>{rebirthTalents[talent.id]} / {talent.max}</b>
+          <section className="rebirth-rewards" aria-label="每次輪迴加成">
+            <div className="rebirth-section-title"><span>輪迴加成</span><small>每轉獲得</small></div>
+            <div className="rebirth-summary">
+              <span>三圍 <strong>+{REBIRTH_REWARD_PER_TURN.coreStats}%</strong></span>
+              <span>經驗 <strong>+{REBIRTH_REWARD_PER_TURN.experience}%</strong></span>
+              <span>金幣 <strong>+{REBIRTH_REWARD_PER_TURN.gold}%</strong></span>
+              <span>資源掉落 <strong>+{REBIRTH_REWARD_PER_TURN.resourceDrop}%</strong></span>
+              <span>裝備掉落 <strong>+{REBIRTH_REWARD_PER_TURN.equipmentDrop}%</strong></span>
+              <span>高品質掉落 <strong>+{REBIRTH_REWARD_PER_TURN.highQualityDrop}%</strong></span>
+              <span>天賦點 <strong>+{REBIRTH_REWARD_PER_TURN.talentPoints}</strong></span>
+            </div>
+          </section>
+          <section className="rebirth-talents" aria-label="輪迴天賦">
+            <div className="rebirth-talent-actions">
+              <span>輪迴天賦 <small>可用 <strong>{rebirthPoints}</strong> 點</small></span>
+              <button className="text-btn" disabled={rebirthPoints === 0 && Object.values(rebirthTalents).every((points) => points === 0)} onClick={resetRebirthTalents}>
+                重置配點
               </button>
-            ))}
-          </div>
+            </div>
+            <div className="rebirth-talent-grid">
+              {rebirthTalentDefs.map((talent) => (
+                <button
+                  key={talent.id}
+                  className="talent-card"
+                  disabled={rebirthPoints <= 0 || rebirthTalents[talent.id] >= talent.max}
+                  onClick={() => spendRebirthTalent(talent.id)}
+                  aria-label={`${talent.label}，${talent.description}，${rebirthTalents[talent.id]} / ${talent.max}`}
+                >
+                  <span className="talent-card-heading"><strong>{talent.label}</strong><b>{rebirthTalents[talent.id]}<small> / {talent.max}</small></b></span>
+                  <span className="talent-card-description">{talent.description}</span>
+                  <span className="talent-card-track" aria-hidden="true">{Array.from({ length: talent.max }, (_, index) => <i key={index} className={index < rebirthTalents[talent.id] ? "filled" : ""} />)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
           <div className="dialog-actions">
             <button className="btn" onClick={() => setRebirthOpen(false)}>稍後再說</button>
             <button className="btn btn-primary" onClick={() => { setRebirthOpen(false); rebirth(); }}>
